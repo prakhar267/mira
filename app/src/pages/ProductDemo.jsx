@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, Logo } from "../components/Brand.jsx";
-import { bootstrapSession, clearApiSession, hasApiSession, incrementMessageUsage, loadCloudState, loadUsage, logoutSession, mergeCloudMessages, requestCloudExport, saveDemoResource, sendChatMessage, zonedWallTimeToIso } from "../lib/api.js";
+import { bootstrapSession, clearApiSession, consentValueAfterWrite, hasApiSession, incrementMessageUsage, loadCloudState, loadUsage, logoutSession, mergeCloudMessages, requestCloudExport, saveDemoResource, sendChatMessage, zonedWallTimeToIso } from "../lib/api.js";
 
 const starterMessages = [
   { id: 1, role: "assistant", content: "Good evening, Mira. How are you arriving today?", time: "7:42 PM" },
@@ -928,14 +928,12 @@ function ProductShell({ initialProfile, onSignOut }) {
     if (!checked) applyConsent(false);
     try {
       const result = await saveDemoResource("/consents", { [apiName]: checked }, "PATCH", { localOnly: !cloudExpected });
+      const confirmed = consentValueAfterWrite({ result, requested: checked, previous, apiName });
       if (cloudWriteFailed(result, cloudExpected)) {
-        if (!checked) applyConsent(previous);
+        applyConsent(confirmed);
         setToast(cloudFailureNotice(result, subject));
         return false;
       }
-      const confirmed = result.mode === "live" && result.data?.[apiName]
-        ? Boolean(result.data[apiName].granted)
-        : checked;
       applyConsent(confirmed);
       setToast(syncNotice(result, confirmed ? enabledMessage : disabledMessage));
       return true;

@@ -6,6 +6,7 @@ import {
   bootstrapSession,
   classifySafetyText,
   clearApiSession,
+  consentValueAfterWrite,
   incrementMessageUsage,
   loadCloudState,
   loadUsage,
@@ -66,6 +67,13 @@ test("planner wall time is converted using the account timezone", () => {
   assert.equal(zonedWallTimeToIso("2026-08-20", "18:00", "Asia/Kolkata"), "2026-08-20T12:30:00.000Z");
   assert.equal(zonedWallTimeToIso("2026-08-20", "18:00", "UTC"), "2026-08-20T18:00:00.000Z");
   assert.equal(zonedWallTimeToIso("not-a-date", "18:00", "Asia/Kolkata"), null);
+});
+
+test("ambiguous consent writes keep processing fail-closed", () => {
+  assert.equal(consentValueAfterWrite({ result: { mode: "uncertain" }, requested: false, previous: true, apiName: "aiProcessing" }), false);
+  assert.equal(consentValueAfterWrite({ result: { mode: "uncertain" }, requested: true, previous: false, apiName: "memory" }), false);
+  assert.equal(consentValueAfterWrite({ result: { mode: "rejected" }, requested: false, previous: true, apiName: "aiProcessing" }), true);
+  assert.equal(consentValueAfterWrite({ result: { mode: "live", data: { memory: { granted: false } } }, requested: true, previous: true, apiName: "memory" }), false);
 });
 
 test("offline safety classification separates self-harm from violence or abuse threats", () => {

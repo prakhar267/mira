@@ -552,3 +552,16 @@ export async function saveDemoResource(path, payload, method = "POST", { localOn
     return { mode: status >= 400 && status < 500 ? "rejected" : "uncertain", error };
   }
 }
+
+export function consentValueAfterWrite({ result, requested, previous, apiName }) {
+  if (result?.mode === "live") {
+    const record = result.data?.[apiName];
+    return typeof record?.granted === "boolean" ? record.granted : Boolean(requested);
+  }
+  if (result?.mode === "local") return Boolean(requested);
+  if (result?.mode === "rejected") return Boolean(previous);
+  // A network or 5xx result is ambiguous: the withdrawal may already have
+  // committed. Keep dependent processing off until an authoritative refresh.
+  if (result?.mode === "uncertain") return requested ? Boolean(previous) : false;
+  return Boolean(previous);
+}
