@@ -33,8 +33,8 @@ Verified journeys and controls:
 - Semantic landmarks, headings, labels, button names, live status regions, dialogs, focus-visible styles, reduced-motion rules, and forced-colour fallbacks were inspected.
 - Onboarding step changes move focus to the new heading.
 - Dialog focus is contained initially, Escape closes it, and focus returns to the trigger.
-- The most recent recorded Browser QA produced no new console errors from its then-current bundle. Because later release-hardening changes altered the bundle, a clean-browser pass against the final deployed version is still required in the release record.
-- The deployed checkpoint passes the production build, 4 Sites packaging tests, and 62 API/client/safety/tenancy/coordinator tests (66 total), plus a zero-vulnerability dependency audit and the exact Wrangler dry-run. Because coordinator/legal hardening changed the bundle after the captured visual pass, clean-browser verification against the exact final deployed bundle still belongs in the release record.
+- The final deployed Worker version `faadc4a6-53ef-4b13-a4d0-5de6d77760b8` was verified in a clean in-app Browser session against assets `index-BJ0CS4Qp.js` and `index-SOVCog_Q.css`. The landing page, onboarding, deterministic cloud chat, consent withdrawal, Memory, Goals, Planner, export, and account-deletion return path were exercised without a new console error; the QA account was deleted afterward.
+- The deployed checkpoint passes the production build, 4 Sites packaging tests, and 63 API/client/safety/tenancy/coordinator tests (67 total), plus a zero-vulnerability dependency audit, the exact Wrangler dry-run, and a live bootstrap → chat → export → delete canary.
 
 ## Iterations completed
 
@@ -49,4 +49,4 @@ Verified journeys and controls:
 
 ## Final result
 
-**Passed for the responsive synthetic-beta frontend scope; NO-GO for private/intimate data, paid service, or enterprise production.** The live data boundary is a SQLite-backed per-account Durable Object with whole-document compare-and-swap and irreversible 30-day alarm expiry. Separate token-hash and hashed rate-key objects coordinate bootstrap/deletion and short fixed-window counts; KV holds only opaque routing pointers. That is a beta mitigation, not a production semantic architecture. Verified identity, a reviewed real-data/export/retention architecture, approved model and notification providers if enabled, billing, legal/safety approval, monitoring/on-call, restore/deletion evidence, and final deployed-browser regression testing remain release blockers.
+**Passed for the responsive synthetic-beta frontend scope; NO-GO for private/intimate data, paid service, or enterprise production.** The live data boundary is a SQLite-backed per-account Durable Object with whole-document compare-and-swap and irreversible 30-day alarm expiry. Separate token-hash and hashed rate-key objects coordinate bootstrap/deletion and short fixed-window counts; KV holds only opaque routing pointers. That is a beta mitigation, not a production semantic architecture. Verified identity, a reviewed real-data/export/retention architecture, approved model and notification providers if enabled, billing, legal/safety approval, edge abuse protection, monitoring/on-call, and restore/deletion evidence remain release blockers.
