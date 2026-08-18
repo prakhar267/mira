@@ -1,0 +1,62 @@
+# Dependencies and build artifacts
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Runtime secrets (keep the checked-in example)
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Cloudflare local state
+.wrangler/
+.mf/
+
+# Logs, reports, and test artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+playwright-report/
+test-results/
+.nyc_output/
+
+# User-data exports and database material
+exports/
+backups/
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+
+# Local tools and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Infrastructure state must use a remote encrypted backend
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Superseded browser captures (retain the final QA evidence)
+app/design-implementation-full.png
+app/design-implementation-desktop.png

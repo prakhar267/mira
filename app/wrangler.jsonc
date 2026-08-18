@@ -1,0 +1,70 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "saathkind",
+  "main": "cloudflare/index.ts",
+  "compatibility_date": "2026-08-17",
+  "workers_dev": true,
+  "preview_urls": true,
+  "minify": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "API_VERSION": "1.0.0",
+    "DEFAULT_TENANT_ID": "saathkind",
+    "ALLOW_DEMO_AUTH": "true",
+    "REQUIRE_D1": "false",
+    "ENABLE_GEMINI": "false",
+    "GEMINI_MODEL": "gemini-2.5-flash",
+    "CORS_ORIGINS": "https://saathkind.pages.dev,http://localhost:5173"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "STATE",
+      "id": "3c23d0dfb05d4d77a6551b990437b6c3"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "USER_STATE",
+        "class_name": "UserStateCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["UserStateCoordinator"]
+    }
+  ],
+  "triggers": {
+    "crons": []
+  },
+  // Inactive exploratory adapter only. D1 is not the current authority and
+  // this commented block is not an instruction to enable it. A real-data
+  // store requires a new reviewed architecture and cutover decision.
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "saathkind-production",
+  //     "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+  //     "migrations_dir": "migrations"
+  //   }
+  // ],
+
+  // Inactive exploratory adapter only. Current export is synchronous JSON and
+  // writes no R2 object. Do not uncomment without a separately approved
+  // private-export architecture, lifecycle, and release plan.
+  // "r2_buckets": [
+  //   { "binding": "EXPORTS", "bucket_name": "saathkind-private-exports" }
+  // ]
+}
