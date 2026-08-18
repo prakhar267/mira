@@ -1,7 +1,7 @@
 # Operations and incident runbooks
 
 Last reviewed: 18 August 2026  
-Current deployment: synthetic/non-sensitive beta only at `saathkind.prakhargupta267.workers.dev`
+Current visitor deployment: synthetic/non-sensitive beta only at `saathkind.pages.dev` (`saathkind.prakhargupta267.workers.dev` remains the bound Worker/backend origin)
 
 ## 1. Current operating boundary
 

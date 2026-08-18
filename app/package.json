@@ -8,10 +8,11 @@
     "dev:worker": "npm run build && npx --yes wrangler@4.123.0 dev --config wrangler.jsonc",
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
-    "test:sites": "node --test tests/sites-worker.test.mjs",
+    "test:sites": "node --test tests/*.test.mjs",
     "test:api": "node --test test-api/*.test.mjs",
     "test": "npm run test:sites && npm run test:api",
-    "deploy": "npm run build && npm test && npx --yes wrangler@4.123.0 deploy --config wrangler.jsonc"
+    "deploy": "npm run build && npm test && npx --yes wrangler@4.123.0 deploy --config wrangler.jsonc",
+    "deploy:pages": "npm run build && node scripts/prepare-pages-build.mjs && npm test && npx --yes wrangler@4.123.0 pages deploy --cwd pages ../dist/client --project-name saathkind --branch main"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.0.4",

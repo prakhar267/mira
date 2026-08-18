@@ -34,7 +34,7 @@ Verified journeys and controls:
 - Onboarding step changes move focus to the new heading.
 - Dialog focus is contained initially, Escape closes it, and focus returns to the trigger.
 - Worker version `faadc4a6-53ef-4b13-a4d0-5de6d77760b8` was verified in a clean in-app Browser session against the same rendered CSS and application flows as the final release. The landing page, onboarding, deterministic cloud chat, consent withdrawal, Memory, Goals, Planner, export, and account-deletion return path were exercised without a new console error; the QA account was deleted afterward. The final consent-failure hardening changed only the JavaScript bundle and was covered by a focused regression test plus the production lifecycle canary on Worker version `b119b186-f8ae-4a32-b6e9-4ded6d711946` and assets `index-BCDAsU4_.js` / `index-SOVCog_Q.css`.
-- The deployed checkpoint passes the production build, 4 Sites packaging tests, and 64 API/client/safety/tenancy/coordinator tests (68 total), plus a zero-vulnerability dependency audit, the exact Wrangler dry-run, and a live bootstrap → chat → export → delete canary.
+- The deployed checkpoint passes the production build, 8 Sites/Pages packaging tests, and 64 API/client/safety/tenancy/coordinator tests (72 total), plus a zero-vulnerability dependency audit, the exact Wrangler dry-run, and live bootstrap → chat → export → delete canaries through both the Worker and `saathkind.pages.dev` service-binding path.
 
 ## Iterations completed
 

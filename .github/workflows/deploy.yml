@@ -1,4 +1,4 @@
-name: Deploy integrated Worker
+name: Deploy Cloudflare production
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to Cloudflare Workers
+    name: Deploy Worker backend and Pages entry point
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -20,7 +20,7 @@ jobs:
       name: production
     env:
       CF_WORKER_NAME: saathkind
-      EXPECTED_APP_ORIGIN: https://saathkind.prakhargupta267.workers.dev
+      EXPECTED_APP_ORIGIN: https://saathkind.pages.dev
       APP_ORIGIN: ${{ vars.APP_ORIGIN }}
 
     steps:
@@ -52,7 +52,7 @@ jobs:
             *) echo "::error::APP_ORIGIN must be an https:// origin."; exit 1 ;;
           esac
           if [[ "${APP_ORIGIN%/}" != "${EXPECTED_APP_ORIGIN}" ]]; then
-            echo "::error::APP_ORIGIN must be the reviewed Saathkind Worker origin: ${EXPECTED_APP_ORIGIN}"
+            echo "::error::APP_ORIGIN must be the reviewed Saathkind Pages origin: ${EXPECTED_APP_ORIGIN}"
             exit 1
           fi
 
@@ -87,6 +87,21 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@4.123.0 deploy --config wrangler.jsonc
+
+      - name: Deploy the Pages entry point with its backend service binding
+        working-directory: app
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node scripts/prepare-pages-build.mjs
+          npx --yes wrangler@4.123.0 pages deploy \
+            --cwd pages ../dist/client \
+            --project-name saathkind \
+            --branch main \
+            --commit-hash "${GITHUB_SHA}" \
+            --commit-dirty=false
 
       - name: Smoke-test configured origin
         shell: bash
