@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const serverSchema = z.object({
   APP_ENV: z.enum(["development", "test", "production"]).default("development"),
-  APP_ORIGIN: z.url().default("http://localhost:3000"),
+  APP_ORIGIN: z.url().default("http://localhost:3001"),
   API_ORIGIN: z.url().default("http://localhost:4000"),
   DATABASE_URL: z.string().min(1).default("postgresql://companion:companion_local_only@localhost:5432/companion"),
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),

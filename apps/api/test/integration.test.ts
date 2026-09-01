@@ -79,6 +79,11 @@ describe("production-mode API journey", () => {
 
     const messages = await app.inject({ method: "GET", url: `/conversations/${conversationId}/messages`, headers: { authorization: `Bearer ${accessToken}` } });
     expect(messages.json().data).toHaveLength(2);
+    const assistant = messages.json().data.find((message: { role: string }) => message.role === "assistant");
+    const regenerated = await app.inject({ method: "POST", url: `/conversations/${conversationId}/messages/${assistant.id}/regenerate`, headers: { authorization: `Bearer ${accessToken}` }, payload: { memoryEnabled: false } });
+    expect(regenerated.statusCode).toBe(200);
+    expect(regenerated.json().data.id).toBe(assistant.id);
+    expect(regenerated.json().data.content.length).toBeGreaterThan(10);
   });
 
   it("creates working realtime voice, video, camera, and media sessions", async () => {
@@ -97,6 +102,15 @@ describe("production-mode API journey", () => {
     const upload = await app.inject({ method: "POST", url: "/media/upload", headers: { authorization: `Bearer ${accessToken}` }, payload: { name: "photo.png", contentType: "image/png", dataBase64: "iVBORw0KGgo=" } });
     expect(upload.statusCode).toBe(201);
     expect(upload.json().data.bytes).toBeGreaterThan(0);
+  });
+
+  it("deletes a conversation without deleting the account", async () => {
+    const deleted = await app.inject({ method: "DELETE", url: `/conversations/${conversationId}`, headers: { authorization: `Bearer ${accessToken}` } });
+    expect(deleted.statusCode).toBe(204);
+    const remaining = await app.inject({ method: "GET", url: "/conversations", headers: { authorization: `Bearer ${accessToken}` } });
+    expect(remaining.json().data.some((conversation: { id: string }) => conversation.id === conversationId)).toBe(false);
+    const user = await app.inject({ method: "GET", url: "/users/me", headers: { authorization: `Bearer ${accessToken}` } });
+    expect(user.statusCode).toBe(200);
   });
 
   it("rotates refresh tokens once", async () => {

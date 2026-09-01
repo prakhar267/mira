@@ -21,6 +21,12 @@ describe("Companion API", () => {
     expect(JSON.stringify(response.json())).not.toContain("SESSION_SECRET");
   });
 
+  it("rejects underage signup even when the confirmation field is forged", async () => {
+    const response = await app.inject({ method: "POST", url: "/auth/signup", payload: { email: "minor@example.com", password: "correct-horse-battery-staple", name: "Minor", birthday: "2020-01-01", pronouns: "they/them", adultConfirmed: true, goals: ["chat"], interests: ["music"], companionName: "Luma", companionPronouns: "she/her", relationshipMode: "friend" } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("invalid_onboarding");
+  });
+
   it("rejects an invalid chat request", async () => {
     const response = await app.inject({ method: "POST", url: "/chat/stream", payload: { content: "hello" } });
     expect(response.statusCode).toBe(400);
@@ -28,9 +34,8 @@ describe("Companion API", () => {
   });
 
   it("keeps activity rewards idempotent", async () => {
-    const payload = { idempotencyKey: "activity-test-0001" };
-    const first = await app.inject({ method: "POST", url: "/activities/activity-reflection/complete", payload });
-    const second = await app.inject({ method: "POST", url: "/activities/activity-reflection/complete", payload });
+    const first = await app.inject({ method: "POST", url: "/activities/activity-reflection/complete", payload: { idempotencyKey: "activity-test-0001" } });
+    const second = await app.inject({ method: "POST", url: "/activities/activity-reflection/complete", payload: { idempotencyKey: "activity-test-0002" } });
     expect(first.statusCode).toBe(200);
     expect(second.json().data).toEqual(first.json().data);
   });

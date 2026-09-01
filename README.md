@@ -8,11 +8,11 @@ Luma is the product direction for this repository. It is a production-oriented, 
 
 With the development server running, open:
 
-- [Luma populated demo](http://127.0.0.1:3000/demo)
-- [Luma app](http://127.0.0.1:3000/app?preview=home)
-- [Public landing page](http://127.0.0.1:3000/)
-- [Ten-step signup](http://127.0.0.1:3000/signup)
-- [Operations console](http://127.0.0.1:3000/admin) — local key: `local-admin-key-change-me`
+- [Luma populated demo](http://127.0.0.1:3001/demo)
+- [Luma app](http://127.0.0.1:3001/app?preview=home)
+- [Public landing page](http://127.0.0.1:3001/)
+- [Ten-step signup](http://127.0.0.1:3001/signup)
+- [Operations console](http://127.0.0.1:3001/admin) — local key: `local-admin-key-change-me`
 
 The deterministic demo needs no external credentials. Setting `NEXT_PUBLIC_API_MODE=live` connects the same web experience to the authenticated API, persistent data, media storage, and provider-backed AI/voice paths.
 
@@ -55,7 +55,7 @@ pnpm dev:api
 pnpm --filter @companion/worker dev
 ```
 
-The default web origin is `http://127.0.0.1:3000`; the API defaults to `http://127.0.0.1:4000`.
+The default web origin is `http://127.0.0.1:3001`; the API defaults to `http://127.0.0.1:4000`.
 
 ## Validate
 
@@ -105,5 +105,6 @@ app/                Legacy Saathkind implementation retained for rollback only
 - [Analytics](docs/ANALYTICS.md)
 - [Design QA](design-qa.md)
 - [Companion-depth before/after audit](audit/luma-companion-depth-2026-09-01/AUDIT.md)
+- [Human acceptance audit](docs/HUMAN_ACCEPTANCE_AUDIT_2026-09-01.md)
 
 The remaining lowercase historical documents describe the retained Saathkind beta and are not the target Luma architecture.

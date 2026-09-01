@@ -86,6 +86,12 @@ export class PrismaCompanionRepository implements CompanionRepository {
     };
   }
 
+  async updateUser(userId: string, user: UserProfile) {
+    if (user.id !== userId) throw new Error("Cross-user profile write rejected");
+    const updated = await this.prisma.user.updateMany({ where: { id: userId, deletedAt: null }, data: { displayName: user.name, pronouns: user.pronouns, timezone: user.timezone } });
+    if (!updated.count) throw new Error("User not found");
+  }
+
   async listCompanions(userId: string): Promise<CompanionProfile[]> {
     const rows = await this.prisma.companion.findMany({ where: { userId, archivedAt: null }, select: { id: true }, orderBy: { createdAt: "asc" } });
     const companions = await Promise.all(rows.map((row) => this.getCompanion(userId, row.id)));
@@ -128,6 +134,12 @@ export class PrismaCompanionRepository implements CompanionRepository {
   async createConversation(input: { id: string; userId: string; companionId: string; createdAt: string }) {
     await this.prisma.conversation.create({ data: { id: input.id, userId: input.userId, companionId: input.companionId, startedAt: new Date(input.createdAt) } });
   }
+  async deleteConversation(userId: string, conversationId: string) {
+    const archivedAt = new Date();
+    const result = await this.prisma.conversation.updateMany({ where: { id: conversationId, userId, archivedAt: null }, data: { archivedAt } });
+    if (result.count) await this.prisma.message.updateMany({ where: { conversationId, userId, deletedAt: null }, data: { deletedAt: archivedAt } });
+    return result.count > 0;
+  }
 
   async listMessages(userId: string, conversationId: string): Promise<ChatMessage[]> {
     const rows = await this.prisma.message.findMany({ where: { userId, conversationId, deletedAt: null }, include: { feedback: true }, orderBy: { createdAt: "asc" } });
@@ -138,11 +150,13 @@ export class PrismaCompanionRepository implements CompanionRepository {
     const conversation = await this.prisma.conversation.findFirst({ where: { id: conversationId, userId } });
     if (!conversation) throw new Error("Conversation not found");
     await this.prisma.message.createMany({ data: messages.map((message) => ({ id: message.id, userId, conversationId, role: messageRole(message.role), content: message.content, ...(message.replyToId ? { replyToId: message.replyToId } : {}), createdAt: new Date(message.createdAt) })), skipDuplicates: true });
+    await this.prisma.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
   }
 
   async updateMessage(userId: string, conversationId: string, message: ChatMessage) {
     const updated = await this.prisma.message.updateMany({ where: { id: message.id, userId, conversationId }, data: { content: message.content, editedAt: new Date() } });
     if (!updated.count) throw new Error("Message not found");
+    await this.prisma.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
     if (message.feedback) await this.prisma.messageFeedback.upsert({ where: { messageId: message.id }, update: { rating: message.feedback === "up" ? 1 : -1 }, create: { messageId: message.id, rating: message.feedback === "up" ? 1 : -1, tags: [] } });
   }
 
@@ -225,23 +239,29 @@ export class PrismaCompanionRepository implements CompanionRepository {
     return rows.map((row) => ({ id: row.id, userId, type: row.type.toLowerCase() as WalletTransactionRecord["type"], currency: row.currency as WalletTransactionRecord["currency"], amount: row.amount, balanceAfter: row.balanceAfter, referenceId: row.referenceId, idempotencyKey: row.idempotencyKey, createdAt: row.createdAt.toISOString() }));
   }
 
-  async completeActivity(userId: string, activityId: string, idempotencyKey: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const activity = await tx.activity.findFirst({ where: { OR: [{ id: activityId }, { slug: activityId }], active: true } });
-      if (!activity) throw new Error("Activity not found");
-      const wallet = await tx.wallet.upsert({ where: { userId }, update: {}, create: { userId } });
-      const coinKey = `${idempotencyKey}:coins`;
-      if (await tx.walletTransaction.findUnique({ where: { idempotencyKey: coinKey } })) return { xp: wallet.xp, level: wallet.level, coins: wallet.coins, gems: wallet.gems };
-      const xp = wallet.xp + activity.xpReward;
-      const coins = wallet.coins + activity.coinReward;
-      const level = Math.max(wallet.level, Math.floor(xp / 100) + 1);
-      const next = await tx.wallet.update({ where: { id: wallet.id }, data: { xp, coins, level, version: { increment: 1 } } });
-      await tx.walletTransaction.createMany({ data: [
-        { walletId: wallet.id, type: "EARN", currency: "xp", amount: activity.xpReward, balanceAfter: xp, idempotencyKey: `${idempotencyKey}:xp`, referenceType: "activity", referenceId: activity.id, metadata: {} },
-        { walletId: wallet.id, type: "EARN", currency: "coins", amount: activity.coinReward, balanceAfter: coins, idempotencyKey: coinKey, referenceType: "activity", referenceId: activity.id, metadata: {} },
-      ] });
-      return { xp: next.xp, level: next.level, coins: next.coins, gems: next.gems };
-    });
+  async completeActivity(userId: string, activityId: string, _idempotencyKey: string) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const activity = await tx.activity.findFirst({ where: { OR: [{ id: activityId }, { slug: activityId }], active: true } });
+        if (!activity) throw new Error("Activity not found");
+        const wallet = await tx.wallet.upsert({ where: { userId }, update: {}, create: { userId } });
+        const completionKey = `activity:${userId}:${activity.slug}`;
+        const coinKey = `${completionKey}:coins`;
+        if (await tx.walletTransaction.findUnique({ where: { idempotencyKey: coinKey } })) return { xp: wallet.xp, level: wallet.level, coins: wallet.coins, gems: wallet.gems };
+        const xp = wallet.xp + activity.xpReward;
+        const coins = wallet.coins + activity.coinReward;
+        const level = Math.max(wallet.level, Math.floor(xp / 100) + 1);
+        const next = await tx.wallet.update({ where: { id: wallet.id }, data: { xp, coins, level, version: { increment: 1 } } });
+        await tx.walletTransaction.createMany({ data: [
+          { walletId: wallet.id, type: "EARN", currency: "xp", amount: activity.xpReward, balanceAfter: xp, idempotencyKey: `${completionKey}:xp`, referenceType: "activity", referenceId: activity.slug, metadata: {} },
+          { walletId: wallet.id, type: "EARN", currency: "coins", amount: activity.coinReward, balanceAfter: coins, idempotencyKey: coinKey, referenceType: "activity", referenceId: activity.slug, metadata: {} },
+        ] });
+        return { xp: next.xp, level: next.level, coins: next.coins, gems: next.gems };
+      });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") return this.getWallet(userId);
+      throw error;
+    }
   }
 
   async listStoreItems(): Promise<StoreItemRecord[]> {

@@ -3,9 +3,19 @@ import { z } from "zod";
 export const pronounsSchema = z.enum(["she/her", "he/him", "they/them"]);
 export const relationshipModeSchema = z.enum(["friend", "mentor", "sibling", "romantic", "organic"]);
 
+function isAdultBirthday(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return false;
+  const today = new Date();
+  let age = today.getUTCFullYear() - year;
+  const birthdayPassed = today.getUTCMonth() + 1 > month || (today.getUTCMonth() + 1 === month && today.getUTCDate() >= day);
+  if (!birthdayPassed) age -= 1;
+  return age >= 18;
+}
+
 export const onboardingSchema = z.object({
   name: z.string().trim().min(1).max(80),
-  birthday: z.iso.date(),
+  birthday: z.iso.date().refine(isAdultBirthday, "You must be 18 or older"),
   pronouns: pronounsSchema,
   adultConfirmed: z.literal(true),
   goals: z.array(z.string().min(1)).min(1),
@@ -20,6 +30,7 @@ export const chatRequestSchema = z.object({
   companionId: z.uuid(),
   clientMessageId: z.string().min(8).max(120),
   content: z.string().trim().min(1).max(8_000),
+  memoryEnabled: z.boolean().default(true),
 });
 
 export const memoryUpdateSchema = z.object({

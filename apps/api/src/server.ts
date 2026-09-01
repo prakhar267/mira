@@ -117,12 +117,10 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
   app.addHook("onRequest", async (request, reply) => {
     const route = request.routeOptions.url ?? request.url.split("?")[0] ?? "/unknown";
     const publicRoute = route === "/health" || route === "/ready" || route === "/openapi.json" || route.startsWith("/auth/") || route === "/subscriptions/webhook" || route.startsWith("/admin/");
-    if (!env.AI_MOCK_MODE && !publicRoute) {
-      const authorization = request.headers.authorization;
-      const verified = authorization?.startsWith("Bearer ") ? await auth.verifyAccessToken(authorization.slice(7)) : null;
-      if (!verified) return reply.code(401).send(apiError("authentication_required", "Sign in to continue.", request.id));
-      request.headers["x-user-id"] = verified.userId;
-    }
+    const authorization = request.headers.authorization;
+    const verified = authorization?.startsWith("Bearer ") ? await auth.verifyAccessToken(authorization.slice(7)) : null;
+    if (verified) request.headers["x-user-id"] = verified.userId;
+    else if (!env.AI_MOCK_MODE && !publicRoute) return reply.code(401).send(apiError("authentication_required", "Sign in to continue.", request.id));
 
     const now = Date.now();
     const key = `${actorId(request.headers)}:${route}`;
@@ -253,6 +251,22 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     return { ok: true, data: user, requestId: request.id };
   });
 
+  app.patch("/users/me", async (request, reply) => {
+    const body = z.object({ name: z.string().trim().min(1).max(80).optional(), pronouns: z.enum(["she/her", "he/him", "they/them"]).optional(), timezone: z.string().min(1).max(80).optional() }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send(apiError("invalid_profile", "Check your profile details.", request.id));
+    const userId = actorId(request.headers);
+    const current = await repository.getUser(userId);
+    if (!current) return reply.code(404).send(apiError("user_not_found", "Account not found.", request.id));
+    const updated = {
+      ...current,
+      ...(body.data.name !== undefined ? { name: body.data.name } : {}),
+      ...(body.data.pronouns !== undefined ? { pronouns: body.data.pronouns } : {}),
+      ...(body.data.timezone !== undefined ? { timezone: body.data.timezone } : {}),
+    };
+    await repository.updateUser(userId, updated);
+    return { ok: true, data: updated, requestId: request.id };
+  });
+
   app.get("/companions", async (request, reply) => {
     const userId = actorId(request.headers);
     const companions = await repository.listCompanions(userId);
@@ -326,6 +340,13 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     return reply.code(201).send({ ok: true, data: conversation, requestId: request.id });
   });
 
+  app.delete("/conversations/:conversationId", async (request, reply) => {
+    const params = z.object({ conversationId: z.uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send(apiError("invalid_conversation", "Conversation ID is invalid.", request.id));
+    if (!await repository.deleteConversation(actorId(request.headers), params.data.conversationId)) return reply.code(404).send(apiError("conversation_not_found", "Conversation not found.", request.id));
+    return reply.code(204).send();
+  });
+
   app.get("/conversations/:conversationId/messages", async (request) => {
     const params = z.object({ conversationId: z.uuid() }).parse(request.params);
     const messages = await repository.listMessages(actorId(request.headers), params.conversationId);
@@ -383,7 +404,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
       user,
       companion,
       relationship: { mode: companion.relationshipMode, startedAt: companion.createdAt, interactionCount: existingMessages.length, sharedExperiences: [] },
-      memories: existingMemories,
+      memories: parsed.data.memoryEnabled ? existingMemories : [],
       messages: allMessages,
       timezone: user.timezone,
       now,
@@ -441,7 +462,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     usageRecords.push(successfulUsage);
     await repository.recordProviderUsage(successfulUsage).catch(() => undefined);
 
-    try {
+    if (parsed.data.memoryEnabled) try {
       let nextMemories = existingMemories;
       for (const candidate of extractMemoryCandidates(parsed.data.content)) {
         nextMemories = applyContradictions(nextMemories, candidate, now);
@@ -492,6 +513,62 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     const updated: ChatMessage = { ...message, feedback: body.data.feedback };
     await repository.updateMessage(userId, params.data.conversationId, updated);
     return { ok: true, data: { message: updated, preferenceSignalRecorded: true }, requestId: request.id };
+  });
+
+  app.post("/conversations/:conversationId/messages/:messageId/regenerate", async (request, reply) => {
+    const params = z.object({ conversationId: z.uuid(), messageId: z.string().min(8) }).safeParse(request.params);
+    const body = z.object({ memoryEnabled: z.boolean().default(true) }).safeParse(request.body ?? {});
+    if (!params.success || !body.success) return reply.code(400).send(apiError("invalid_message", "Choose an assistant response to try again.", request.id));
+    const userId = actorId(request.headers);
+    const messages = await repository.listMessages(userId, params.data.conversationId);
+    const targetIndex = messages.findIndex((message) => message.id === params.data.messageId && message.role === "assistant");
+    if (targetIndex < 0) return reply.code(404).send(apiError("message_not_found", "Assistant message not found.", request.id));
+    const target = messages[targetIndex]!;
+    let sourceIndex = target.replyToId
+      ? messages.findIndex((message) => message.id === target.replyToId && message.role === "user")
+      : -1;
+    if (!target.replyToId) {
+      for (let index = targetIndex - 1; index >= 0; index -= 1) {
+        if (messages[index]?.role === "user") {
+          sourceIndex = index;
+          break;
+        }
+      }
+    }
+    const source = messages[sourceIndex];
+    if (!source || source.role !== "user") return reply.code(409).send(apiError("source_message_not_found", "The original message is no longer available.", request.id));
+    const conversation = (await repository.listConversations(userId)).find((candidate) => candidate.id === params.data.conversationId);
+    if (!conversation) return reply.code(404).send(apiError("conversation_not_found", "Conversation not found.", request.id));
+    const [user, companion, memories] = await Promise.all([
+      repository.getUser(userId),
+      repository.getCompanion(userId, conversation.companionId),
+      repository.listMemories(userId, conversation.companionId),
+    ]);
+    if (!user || !companion) return reply.code(404).send(apiError("actor_not_found", "Account or companion not found.", request.id));
+
+    const contextMessages = messages.slice(0, sourceIndex + 1);
+    const context = buildCompanionContext({
+      user,
+      companion,
+      relationship: { mode: companion.relationshipMode, startedAt: companion.createdAt, interactionCount: contextMessages.length, sharedExperiences: [] },
+      memories: body.data.memoryEnabled ? memories : [],
+      messages: contextMessages,
+      timezone: user.timezone,
+      now: new Date(),
+    });
+    let content = "";
+    try {
+      for await (const chunk of provider.stream({ messages: contextMessages, context })) content += chunk.delta;
+      const outputSafety = await moderation.assess(content);
+      if (outputSafety.level !== "safe") content = outputSafety.response ?? "I want to answer that more carefully. Can we take a gentler direction?";
+    } catch (error) {
+      request.log.error({ err: error, provider: provider.id }, "Response regeneration failed");
+      return reply.code(503).send(apiError("provider_failed", "Luma could not try that response again just now.", request.id));
+    }
+    const updated: ChatMessage = { ...target, content, status: "sent" };
+    delete updated.feedback;
+    await repository.updateMessage(userId, params.data.conversationId, updated);
+    return { ok: true, data: updated, requestId: request.id };
   });
 
   app.get("/memories", async (request, reply) => {
@@ -570,8 +647,10 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     try {
       const wallet = await repository.completeActivity(actorId(request.headers), params.data.activityId, body.data.idempotencyKey);
       return { ok: true, data: wallet, requestId: request.id };
-    } catch {
-      return reply.code(404).send(apiError("activity_not_found", "Activity not found.", request.id));
+    } catch (error) {
+      if (error instanceof Error && error.message === "Activity not found") return reply.code(404).send(apiError("activity_not_found", "Activity not found.", request.id));
+      request.log.error({ err: error }, "Activity completion failed");
+      return reply.code(500).send(apiError("activity_completion_failed", "The activity could not be completed just now.", request.id));
     }
   });
 
@@ -753,19 +832,19 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
 
   app.get("/moments", async (request) => ({
     ok: true,
-    data: [
+    data: actorId(request.headers) === seedUser.id ? [
       { id: "moment-first-call", type: "call", title: "Our first call", description: "You were ridiculously nervous for the first thirty seconds.", happenedAt: "2026-07-18T19:30:00.000Z", mediaUrl: "/assets/luma/portrait.png" },
       { id: "moment-rooftop", type: "date", title: "Rooftop at blue hour", description: "Two mugs, one impossible question, and a very good laugh.", happenedAt: "2026-08-14T18:45:00.000Z", mediaUrl: "/assets/luma/rooftop-date.png" },
-    ],
+    ] : [],
     requestId: request.id,
   }));
 
   app.get("/photos", async (request) => ({
     ok: true,
-    data: [
+    data: actorId(request.headers) === seedUser.id ? [
       { id: "photo-window", type: "selfie", caption: "Waiting in the window nook", createdAt: "2026-08-31T17:30:00.000Z", mediaUrl: "/assets/luma/window-nook.png" },
       { id: "photo-cafe", type: "selfie", caption: "Rainy coffee break", createdAt: "2026-08-26T11:40:00.000Z", mediaUrl: "/assets/luma/cafe-selfie.png" },
-    ],
+    ] : [],
     requestId: request.id,
   }));
 
@@ -826,7 +905,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     const bytes = Buffer.from(body.data.dataBase64, "base64");
     const extension = body.data.contentType === "image/png" ? "png" : body.data.contentType === "image/webp" ? "webp" : "jpg";
     const storedUrl = await infrastructure.putMedia({ key: `${actorId(request.headers)}/${assetId}.${extension}`, contentType: body.data.contentType, bytes });
-    return reply.code(201).send({ ok: true, data: { id: assetId, url: storedUrl ?? `/mock-media/${assetId}`, name: body.data.name, contentType: body.data.contentType, bytes: bytes.byteLength, mock: storedUrl === null }, requestId: request.id });
+    return reply.code(201).send({ ok: true, data: { id: assetId, url: storedUrl ?? `data:${body.data.contentType};base64,${body.data.dataBase64}`, name: body.data.name, contentType: body.data.contentType, bytes: bytes.byteLength, mock: storedUrl === null }, requestId: request.id });
   });
 
   app.post("/media/analyze", async (request, reply) => {
@@ -845,7 +924,8 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     const result = await imageProvider.generate(body.data);
     const assetId = randomUUID();
     const storedUrl = await infrastructure.putMedia({ key: `${userId}/generated/${assetId}.png`, contentType: result.contentType, bytes: result.bytes });
-    return { ok: true, data: { assetUrl: storedUrl ?? "/assets/luma/cafe-selfie.png", artifactBase64: storedUrl ? undefined : Buffer.from(result.bytes).toString("base64"), contentType: result.contentType, provider: imageProvider.id, mock: imageProvider.id === "mock" }, requestId: request.id };
+    const renderableImage = result.contentType.startsWith("image/");
+    return { ok: true, data: { assetUrl: storedUrl ?? "/assets/luma/cafe-selfie.png", artifactBase64: !storedUrl && renderableImage ? Buffer.from(result.bytes).toString("base64") : undefined, contentType: renderableImage ? result.contentType : "image/png", provider: imageProvider.id, mock: imageProvider.id === "mock" }, requestId: request.id };
   });
 
   app.get("/responses/:messageId/explanation", async (request, reply) => {

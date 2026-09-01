@@ -43,6 +43,8 @@ export function ActivitiesView({
   journalEntries,
   futureEvents,
   nudges,
+  companionName,
+  liveMode = false,
   onComplete,
   onAddJournal,
   onDeleteJournal,
@@ -55,6 +57,8 @@ export function ActivitiesView({
   journalEntries: JournalEntryRecord[];
   futureEvents: FutureEventRecord[];
   nudges: ScheduledNudgeRecord[];
+  companionName: string;
+  liveMode?: boolean;
   onComplete: (activity: ActivityDefinition) => void;
   onAddJournal: (entry: {
     title: string;
@@ -147,7 +151,7 @@ export function ActivitiesView({
               <span className="eyebrow">Suggested for tonight</span>
               <h2>Put the week down for six minutes.</h2>
               <p>
-                A guided reflection with Luma: one thing that felt heavy, one
+                A guided reflection with {companionName}: one thing that felt heavy, one
                 thing that surprised you, and one thing you want to carry
                 forward.
               </p>
@@ -156,17 +160,17 @@ export function ActivitiesView({
                 className="button button--primary"
                 onClick={() => {
                   const activity = activities.find(
-                    (item) => item.id === "activity-reflection",
+                    (item) => item.id === "reflection" || item.id === "activity-reflection",
                   );
                   if (activity) onComplete(activity);
                 }}
               >
-                <Sparkles aria-hidden="true" /> Begin with Luma
+                <Sparkles aria-hidden="true" /> Begin with {companionName}
               </button>
             </div>
             <img
               src="/assets/luma/portrait.png"
-              alt="Luma, ready to begin a reflection activity"
+              alt={`${companionName}, ready to begin a reflection activity`}
             />
           </div>
           <div className="section-heading">
@@ -232,8 +236,7 @@ export function ActivitiesView({
               <div>
                 <h2>New private entry</h2>
                 <p>
-                  Saved locally in mock mode. Sharing with Luma is always
-                  explicit.
+                  {liveMode ? "Saved to your account." : "Saved locally in mock mode."} Sharing with {companionName} is always explicit.
                 </p>
               </div>
             </div>
@@ -307,7 +310,7 @@ export function ActivitiesView({
                 <footer>
                   <time>{new Date(entry.createdAt).toLocaleDateString()}</time>
                   <button type="button" onClick={() => onReflect(entry)}>
-                    <Sparkles aria-hidden="true" /> Reflect with Luma
+                    <Sparkles aria-hidden="true" /> Reflect with {companionName}
                   </button>
                   <button
                     type="button"
@@ -337,7 +340,7 @@ export function ActivitiesView({
               <div>
                 <h2>Remember a future moment</h2>
                 <p>
-                  Luma can check in later, within your quiet hours and
+                  {companionName} can check in later, within your quiet hours and
                   notification choices.
                 </p>
               </div>

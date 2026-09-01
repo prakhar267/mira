@@ -81,6 +81,7 @@ export function VoiceCallModal({
   const [companionLine, setCompanionLine] = useState(greeting);
   const [speechError, setSpeechError] = useState("");
   const [transport, setTransport] = useState<"connecting" | "realtime" | "fallback">(onRealtimeConnect ? "connecting" : "fallback");
+  const [mouthOpen, setMouthOpen] = useState(false);
   const realtimeRef = useRef<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void } | null>(null);
   const realtimeReplyStarted = useRef(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
@@ -146,6 +147,14 @@ export function VoiceCallModal({
       window.speechSynthesis?.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    const speakingFrame = new Image();
+    speakingFrame.src = "/assets/luma/portrait-speaking-v2.png";
+    if (phase !== "speaking") { setMouthOpen(false); return; }
+    const timer = window.setInterval(() => setMouthOpen((value) => !value), 135);
+    return () => window.clearInterval(timer);
+  }, [phase]);
 
   useEffect(() => {
     if (greetingSpoken.current) return;
@@ -255,7 +264,7 @@ export function VoiceCallModal({
       <div className="live-call__veil" />
       <header className="live-call__header"><span><i className="status-dot" /> {transport === "realtime" ? "Realtime voice connected" : transport === "connecting" ? "Connecting secure voice…" : "Browser voice fallback"}</span><strong>{companionName}</strong><time>{time}</time></header>
       <div className="voice-call__portrait">
-        <motion.img src="/assets/luma/portrait.png" alt={`${companionName}, your AI companion`} animate={phase === "speaking" ? { scale: [1, 1.025, 1], y: [0, -3, 0] } : { scale: 1, y: 0 }} transition={{ duration: 2.4, repeat: phase === "speaking" ? Infinity : 0 }} />
+        <motion.img src={phase === "speaking" && mouthOpen ? "/assets/luma/portrait-speaking-v2.png" : "/assets/luma/portrait.png"} alt={`${companionName}, your AI companion`} animate={phase === "speaking" ? { scale: [1, 1.025, 1], y: [0, -3, 0] } : { scale: 1, y: 0 }} transition={{ duration: 2.4, repeat: phase === "speaking" ? Infinity : 0 }} />
         <i className={phase === "speaking" ? "voice-call__ring voice-call__ring--active" : "voice-call__ring"} />
         <AnimatePresence mode="wait"><motion.span key={phase} initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{phaseCopy[phase]}</motion.span></AnimatePresence>
       </div>

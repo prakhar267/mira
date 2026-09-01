@@ -25,6 +25,8 @@ export function AppShell({
   onNavigate,
   onCall,
   companionName,
+  relationshipStage,
+  relationshipLevel,
   children,
   immersive = false,
 }: {
@@ -32,6 +34,8 @@ export function AppShell({
   onNavigate: (view: AppView) => void;
   onCall?: () => void;
   companionName: string;
+  relationshipStage: string;
+  relationshipLevel: number;
   children: React.ReactNode;
   immersive?: boolean;
 }) {
@@ -58,7 +62,7 @@ export function AppShell({
         </nav>
         <div className="sidebar__relationship">
           <Heart aria-hidden="true" weight="fill" />
-          <span><strong>Close · 12</strong><small>{brand.disclosure}</small></span>
+          <span><strong>{relationshipStage} · {relationshipLevel}</strong><small>{brand.disclosure}</small></span>
         </div>
       </aside>
 

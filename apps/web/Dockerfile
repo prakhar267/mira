@@ -18,5 +18,5 @@ ARG NEXT_PUBLIC_API_MODE=live
 ENV NEXT_PUBLIC_API_ORIGIN=$NEXT_PUBLIC_API_ORIGIN
 ENV NEXT_PUBLIC_API_MODE=$NEXT_PUBLIC_API_MODE
 RUN pnpm --filter @companion/web build
-EXPOSE 3000
+EXPOSE 3001
 CMD ["pnpm", "--filter", "@companion/web", "start"]

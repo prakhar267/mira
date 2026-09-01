@@ -1,4 +1,19 @@
-import type { ChatMessage, CompanionProfile, UserProfile } from "@companion/shared";
+import type {
+  ActivityDefinition,
+  ChatMessage,
+  CompanionProfile,
+  FutureEventRecord,
+  JournalEntryRecord,
+  MemoryRecord,
+  NotificationSettings,
+  OwnedItemRecord,
+  ScheduledNudgeRecord,
+  StoreItemRecord,
+  SubscriptionState,
+  UserProfile,
+  WalletState,
+  WalletTransactionRecord,
+} from "@companion/shared";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://127.0.0.1:4000";
 const TOKEN_KEY = "luma.production-session.v1";
@@ -103,14 +118,44 @@ export const companionApi = {
   verifyEmail: (token: string) => request<{ verified: boolean }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }),
 
   me: () => request<UserProfile>("/users/me"),
+  updateUser: (input: { name?: string; pronouns?: UserProfile["pronouns"]; timezone?: string }) => request<UserProfile>("/users/me", { method: "PATCH", body: JSON.stringify(input) }),
   companions: () => request<CompanionProfile[]>("/companions"),
   updateCompanion: (companionId: string, input: { name?: string; relationshipMode?: CompanionProfile["relationshipMode"]; voiceId?: string }) => request<CompanionProfile>(`/companions/${companionId}`, { method: "PATCH", body: JSON.stringify(input) }),
   updatePersonality: (companionId: string, input: Partial<CompanionProfile["personality"]>) => request<CompanionProfile>(`/companions/${companionId}/personality`, { method: "PATCH", body: JSON.stringify(input) }),
   conversations: () => request<Array<{ id: string; companionId: string }>>("/conversations"),
   messages: (conversationId: string) => request<ChatMessage[]>(`/conversations/${conversationId}/messages`),
   createConversation: (companionId: string) => request<{ id: string; companionId: string }>("/conversations", { method: "POST", body: JSON.stringify({ companionId }) }),
+  deleteConversation: (conversationId: string) => request<void>(`/conversations/${conversationId}`, { method: "DELETE" }),
+  memories: () => request<MemoryRecord[]>("/memories"),
+  activities: () => request<ActivityDefinition[]>("/activities"),
+  wallet: () => request<WalletState>("/wallet"),
+  walletTransactions: () => request<WalletTransactionRecord[]>("/wallet/transactions"),
+  store: () => request<Array<StoreItemRecord & { owned: boolean; equipped: boolean }>>("/store"),
+  inventory: () => request<OwnedItemRecord[]>("/inventory"),
+  subscription: () => request<{ subscription: SubscriptionState }>("/subscriptions"),
+  journal: () => request<JournalEntryRecord[]>("/journal"),
+  events: () => request<FutureEventRecord[]>("/events"),
+  nudges: () => request<ScheduledNudgeRecord[]>("/notifications/planned"),
+  notifications: () => request<NotificationSettings>("/notifications/preferences"),
+  calls: () => request<Array<{ id: string; type: "voice" | "video"; startedAt: string; durationMs?: number; summary?: string }>>("/calls"),
+  moments: () => request<Array<{ id: string; type: "call" | "date" | "milestone" | "memory"; title: string; description: string; happenedAt: string; mediaUrl: string }>>("/moments"),
+  photos: () => request<Array<{ id: string; type: "selfie" | "moment" | "shared"; caption: string; createdAt: string; mediaUrl: string }>>("/photos"),
+  updateMemory: (memoryId: string, input: { content?: string; pinned?: boolean; status?: MemoryRecord["status"] }) => request<MemoryRecord>(`/memories/${memoryId}`, { method: "PATCH", body: JSON.stringify(input) }),
+  createMemory: (companionId: string, type: MemoryRecord["type"], content: string) => request<MemoryRecord>("/memories", { method: "POST", body: JSON.stringify({ companionId, type, content, pinned: false }) }),
+  deleteMemory: (memoryId: string) => request<void>(`/memories/${memoryId}`, { method: "DELETE" }),
+  completeActivity: (activityId: string) => request<WalletState>(`/activities/${activityId}/complete`, { method: "POST", body: JSON.stringify({ idempotencyKey: `web:${activityId}:${crypto.randomUUID()}` }) }),
+  purchaseItem: (itemId: string) => request<{ wallet: WalletState; owned: OwnedItemRecord }>("/store/purchase", { method: "POST", body: JSON.stringify({ itemId, idempotencyKey: `web:${itemId}:${crypto.randomUUID()}` }) }),
+  equipItem: (itemId: string) => request<OwnedItemRecord[]>(`/inventory/${itemId}/equip`, { method: "POST" }),
+  mockUpgrade: (planId: SubscriptionState["planId"]) => request<{ subscription: SubscriptionState }>("/subscriptions/mock-upgrade", { method: "POST", body: JSON.stringify({ planId, idempotencyKey: `web:${planId}:${crypto.randomUUID()}` }) }),
+  addJournal: (input: { title: string; content: string; mood: JournalEntryRecord["mood"] }) => request<JournalEntryRecord>("/journal", { method: "POST", body: JSON.stringify({ ...input, tags: [] }) }),
+  deleteJournal: (entryId: string) => request<void>(`/journal/${entryId}`, { method: "DELETE" }),
+  reflectJournal: (entryId: string) => request<{ reflection: string }>(`/journal/${entryId}/reflect`, { method: "POST" }),
+  addEvent: (description: string, eventDate: string) => request<{ event: FutureEventRecord; nudge: ScheduledNudgeRecord | null }>("/events", { method: "POST", body: JSON.stringify({ description, eventDate, status: "confirmed" }) }),
+  updateNotifications: (settings: NotificationSettings) => request<NotificationSettings>("/notifications/preferences", { method: "PATCH", body: JSON.stringify(settings) }),
+  feedback: (conversationId: string, messageId: string, feedback: "up" | "down", note?: string) => request<{ message: ChatMessage }>(`/conversations/${conversationId}/messages/${messageId}/feedback`, { method: "PATCH", body: JSON.stringify({ feedback, ...(note ? { note } : {}) }) }),
+  regenerate: (conversationId: string, messageId: string, memoryEnabled: boolean) => request<ChatMessage>(`/conversations/${conversationId}/messages/${messageId}/regenerate`, { method: "POST", body: JSON.stringify({ memoryEnabled }) }),
 
-  async streamChat(input: { conversationId: string; companionId: string; content: string; clientMessageId: string }, onDelta: (delta: string) => void) {
+  async streamChat(input: { conversationId: string; companionId: string; content: string; clientMessageId: string; memoryEnabled?: boolean }, onDelta: (delta: string) => void) {
     const response = await authorizedFetch("/chat/stream", {
       method: "POST",
       body: JSON.stringify(input),
@@ -142,7 +187,7 @@ export const companionApi = {
     return { assistantMessageId };
   },
 
-  synthesize: (text: string, voiceId?: string) => request<{ audioBase64: string; contentType: string }>("/voice/synthesize", { method: "POST", body: JSON.stringify({ text, voiceId }) }),
+  synthesize: (text: string, voiceId?: string) => request<{ audioBase64: string; contentType: string; mock?: boolean }>("/voice/synthesize", { method: "POST", body: JSON.stringify({ text, voiceId }) }),
   transcribe: (audioBase64: string, contentType: string) => request<{ text: string; durationMs: number }>("/voice/transcribe", { method: "POST", body: JSON.stringify({ audioBase64, contentType }) }),
   startCameraSession: () => request<{ sessionId: string; consentRequired: boolean }>("/camera/session", { method: "POST" }),
   analyzeImage: (dataBase64: string, contentType: string, prompt: string) => request<{ description: string }>("/media/analyze", { method: "POST", body: JSON.stringify({ dataBase64, contentType, prompt }) }),
@@ -152,13 +197,20 @@ export const companionApi = {
   adminProviders: (key: string) => request<Record<string, string | boolean>>("/admin/providers", { headers: { "x-admin-key": key } }),
   adminFlags: (key: string) => request<Record<string, boolean>>("/admin/feature-flags", { headers: { "x-admin-key": key } }),
   updateAdminFlags: (key: string, flags: Record<string, boolean>) => request<Record<string, boolean>>("/admin/feature-flags", { method: "PATCH", headers: { "x-admin-key": key }, body: JSON.stringify(flags) }),
+  exportData: () => request<Record<string, unknown>>("/data/export", { method: "POST" }),
+  async deleteAccount(confirmation: "DELETE") {
+    try { await request<void>("/account/delete", { method: "POST", body: JSON.stringify({ confirmation }) }); } finally { saveTokens(null); }
+  },
 
   async connectRealtime(kind: "voice" | "video", companionId: string): Promise<RealtimeConnection> {
     const session = kind === "voice"
       ? await request<{ clientSecret: unknown; callId: string }>("/voice/session", { method: "POST", body: JSON.stringify({ companionId }) })
       : await request<{ id: string; realtime: { clientSecret: unknown } }>("/video/session", { method: "POST", body: JSON.stringify({ companionId, cameraEnabled: kind === "video" }) }).then((data) => ({ clientSecret: data.realtime.clientSecret, callId: data.id }));
     const secret = secretValue(session.clientSecret);
-    if (!secret || secret.startsWith("mock-")) throw new Error("Realtime voice is running in local fallback mode.");
+    if (!secret || secret.startsWith("mock-")) {
+      await request(`/calls/${session.callId}/end`, { method: "POST" }).catch(() => undefined);
+      throw new Error("Realtime voice is running in local fallback mode.");
+    }
 
     const peer = new RTCPeerConnection();
     const audio = new Audio();

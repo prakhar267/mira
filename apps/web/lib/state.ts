@@ -114,6 +114,8 @@ export interface DemoState {
   mediaLibrary: Array<{ id: string; type: "image" | "generated-image"; name: string; url: string; createdAt: string }>;
   notifications: NotificationSettings;
   memoryEnabled: boolean;
+  aiProcessingConsent: boolean;
+  conversationStorageEnabled: boolean;
   theme: "light" | "dark";
   activeEnvironment: EnvironmentId;
   ambienceEnabled: boolean;
@@ -266,6 +268,8 @@ export const initialState: DemoState = {
     enabledTopics: ["future-events", "goals", "moments"],
   },
   memoryEnabled: true,
+  aiProcessingConsent: true,
+  conversationStorageEnabled: true,
   theme: "dark",
   activeEnvironment: "window-nook",
   ambienceEnabled: true,

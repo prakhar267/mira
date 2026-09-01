@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { applyContradictions, assessSafety, buildCompanionContext, extractMemoryCandidates, planCompanionTurn, type CompanionTurn } from "@companion/ai";
 import type { ActivityDefinition, ChatMessage, CompanionMood, MemoryRecord, MemoryType, StoreItemRecord } from "@companion/shared";
-import type { PlanId } from "@companion/config";
+import { featureEntitlements, type PlanId } from "@companion/config";
 import { AppShell } from "./AppShell";
 import { ActivitiesView } from "./ActivitiesView";
 import { CameraConversationModal } from "./CameraConversationModal";
@@ -12,6 +13,7 @@ import { CompanionView } from "./CompanionView";
 import { FirstMeeting } from "./FirstMeeting";
 import { HomeView } from "./HomeView";
 import { MemoryView } from "./MemoryView";
+import { Modal } from "./Modal";
 import { MomentsView, type MomentsTab } from "./MomentsView";
 import { Onboarding, type OnboardingDraft } from "./Onboarding";
 import { PlanModal } from "./PlanModal";
@@ -19,13 +21,17 @@ import { ProfileView } from "./ProfileView";
 import { VideoCallModal } from "./VideoCallModal";
 import { VoiceCallModal } from "./VoiceCallModal";
 import { initialState, storageKey, type AppView, type DemoState, type EnvironmentId, type FeedbackReason } from "@/lib/state";
-import { canAccessItem, currencyBalance } from "@/lib/product-rules";
+import { canAccessItem, currencyBalance, environmentForItem } from "@/lib/product-rules";
 import { companionApi } from "@/lib/api-client";
+import { messagesForConversation, previousUserMessage } from "@/lib/conversation-state";
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 const chooseTypingDelay = (content: string) => Math.min(680, 320 + content.trim().length * 3);
+const optional = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => promise.catch(() => fallback);
+const livePreferencesKey = (userId: string) => `luma-live-preferences-v1:${userId}`;
 
 export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
+  const router = useRouter();
   const liveMode = companionApi.enabled && !forceDemo;
   const [state, setState] = useState<DemoState>(initialState);
   const [hydrated, setHydrated] = useState(false);
@@ -34,19 +40,51 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const [videoCallOpen, setVideoCallOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
+  const [processingNoticeOpen, setProcessingNoticeOpen] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [hydrationError, setHydrationError] = useState("");
   const [momentsTab, setMomentsTab] = useState<MomentsTab>("moments");
+  const companionSyncTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const preview = query.get("preview");
     const onboarding = query.get("onboarding");
-    if (forceDemo || preview === "home") {
+    if (preview === "home") {
       setState({ ...initialState, onboardingComplete: true, firstMeetingComplete: true, currentView: "home" });
       setHydrated(true);
       return;
     }
     if (onboarding === "1") {
       setState({ ...initialState, firstMeetingComplete: false });
+      setHydrated(true);
+      return;
+    }
+    if (forceDemo) {
+      try {
+        const saved = window.localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved) as Partial<DemoState>;
+          const restored = {
+            ...initialState,
+            ...parsed,
+            onboardingComplete: true,
+            firstMeetingComplete: true,
+            relationship: { ...initialState.relationship, ...parsed.relationship },
+            responsePreferences: { ...initialState.responsePreferences, ...parsed.responsePreferences },
+          };
+          if (!restored.messages.length) {
+            const conversationId = crypto.randomUUID();
+            restored.activeConversationId = conversationId;
+            restored.messages = [{ id: crypto.randomUUID(), conversationId, role: "assistant", content: "Fresh start. What would feel good to talk about now?", createdAt: new Date().toISOString(), status: "sent" }];
+          }
+          setState(restored);
+        } else {
+          setState({ ...initialState, onboardingComplete: true, firstMeetingComplete: true });
+        }
+      } catch {
+        setState({ ...initialState, onboardingComplete: true, firstMeetingComplete: true });
+      }
       setHydrated(true);
       return;
     }
@@ -57,15 +95,67 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
           const companion = companions[0];
           if (!companion) throw new Error("Companion not found");
           const conversation = conversations[0] ?? await companionApi.createConversation(companion.id);
-          const messages = await companionApi.messages(conversation.id);
-          setState((current) => ({ ...current, onboardingComplete: true, firstMeetingComplete: true, user, companion, activeConversationId: conversation.id, messages, currentView: "home" }));
-        } catch {
-          companionApi.clearSession();
-          setState({ ...initialState, onboardingComplete: false, firstMeetingComplete: false });
+          const [messages, memories, activities, wallet, walletTransactions, store, ownedItems, subscriptionResult, journalEntries, futureEvents, nudges, notifications, calls, moments, photos] = await Promise.all([
+            companionApi.messages(conversation.id),
+            optional(companionApi.memories(), []),
+            optional(companionApi.activities(), []),
+            optional(companionApi.wallet(), { xp: 0, level: 1, coins: 0, gems: 0 }),
+            optional(companionApi.walletTransactions(), []),
+            optional(companionApi.store(), []),
+            optional(companionApi.inventory(), []),
+            optional(companionApi.subscription(), { subscription: { planId: "free", status: "active", testMode: true } }),
+            optional(companionApi.journal(), []),
+            optional(companionApi.events(), []),
+            optional(companionApi.nudges(), []),
+            optional(companionApi.notifications(), { ...initialState.notifications, timezone: user.timezone }),
+            optional(companionApi.calls(), []),
+            optional(companionApi.moments(), []),
+            optional(companionApi.photos(), []),
+          ]);
+          let savedPreferences: Partial<DemoState> = {};
+          try { savedPreferences = JSON.parse(window.localStorage.getItem(livePreferencesKey(user.id)) ?? "{}") as Partial<DemoState>; } catch { /* Use safe defaults. */ }
+          setState((current) => ({
+            ...current,
+            ...savedPreferences,
+            onboardingComplete: true,
+            firstMeetingComplete: true,
+            user,
+            companion,
+            relationship: { ...current.relationship, ...savedPreferences.relationship },
+            responsePreferences: { ...current.responsePreferences, ...savedPreferences.responsePreferences },
+            activeConversationId: conversation.id,
+            messages: messages.length ? messages : [{ id: crypto.randomUUID(), conversationId: conversation.id, role: "assistant", content: `I’m here, ${user.name}. What kind of company would feel good right now?`, createdAt: new Date().toISOString(), status: "sent" }],
+            memories,
+            activities: activities.length ? activities : current.activities,
+            completedActivityIds: [...new Set(walletTransactions.filter((transaction) => transaction.type === "earn" && transaction.currency === "coins").map((transaction) => transaction.referenceId).filter((id) => activities.some((activity) => activity.id === id)))],
+            wallet,
+            walletTransactions,
+            storeItems: store.map((item) => ({ id: item.id, name: item.name, description: item.description, category: item.category, assetUrl: item.assetUrl, currency: item.currency, price: item.price, tierRequired: item.tierRequired, metadata: item.metadata, active: item.active })),
+            ownedItems,
+            subscription: subscriptionResult.subscription,
+            journalEntries,
+            futureEvents,
+            nudges,
+            notifications,
+            calls: calls.map((call) => ({ id: call.id, type: call.type, startedAt: call.startedAt, durationSeconds: Math.round((call.durationMs ?? 0) / 1_000), summary: call.summary ?? "A private companion call." })),
+            moments: moments.map((moment) => ({ id: moment.id, title: moment.title, description: moment.description, date: moment.happenedAt, imageUrl: moment.mediaUrl, kind: moment.type })),
+            photos: photos.map((photo) => ({ id: photo.id, imageUrl: photo.mediaUrl, caption: photo.caption, createdAt: photo.createdAt, kind: photo.type })),
+            companionReflections: [],
+            mediaLibrary: [],
+            currentView: "home",
+          }));
+        } catch (cause) {
+          if (!companionApi.hasSession()) router.replace("/login");
+          else setHydrationError(cause instanceof Error ? cause.message : "Your account could not be loaded just now.");
         } finally {
           setHydrated(true);
         }
       })();
+      return;
+    }
+    if (liveMode) {
+      router.replace("/login");
+      setHydrated(true);
       return;
     }
     try {
@@ -83,17 +173,36 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       // A clean local demo remains available when saved state is malformed.
     }
     setHydrated(true);
-  }, [forceDemo, liveMode]);
+  }, [forceDemo, liveMode, router]);
 
   useEffect(() => {
     if (!hydrated) return;
+    if (liveMode) {
+      try {
+        window.localStorage.setItem(livePreferencesKey(state.user.id), JSON.stringify({
+          relationship: state.relationship,
+          responsePreferences: state.responsePreferences,
+          companionBackstory: state.companionBackstory,
+          memoryEnabled: state.memoryEnabled,
+          aiProcessingConsent: state.aiProcessingConsent,
+          conversationStorageEnabled: state.conversationStorageEnabled,
+          theme: state.theme,
+          activeEnvironment: state.activeEnvironment,
+          ambienceEnabled: state.ambienceEnabled,
+          proactiveCalls: state.proactiveCalls,
+        }));
+      } catch { /* Keep the signed session usable without browser preference storage. */ }
+      document.documentElement.dataset.theme = state.theme;
+      return;
+    }
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(state));
+      const persistedState = state.conversationStorageEnabled ? state : { ...state, messages: [] };
+      window.localStorage.setItem(storageKey, JSON.stringify(persistedState));
     } catch {
       // The current session stays usable without persistent browser storage.
     }
     document.documentElement.dataset.theme = state.theme;
-  }, [hydrated, state]);
+  }, [hydrated, liveMode, state]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -102,14 +211,50 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     return () => window.cancelAnimationFrame(frame);
   }, [state.currentView]);
 
+  useEffect(() => () => {
+    if (companionSyncTimer.current !== null) window.clearTimeout(companionSyncTimer.current);
+  }, []);
+
   const activeMemories = useMemo(() => state.memories.filter((memory) => memory.status === "active"), [state.memories]);
   const connectVoiceRealtime = useCallback(() => companionApi.connectRealtime("voice", state.companion.id), [state.companion.id]);
   const connectVideoRealtime = useCallback(() => companionApi.connectRealtime("video", state.companion.id), [state.companion.id]);
   const navigate = (view: AppView) => setState((current) => ({ ...current, currentView: view }));
+  const processingAllowed = () => {
+    if (state.aiProcessingConsent) return true;
+    setProcessingNoticeOpen(true);
+    return false;
+  };
+  const runAction = (action: Promise<unknown>, fallback: string) => {
+    void action.catch((cause) => setActionError(cause instanceof Error ? cause.message : fallback));
+  };
 
   const openMoments = (tab: MomentsTab) => {
     setMomentsTab(tab);
     navigate("moments");
+  };
+
+  const changeCompanion = (companion: DemoState["companion"]) => {
+    setState((current) => ({ ...current, companion }));
+    if (!liveMode) return;
+    if (companionSyncTimer.current !== null) window.clearTimeout(companionSyncTimer.current);
+    companionSyncTimer.current = window.setTimeout(() => {
+      runAction(Promise.all([
+        companionApi.updateCompanion(companion.id, { name: companion.name, relationshipMode: companion.relationshipMode, voiceId: companion.voiceId }),
+        companionApi.updatePersonality(companion.id, companion.personality),
+      ]), "The companion settings could not be saved.");
+    }, 420);
+  };
+
+  const changeProfile = (next: DemoState) => {
+    const notificationsChanged = JSON.stringify(next.notifications) !== JSON.stringify(state.notifications);
+    const userChanged = next.user.name !== state.user.name || next.user.pronouns !== state.user.pronouns || next.user.timezone !== state.user.timezone;
+    const relationshipMode: DemoState["companion"]["relationshipMode"] = next.relationship.romanticOptIn ? "romantic" : next.companion.relationshipMode === "romantic" ? "friend" : next.companion.relationshipMode;
+    const normalized = relationshipMode === next.companion.relationshipMode ? next : { ...next, companion: { ...next.companion, relationshipMode } };
+    const relationshipChanged = normalized.companion.relationshipMode !== state.companion.relationshipMode;
+    setState(normalized);
+    if (liveMode && notificationsChanged) runAction(companionApi.updateNotifications(normalized.notifications), "Notification settings could not be saved.");
+    if (liveMode && userChanged) runAction(companionApi.updateUser({ name: normalized.user.name, pronouns: normalized.user.pronouns, timezone: normalized.user.timezone }), "Profile changes could not be saved.");
+    if (liveMode && relationshipChanged) runAction(companionApi.updateCompanion(normalized.companion.id, { relationshipMode }), "Relationship mode could not be saved.");
   };
 
   const completeOnboarding = async (draft: OnboardingDraft) => {
@@ -185,12 +330,13 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const createCompanionTurn = (content: string, messages: ChatMessage[], now: Date, delivery: "text" | "voice" | "video" = "text"): CompanionTurn => {
+    const conversationMessages = messagesForConversation(messages, state.activeConversationId);
     const context = buildCompanionContext({
       user: state.user,
       companion: state.companion,
-      relationship: { mode: state.companion.relationshipMode, startedAt: state.companion.createdAt, interactionCount: state.messages.length, sharedExperiences: state.moments.map((moment) => moment.title) },
+      relationship: { mode: state.companion.relationshipMode, startedAt: state.companion.createdAt, interactionCount: conversationMessages.length, sharedExperiences: state.moments.map((moment) => moment.title) },
       memories: state.memoryEnabled ? activeMemories : [],
-      messages,
+      messages: conversationMessages,
       timezone: state.user.timezone,
       now,
       delivery,
@@ -201,6 +347,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const sendMessage = async (content: string) => {
+    if (!processingAllowed()) return;
     if (streaming) return;
     setStreaming(true);
     const now = new Date();
@@ -221,12 +368,12 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       const assistantId = `pending:${crypto.randomUUID()}`;
       setState((current) => ({ ...current, messages: [...current.messages, { id: assistantId, conversationId: current.activeConversationId, role: "assistant", content: "", createdAt: new Date().toISOString(), status: "sending" }] }));
       try {
-        const result = await companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: userMessage.id, content }, (delta) => {
+        const result = await companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: userMessage.id, content, memoryEnabled: state.memoryEnabled }, (delta) => {
           setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: `${message.content}${delta}` } : message) }));
         });
         setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, id: result.assistantMessageId || assistantId, status: "sent" } : message) }));
       } catch (cause) {
-        setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: cause instanceof Error ? cause.message : "Luma could not respond just now.", status: "failed" } : message) }));
+        setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: cause instanceof Error ? cause.message : `${current.companion.name} could not respond just now.`, status: "failed" } : message) }));
       } finally {
         setStreaming(false);
       }
@@ -234,7 +381,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     }
 
     const safety = assessSafety(content);
-    const turn = createCompanionTurn(content, [...state.messages, userMessage], now);
+    const turn = createCompanionTurn(content, [...messagesForConversation(state.messages, state.activeConversationId), userMessage], now);
     const beats = turn.text.split(/\n\n+/).map((beat) => beat.trim()).filter(Boolean);
     await pause(chooseTypingDelay(content));
 
@@ -313,14 +460,22 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     }));
   };
 
+  const deleteConversation = async () => {
+    const deletedId = state.activeConversationId;
+    if (liveMode) await companionApi.deleteConversation(deletedId);
+    const conversationId = liveMode ? (await companionApi.createConversation(state.companion.id)).id : crypto.randomUUID();
+    setState((current) => ({ ...current, activeConversationId: conversationId, messages: [...current.messages.filter((message) => message.conversationId !== deletedId), { id: crypto.randomUUID(), conversationId, role: "assistant", content: "Clean slate. What would feel good to talk about now?", createdAt: new Date().toISOString(), status: "sent" }] }));
+  };
+
   const addMockExchange = (userMessage: ChatMessage, assistantMessage: ChatMessage) => setState((current) => ({ ...current, messages: [...current.messages, userMessage, assistantMessage] }));
 
   const sendVoiceNote = async (transcript: string) => {
-    if (!liveMode && state.subscription.planId === "free") { setPlansOpen(true); return; }
+    if (!processingAllowed()) return;
+    if (!featureEntitlements.has(state.subscription.planId, "voiceNotes")) { setPlansOpen(true); return; }
     if (liveMode) { await sendMessage(transcript); return; }
     const now = new Date();
     const userMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "user", content: transcript, createdAt: now.toISOString(), status: "sent", attachments: [{ id: crypto.randomUUID(), type: "audio", url: "browser://voice-transcript", name: "Voice note", transcript, durationMs: Math.max(1_000, transcript.split(/\s+/).length * 420) }] };
-    const turn = createCompanionTurn(transcript, [...state.messages, userMessage], now, "voice");
+    const turn = createCompanionTurn(transcript, [...messagesForConversation(state.messages, state.activeConversationId), userMessage], now, "voice");
     const reply = turn.text;
     await pause(250);
     const assistantMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "assistant", content: reply, createdAt: new Date().toISOString(), status: "sent", explanation: turn.explanation, attachments: [{ id: crypto.randomUUID(), type: "audio", url: "browser://speech-synthesis", name: `${state.companion.name} voice reply`, transcript: reply, durationMs: Math.max(1_500, reply.split(/\s+/).length * 360) }] };
@@ -328,6 +483,8 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const sendVoiceRecording = async (audioBase64: string, contentType: string) => {
+    if (!processingAllowed()) return;
+    if (!featureEntitlements.has(state.subscription.planId, "voiceNotes")) { setPlansOpen(true); return; }
     const transcription = await companionApi.transcribe(audioBase64, contentType);
     if (!transcription.text.trim()) throw new Error("I couldn’t hear words in that voice note.");
     await sendMessage(transcription.text);
@@ -335,12 +492,20 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
 
   const speakWithProvider = async (content: string) => {
     const speech = await companionApi.synthesize(content, state.companion.voiceId);
+    if (speech.mock) {
+      if (!("speechSynthesis" in window)) throw new Error("Speech playback is unavailable in this browser.");
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(content));
+      return;
+    }
     const audio = new Audio(`data:${speech.contentType};base64,${speech.audioBase64}`);
     await audio.play();
   };
 
   const uploadImage = async (file: File) => {
-    if (!file.type.match(/^image\/(jpeg|png|webp)$/) || file.size > 8_000_000) return;
+    if (!processingAllowed()) return;
+    if (!file.type.match(/^image\/(jpeg|png|webp)$/)) throw new Error("Choose a JPEG, PNG, or WebP image.");
+    if (file.size > 8_000_000) throw new Error("Choose an image smaller than 8 MB.");
     const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
     if (liveMode) {
       const dataBase64 = dataUrl.split(",")[1] ?? "";
@@ -360,7 +525,8 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const generateImage = async (prompt: string) => {
-    if (!liveMode && state.subscription.planId === "free") { setPlansOpen(true); return; }
+    if (!processingAllowed()) return;
+    if (!featureEntitlements.has(state.subscription.planId, "imageGeneration")) { setPlansOpen(true); return; }
     if (liveMode) {
       const result = await companionApi.generateImage(prompt, `${state.companion.name}, ${state.companion.presentation}, original stylized-realistic 3D companion`);
       const imageUrl = result.artifactBase64 ? `data:${result.contentType};base64,${result.artifactBase64}` : result.assetUrl;
@@ -377,39 +543,50 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const addSelfie = () => {
-    if (!liveMode && state.subscription.planId === "free") { setPlansOpen(true); return; }
+    if (!processingAllowed()) return;
+    if (!featureEntitlements.has(state.subscription.planId, "aiSelfies")) { setPlansOpen(true); return; }
+    if (liveMode) {
+      runAction(generateImage(`A warm, candid selfie from ${state.companion.name} during a quiet coffee break, natural expression, private companion moment`).then(() => setMomentsTab("photos")), "The selfie could not be created.");
+      return;
+    }
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
     setState((current) => ({
       ...current,
       photos: [{ id, imageUrl: "/assets/luma/cafe-selfie.png", caption: "Rainy coffee break—just for you", createdAt: now, kind: "selfie" }, ...current.photos],
-      mediaLibrary: [{ id, type: "generated-image", name: "Luma coffee selfie", url: "/assets/luma/cafe-selfie.png", createdAt: now }, ...current.mediaLibrary],
+      mediaLibrary: [{ id, type: "generated-image", name: `${current.companion.name} coffee selfie`, url: "/assets/luma/cafe-selfie.png", createdAt: now }, ...current.mediaLibrary],
     }));
     setMomentsTab("photos");
   };
 
-  const recordFeedback = (messageId: string, feedback: "up" | "down", reason?: FeedbackReason) => setState((current) => ({
-    ...current,
-    messages: current.messages.map((message) => message.id === messageId ? { ...message, feedback } : message),
-    feedbackSignals: [...current.feedbackSignals, { id: crypto.randomUUID(), messageId, rating: feedback, ...(reason ? { reason } : {}), createdAt: new Date().toISOString() }],
-    responsePreferences: feedback === "down" ? {
-      ...current.responsePreferences,
-      listeningFirst: reason === "wrong-tone" ? current.responsePreferences.listeningFirst : true,
-      responseLength: reason === "too-scripted" || reason === "too-many-questions" ? "short" : current.responsePreferences.responseLength,
-      adviceStyle: reason === "wrong-tone" ? "gentle" : "ask-first",
-      questionFrequency: reason === "too-many-questions" ? "rare" : current.responsePreferences.questionFrequency,
-    } : current.responsePreferences,
-  }));
+  const recordFeedback = (messageId: string, feedback: "up" | "down", reason?: FeedbackReason) => {
+    setState((current) => ({
+      ...current,
+      messages: current.messages.map((message) => message.id === messageId ? { ...message, feedback } : message),
+      feedbackSignals: [...current.feedbackSignals, { id: crypto.randomUUID(), messageId, rating: feedback, ...(reason ? { reason } : {}), createdAt: new Date().toISOString() }],
+      responsePreferences: feedback === "down" ? {
+        ...current.responsePreferences,
+        listeningFirst: reason === "wrong-tone" ? current.responsePreferences.listeningFirst : true,
+        responseLength: reason === "too-scripted" || reason === "too-many-questions" ? "short" : current.responsePreferences.responseLength,
+        adviceStyle: reason === "wrong-tone" ? "gentle" : "ask-first",
+        questionFrequency: reason === "too-many-questions" ? "rare" : current.responsePreferences.questionFrequency,
+      } : current.responsePreferences,
+    }));
+    if (liveMode) runAction(companionApi.feedback(state.activeConversationId, messageId, feedback, reason), "Your feedback could not be saved.");
+  };
 
   const regenerateResponse = async (messageId: string) => {
-    const messageIndex = state.messages.findIndex((message) => message.id === messageId);
-    if (messageIndex < 0) return;
-    let userIndex = messageIndex - 1;
-    while (userIndex >= 0 && state.messages[userIndex]?.role !== "user") userIndex -= 1;
-    const source = state.messages[userIndex];
+    const source = previousUserMessage(state.messages, messageId, state.activeConversationId);
     if (!source) return;
+    if (liveMode) {
+      const updated = await companionApi.regenerate(state.activeConversationId, messageId, state.memoryEnabled);
+      setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === messageId ? updated : message) }));
+      return;
+    }
     const now = new Date();
-    const turn = createCompanionTurn(source.content, state.messages.slice(0, userIndex + 1), now);
+    const activeMessages = messagesForConversation(state.messages, state.activeConversationId);
+    const sourceIndex = activeMessages.findIndex((message) => message.id === source.id);
+    const turn = createCompanionTurn(source.content, activeMessages.slice(0, sourceIndex + 1), now);
     setState((current) => ({
       ...current,
       messages: current.messages.map((message) => {
@@ -421,9 +598,14 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     }));
   };
 
-  const purchaseItem = (item: StoreItemRecord): string | null => {
+  const purchaseItem = async (item: StoreItemRecord): Promise<string | null> => {
     if (!canAccessItem(state.subscription.planId, item)) { setPlansOpen(true); return `${item.tierRequired[0]?.toUpperCase()}${item.tierRequired.slice(1)} is required for this item.`; }
     if (currencyBalance(item, state.wallet) < item.price) return `Not enough ${item.currency}. Try an activity together to earn more.`;
+    if (liveMode) {
+      const result = await companionApi.purchaseItem(item.id);
+      setState((current) => ({ ...current, wallet: result.wallet, ownedItems: current.ownedItems.some((owned) => owned.itemId === result.owned.itemId) ? current.ownedItems : [...current.ownedItems, result.owned] }));
+      return null;
+    }
     const now = new Date().toISOString();
     setState((current) => {
       if (current.ownedItems.some((owned) => owned.itemId === item.id)) return current;
@@ -434,50 +616,77 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     return null;
   };
 
-  const equipItem = (item: StoreItemRecord) => setState((current) => {
-    const environment = item.metadata.environment as EnvironmentId | undefined;
-    return {
-      ...current,
-      ...(environment ? { activeEnvironment: environment } : {}),
-      ownedItems: current.ownedItems.map((owned) => {
-        const ownedItem = current.storeItems.find((candidate) => candidate.id === owned.itemId);
-        return ownedItem?.metadata.slot === item.metadata.slot ? { ...owned, equipped: owned.itemId === item.id } : owned;
-      }),
-    };
-  });
+  const equipItem = async (item: StoreItemRecord) => {
+    const liveOwnedItems = liveMode ? await companionApi.equipItem(item.id) : null;
+    setState((current) => {
+      const environment = environmentForItem(item) as EnvironmentId | null;
+      return {
+        ...current,
+        ...(environment ? { activeEnvironment: environment } : {}),
+        ownedItems: liveOwnedItems ?? current.ownedItems.map((owned) => {
+          const ownedItem = current.storeItems.find((candidate) => candidate.id === owned.itemId);
+          return ownedItem?.metadata.slot === item.metadata.slot ? { ...owned, equipped: owned.itemId === item.id } : owned;
+        }),
+      };
+    });
+  };
 
-  const choosePlan = (planId: PlanId) => {
-    setState((current) => ({ ...current, subscription: { planId, status: "active", testMode: true, renewsAt: new Date(Date.now() + 30 * 86_400_000).toISOString() } }));
+  const choosePlan = async (planId: PlanId) => {
+    const subscription = liveMode ? (await companionApi.mockUpgrade(planId)).subscription : { planId, status: "active" as const, testMode: true, renewsAt: new Date(Date.now() + 30 * 86_400_000).toISOString() };
+    setState((current) => ({ ...current, subscription }));
     setPlansOpen(false);
   };
 
-  const addJournal = (entry: { title: string; content: string; mood: CompanionMood }) => setState((current) => { const now = new Date().toISOString(); return { ...current, journalEntries: [{ id: crypto.randomUUID(), userId: current.user.id, ...entry, tags: [], reflected: false, createdAt: now, updatedAt: now }, ...current.journalEntries] }; });
-  const deleteJournal = (entryId: string) => setState((current) => ({ ...current, journalEntries: current.journalEntries.filter((entry) => entry.id !== entryId) }));
-  const reflectOnJournal = (entry: DemoState["journalEntries"][number]) => setState((current) => ({ ...current, currentView: "chat", journalEntries: current.journalEntries.map((candidate) => candidate.id === entry.id ? { ...candidate, reflected: true, updatedAt: new Date().toISOString() } : candidate), messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: `I notice ${entry.mood} energy in “${entry.title}.” What part would you like me to sit with?`, createdAt: new Date().toISOString(), status: "sent" }] }));
-  const addFutureEvent = (event: { description: string; eventDate: string }) => setState((current) => { const eventId = crypto.randomUUID(); const scheduled = new Date(new Date(event.eventDate).getTime() - 3_600_000); if (scheduled.getHours() >= 22 || scheduled.getHours() < 8) scheduled.setHours(8, 0, 0, 0); return { ...current, futureEvents: [{ id: eventId, userId: current.user.id, companionId: current.companion.id, ...event, status: "confirmed", createdAt: new Date().toISOString() }, ...current.futureEvents], nudges: current.notifications.frequency === "off" ? current.nudges : [{ id: crypto.randomUUID(), userId: current.user.id, eventId, content: `You mentioned ${event.description}. Want a calm check-in before it?`, scheduledFor: scheduled.toISOString(), status: "planned" }, ...current.nudges] }; });
-  const updateMemory = (updated: MemoryRecord) => setState((current) => ({ ...current, memories: current.memories.map((memory) => memory.id === updated.id ? updated : memory) }));
-  const deleteMemory = (memoryId: string) => setState((current) => ({ ...current, memories: current.memories.map((memory) => memory.id === memoryId ? { ...memory, status: "deleted", updatedAt: new Date().toISOString() } : memory) }));
-  const addMemory = (content: string, type: MemoryType) => setState((current) => ({ ...current, memories: [...current.memories, { id: crypto.randomUUID(), userId: current.user.id, companionId: current.companion.id, type, content, normalizedContent: content.toLowerCase(), importance: 0.8, confidence: 1, sourceMessageIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), retrievalCount: 0, status: "active", pinned: false }] }));
+  const addJournal = async (entry: { title: string; content: string; mood: CompanionMood }) => {
+    const created = liveMode ? await companionApi.addJournal(entry) : { id: crypto.randomUUID(), userId: state.user.id, ...entry, tags: [], reflected: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    setState((current) => ({ ...current, journalEntries: [created, ...current.journalEntries] }));
+  };
+  const deleteJournal = async (entryId: string) => { if (liveMode) await companionApi.deleteJournal(entryId); setState((current) => ({ ...current, journalEntries: current.journalEntries.filter((entry) => entry.id !== entryId) })); };
+  const reflectOnJournal = async (entry: DemoState["journalEntries"][number]) => {
+    const reflection = liveMode ? (await companionApi.reflectJournal(entry.id)).reflection : `I notice ${entry.mood} energy in “${entry.title}.” What part would you like me to sit with?`;
+    setState((current) => ({ ...current, currentView: "chat", journalEntries: current.journalEntries.map((candidate) => candidate.id === entry.id ? { ...candidate, reflected: true, updatedAt: new Date().toISOString() } : candidate), messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: reflection, createdAt: new Date().toISOString(), status: "sent" }] }));
+  };
+  const addFutureEvent = async (event: { description: string; eventDate: string }) => {
+    if (liveMode) {
+      const result = await companionApi.addEvent(event.description, event.eventDate);
+      setState((current) => ({ ...current, futureEvents: [result.event, ...current.futureEvents], nudges: result.nudge ? [result.nudge, ...current.nudges] : current.nudges }));
+      return;
+    }
+    setState((current) => { const eventId = crypto.randomUUID(); const scheduled = new Date(new Date(event.eventDate).getTime() - 3_600_000); if (scheduled.getHours() >= 22 || scheduled.getHours() < 8) scheduled.setHours(8, 0, 0, 0); return { ...current, futureEvents: [{ id: eventId, userId: current.user.id, companionId: current.companion.id, ...event, status: "confirmed", createdAt: new Date().toISOString() }, ...current.futureEvents], nudges: current.notifications.frequency === "off" ? current.nudges : [{ id: crypto.randomUUID(), userId: current.user.id, eventId, content: `You mentioned ${event.description}. Want a calm check-in before it?`, scheduledFor: scheduled.toISOString(), status: "planned" }, ...current.nudges] }; });
+  };
+  const updateMemory = async (updated: MemoryRecord) => { const saved = liveMode ? await companionApi.updateMemory(updated.id, { content: updated.content, pinned: updated.pinned, status: updated.status }) : updated; setState((current) => ({ ...current, memories: current.memories.map((memory) => memory.id === saved.id ? saved : memory) })); };
+  const deleteMemory = async (memoryId: string) => { if (liveMode) await companionApi.deleteMemory(memoryId); setState((current) => ({ ...current, memories: current.memories.map((memory) => memory.id === memoryId ? { ...memory, status: "deleted", updatedAt: new Date().toISOString() } : memory) })); };
+  const addMemory = async (content: string, type: MemoryType) => { const now = new Date().toISOString(); const memory = liveMode ? await companionApi.createMemory(state.companion.id, type, content) : { id: crypto.randomUUID(), userId: state.user.id, companionId: state.companion.id, type, content, normalizedContent: content.toLowerCase(), importance: 0.8, confidence: 1, sourceMessageIds: [], createdAt: now, updatedAt: now, retrievalCount: 0, status: "active" as const, pinned: false }; setState((current) => ({ ...current, memories: [...current.memories, memory] })); };
 
-  const completeActivity = (activity: ActivityDefinition) => setState((current) => {
-    if (current.completedActivityIds.includes(activity.id)) return current;
-    const xp = current.wallet.xp + activity.xp;
-    const coins = current.wallet.coins + activity.coinReward;
-    const completedAt = new Date().toISOString();
-    return {
-      ...current,
-      currentView: "chat",
-      completedActivityIds: [...current.completedActivityIds, activity.id],
-      wallet: { ...current.wallet, xp, level: Math.max(current.wallet.level, Math.floor(xp / 100) + 1), coins },
-      walletTransactions: [...current.walletTransactions,
-        { id: crypto.randomUUID(), userId: current.user.id, type: "earn", currency: "xp", amount: activity.xp, balanceAfter: xp, referenceId: activity.id, idempotencyKey: `activity:${activity.id}:xp`, createdAt: completedAt },
-        { id: crypto.randomUUID(), userId: current.user.id, type: "earn", currency: "coins", amount: activity.coinReward, balanceAfter: coins, referenceId: activity.id, idempotencyKey: `activity:${activity.id}:coins`, createdAt: completedAt },
-      ],
-      messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: `Let’s do “${activity.title}.” ${activity.description} I’ll go first.`, createdAt: completedAt, status: "sent" }],
-    };
-  });
+  const completeActivity = async (activity: ActivityDefinition) => {
+    if (state.completedActivityIds.includes(activity.id)) return;
+    const liveWallet = liveMode ? await companionApi.completeActivity(activity.id) : null;
+    setState((current) => {
+      if (current.completedActivityIds.includes(activity.id)) return current;
+      const xp = current.wallet.xp + activity.xp;
+      const coins = current.wallet.coins + activity.coinReward;
+      const completedAt = new Date().toISOString();
+      return {
+        ...current,
+        currentView: "chat",
+        completedActivityIds: [...current.completedActivityIds, activity.id],
+        wallet: liveWallet ?? { ...current.wallet, xp, level: Math.max(current.wallet.level, Math.floor(xp / 100) + 1), coins },
+        walletTransactions: liveMode ? current.walletTransactions : [...current.walletTransactions,
+          { id: crypto.randomUUID(), userId: current.user.id, type: "earn", currency: "xp", amount: activity.xp, balanceAfter: xp, referenceId: activity.id, idempotencyKey: `activity:${activity.id}:xp`, createdAt: completedAt },
+          { id: crypto.randomUUID(), userId: current.user.id, type: "earn", currency: "coins", amount: activity.coinReward, balanceAfter: coins, referenceId: activity.id, idempotencyKey: `activity:${activity.id}:coins`, createdAt: completedAt },
+        ],
+        messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: `Let’s do “${activity.title}.” ${activity.description} I’ll go first.`, createdAt: completedAt, status: "sent" }],
+      };
+    });
+  };
 
   const startDate = (environment: EnvironmentId, title: string) => {
+    const environmentItem = state.storeItems.find((item) => environmentForItem(item) === environment);
+    if (environmentItem && !state.ownedItems.some((owned) => owned.itemId === environmentItem.id)) {
+      setActionError(`Unlock ${environmentItem.name} in Companion before starting this date.`);
+      navigate("companion");
+      return;
+    }
     setState((current) => ({
       ...current,
       activeEnvironment: environment,
@@ -498,18 +707,25 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const openVoiceCall = () => {
-    if (!liveMode && state.subscription.planId === "free") setPlansOpen(true);
+    if (!processingAllowed()) return;
+    if (!featureEntitlements.has(state.subscription.planId, "voiceCalls")) setPlansOpen(true);
     else setVoiceCallOpen(true);
   };
   const openVideoCall = () => {
-    if (!liveMode && (state.subscription.planId === "free" || state.subscription.planId === "plus")) setPlansOpen(true);
+    if (!processingAllowed()) return;
+    if (!featureEntitlements.has(state.subscription.planId, "videoCalls")) setPlansOpen(true);
     else setVideoCallOpen(true);
+  };
+  const analyzeSharedCallFrame = async (dataBase64: string, contentType: string) => {
+    if (liveMode) return (await companionApi.analyzeImage(dataBase64, contentType, "React naturally to the single camera frame the user explicitly shared during a video call. Describe only visible, non-sensitive details and do not identify people.")).description;
+    await pause(280);
+    return "Okay, I can see the frame you chose to share. I won’t guess anything sensitive about you, but I’m here for the story behind what you’re showing me.";
   };
 
   const replyDuringCall = (content: string, delivery: "voice" | "video") => {
     if (liveMode) {
       let reply = "";
-      return companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: crypto.randomUUID(), content }, (delta) => { reply += delta; }).then(() => reply);
+      return companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: crypto.randomUUID(), content, memoryEnabled: state.memoryEnabled }, (delta) => { reply += delta; }).then(() => reply);
     }
     const now = new Date();
     const userTurn: ChatMessage = {
@@ -520,47 +736,61 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       createdAt: now.toISOString(),
       status: "sent",
     };
-    return Promise.resolve(createCompanionTurn(content, [...state.messages, userTurn], now, delivery).text);
+    return Promise.resolve(createCompanionTurn(content, [...messagesForConversation(state.messages, state.activeConversationId), userTurn], now, delivery).text);
   };
 
-  const exportData = () => {
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), source: "luma-local-mock", ...state }, null, 2)], { type: "application/json" });
+  const exportData = async () => {
+    const payload = liveMode ? await companionApi.exportData() : { exportedAt: new Date().toISOString(), source: "luma-local-mock", ...state };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "luma-demo-export.json";
+    anchor.download = liveMode ? "luma-account-export.json" : "luma-demo-export.json";
     anchor.click();
     URL.revokeObjectURL(url);
   };
 
-  const deleteDemo = () => {
+  const deleteDemo = async () => {
+    if (liveMode) {
+      await companionApi.deleteAccount("DELETE");
+      router.replace("/");
+      return;
+    }
     window.localStorage.removeItem(storageKey);
     setState({ ...initialState, firstMeetingComplete: false });
   };
 
+  const logout = async () => {
+    await companionApi.logout();
+    router.replace("/login");
+  };
+
   if (!hydrated) return <div className="app-loader"><span /><p>Opening Luma’s room…</p></div>;
+  if (hydrationError) return <div className="app-loader"><p>{hydrationError}</p><button type="button" className="button button--primary" onClick={() => window.location.reload()}>Try again</button></div>;
   if (!state.onboardingComplete) return <Onboarding onComplete={completeOnboarding} />;
   if (!state.firstMeetingComplete) return <FirstMeeting userName={state.user.name} companionName={state.companion.name} onComplete={() => setState((current) => ({ ...current, firstMeetingComplete: true }))} />;
 
   const renderView = () => {
     switch (state.currentView) {
       case "home": return <HomeView state={state} onChat={() => navigate("chat")} onCall={openVoiceCall} onVideoCall={openVideoCall} onMoments={() => openMoments("moments")} onCompanion={() => navigate("companion")} onSpendTime={() => openMoments("together")} onEnvironmentChange={(activeEnvironment) => setState((current) => ({ ...current, activeEnvironment }))} onAmbienceChange={() => setState((current) => ({ ...current, ambienceEnabled: !current.ambienceEnabled }))} />;
-      case "chat": return <ChatView state={state} streaming={streaming} onSend={sendMessage} onNewConversation={newConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} {...(liveMode ? { onVoiceRecording: sendVoiceRecording, onSpeak: speakWithProvider } : {})} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={regenerateResponse} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!liveMode && (state.subscription.planId === "free" || state.subscription.planId === "plus")) setPlansOpen(true); else setCameraOpen(true); }} />;
-      case "moments": return <MomentsView key={momentsTab} defaultTab={momentsTab} state={state} onCompleteActivity={completeActivity} onStartDate={startDate} onGenerateSelfie={addSelfie} onVideoCall={openVideoCall} />;
-      case "companion": return <CompanionView companion={state.companion} backstory={state.companionBackstory} storeItems={state.storeItems} ownedItems={state.ownedItems} wallet={state.wallet} subscription={state.subscription} onChange={(companion) => setState((current) => ({ ...current, companion }))} onBackstoryChange={(companionBackstory) => setState((current) => ({ ...current, companionBackstory }))} onPurchase={purchaseItem} onEquip={equipItem} onUpgrade={() => setPlansOpen(true)} />;
-      case "memory": return <MemoryView memories={state.memories} enabled={state.memoryEnabled} onToggle={() => setState((current) => ({ ...current, memoryEnabled: !current.memoryEnabled }))} onUpdate={updateMemory} onDelete={deleteMemory} onAdd={addMemory} />;
-      case "activities": return <ActivitiesView activities={state.activities} completedIds={state.completedActivityIds} wallet={state.wallet} journalEntries={state.journalEntries} futureEvents={state.futureEvents} nudges={state.nudges} onComplete={completeActivity} onAddJournal={addJournal} onDeleteJournal={deleteJournal} onReflect={reflectOnJournal} onAddEvent={addFutureEvent} />;
-      case "profile": return <ProfileView state={state} onChange={setState} onExport={exportData} onDelete={deleteDemo} onUpgrade={() => setPlansOpen(true)} onOpenMemory={() => navigate("memory")} onOpenActivities={() => openMoments("together")} />;
+      case "chat": return <ChatView state={state} streaming={streaming} processingEnabled={state.aiProcessingConsent} liveMode={liveMode} onSend={sendMessage} onNewConversation={() => runAction(newConversation(), "A new conversation could not be started.")} onDeleteConversation={deleteConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} {...(liveMode ? { onVoiceRecording: sendVoiceRecording, onSpeak: (content: string) => speakWithProvider(content).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Speech playback failed.")) } : {})} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={(messageId) => runAction(regenerateResponse(messageId), "The response could not be regenerated.")} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!processingAllowed()) return; if (!featureEntitlements.has(state.subscription.planId, "cameraConversation")) setPlansOpen(true); else setCameraOpen(true); }} />;
+      case "moments": return <MomentsView key={momentsTab} defaultTab={momentsTab} state={state} liveMode={liveMode} onCompleteActivity={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onStartDate={startDate} onGenerateSelfie={addSelfie} onVideoCall={openVideoCall} />;
+      case "companion": return <CompanionView companion={state.companion} backstory={state.companionBackstory} storeItems={state.storeItems} ownedItems={state.ownedItems} wallet={state.wallet} subscription={state.subscription} onChange={changeCompanion} onBackstoryChange={(companionBackstory) => setState((current) => ({ ...current, companionBackstory }))} onPurchase={purchaseItem} onEquip={equipItem} onUpgrade={() => setPlansOpen(true)} />;
+      case "memory": return <MemoryView memories={state.memories} enabled={state.memoryEnabled} companionName={state.companion.name} onToggle={() => setState((current) => ({ ...current, memoryEnabled: !current.memoryEnabled }))} onUpdate={(memory) => runAction(updateMemory(memory), "The memory could not be updated.")} onDelete={(memoryId) => runAction(deleteMemory(memoryId), "The memory could not be deleted.")} onAdd={(content, type) => runAction(addMemory(content, type), "The memory could not be added.")} />;
+      case "activities": return <ActivitiesView activities={state.activities} completedIds={state.completedActivityIds} wallet={state.wallet} journalEntries={state.journalEntries} futureEvents={state.futureEvents} nudges={state.nudges} companionName={state.companion.name} liveMode={liveMode} onComplete={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onAddJournal={(entry) => runAction(addJournal(entry), "The journal entry could not be saved.")} onDeleteJournal={(entryId) => runAction(deleteJournal(entryId), "The journal entry could not be deleted.")} onReflect={(entry) => runAction(reflectOnJournal(entry), "The reflection could not be created.")} onAddEvent={(event) => runAction(addFutureEvent(event), "The future plan could not be saved.")} />;
+      case "profile": return <ProfileView state={state} liveMode={liveMode} onChange={changeProfile} onExport={() => runAction(exportData(), "Your data export could not be created.")} onDelete={() => runAction(deleteDemo(), "Your account could not be deleted.")} {...(liveMode ? { onLogout: () => runAction(logout(), "You could not be signed out.") } : {})} onUpgrade={() => setPlansOpen(true)} onOpenMemory={() => navigate("memory")} onOpenActivities={() => openMoments("together")} />;
     }
   };
 
   return (
     <>
-      <AppShell active={state.currentView} onNavigate={navigate} onCall={openVoiceCall} companionName={state.companion.name} immersive={state.currentView === "home"}>{renderView()}</AppShell>
+      <AppShell active={state.currentView} onNavigate={navigate} onCall={openVoiceCall} companionName={state.companion.name} relationshipStage={state.relationship.stage} relationshipLevel={state.relationship.level} immersive={state.currentView === "home"}>{renderView()}</AppShell>
       {voiceCallOpen ? <VoiceCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} onUserTurn={(content) => replyDuringCall(content, "voice")} {...(liveMode ? { onRealtimeConnect: connectVoiceRealtime } : {})} onClose={(seconds) => finishCall("voice", seconds)} /> : null}
-      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} {...(liveMode ? { onRealtimeConnect: connectVideoRealtime } : {})} onClose={(seconds) => finishCall("video", seconds)} /> : null}
-      {cameraOpen ? <CameraConversationModal companionName={state.companion.name} {...(liveMode ? { onSessionStart: companionApi.startCameraSession, onAnalyzeFrame: async (dataBase64: string, contentType: string) => (await companionApi.analyzeImage(dataBase64, contentType, "Discuss the visible object or surroundings naturally and safely.")).description } : {})} onClose={() => setCameraOpen(false)} /> : null}
-      {plansOpen ? <PlanModal current={state.subscription.planId} onSelect={choosePlan} onClose={() => setPlansOpen(false)} /> : null}
+      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} onAnalyzeFrame={analyzeSharedCallFrame} {...(liveMode ? { onRealtimeConnect: connectVideoRealtime } : {})} onClose={(seconds) => finishCall("video", seconds)} /> : null}
+      {cameraOpen ? <CameraConversationModal companionName={state.companion.name} onSessionStart={liveMode ? companionApi.startCameraSession : async () => ({ mock: true })} onAnalyzeFrame={liveMode ? async (dataBase64: string, contentType: string) => (await companionApi.analyzeImage(dataBase64, contentType, "Discuss the visible object or surroundings naturally and safely.")).description : async () => { await pause(280); return "I can see the frame you chose to share. Tell me what matters about it to you, and I’ll stay with that rather than making assumptions."; }} onClose={() => setCameraOpen(false)} /> : null}
+      {plansOpen ? <PlanModal current={state.subscription.planId} onSelect={(planId) => runAction(choosePlan(planId), "The plan could not be changed.")} onClose={() => setPlansOpen(false)} /> : null}
+      {processingNoticeOpen ? <Modal title="AI processing is paused" description="Turn processing consent back on before starting chat, voice, video, camera, or image features." onClose={() => setProcessingNoticeOpen(false)}><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setProcessingNoticeOpen(false)}>Keep paused</button><button type="button" className="button button--primary" onClick={() => { setState((current) => ({ ...current, aiProcessingConsent: true })); setProcessingNoticeOpen(false); }}>Enable AI features</button></div></Modal> : null}
+      {actionError ? <Modal title="That didn’t work" description={actionError} onClose={() => setActionError("")}><button type="button" className="button button--primary" onClick={() => setActionError("")}>Okay</button></Modal> : null}
     </>
   );
 }

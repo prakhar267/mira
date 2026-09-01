@@ -14,6 +14,7 @@ import {
   Volume2,
 } from "lucide-react";
 import type { CompanionProfile, OwnedItemRecord, StoreItemRecord, SubscriptionState, WalletState } from "@companion/shared";
+import { canAccessItem } from "@/lib/product-rules";
 
 const voices = [
   { id: "luma-warm-01", name: "Warm", detail: "Soft, grounded, close", rate: .92, pitch: 1.02 },
@@ -31,8 +32,8 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
   subscription: SubscriptionState;
   onChange: (companion: CompanionProfile) => void;
   onBackstoryChange: (backstory: string) => void;
-  onPurchase: (item: StoreItemRecord) => string | null;
-  onEquip: (item: StoreItemRecord) => void;
+  onPurchase: (item: StoreItemRecord) => string | null | Promise<string | null>;
+  onEquip: (item: StoreItemRecord) => void | Promise<void>;
   onUpgrade: () => void;
 }) {
   const [tab, setTab] = useState<"appearance" | "personality" | "backstory" | "voice">("appearance");
@@ -82,7 +83,7 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
                   <article key={item.id} className={owned ? "catalog-item catalog-item--owned" : "catalog-item"}>
                     <img src={item.assetUrl} alt="" />
                     <div><span>{item.metadata.slot === "room" ? "Environment" : item.category}</span><strong>{item.name}</strong><small>{item.description}</small></div>
-                    <footer><small className="catalog-price">{item.currency === "free" ? "Included" : `${item.price} ${item.currency}`}</small>{owned ? <button type="button" disabled={owned.equipped} onClick={() => { onEquip(item); setNotice(`${item.name} equipped.`); }}>{owned.equipped ? <><Check aria-hidden="true" /> Equipped</> : "Equip"}</button> : <button type="button" onClick={() => { const message = onPurchase(item); setNotice(message ?? `${item.name} added to your collection.`); }}>{item.tierRequired !== "free" && item.tierRequired !== subscription.planId ? <Lock aria-hidden="true" /> : null} Buy</button>}</footer>
+                    <footer><small className="catalog-price">{item.currency === "free" ? "Included" : `${item.price} ${item.currency}`}</small>{owned ? <button type="button" disabled={owned.equipped} onClick={() => { void Promise.resolve(onEquip(item)).then(() => setNotice(`${item.name} equipped.`)).catch((cause) => setNotice(cause instanceof Error ? cause.message : "That item could not be equipped.")); }}>{owned.equipped ? <><Check aria-hidden="true" /> Equipped</> : "Equip"}</button> : <button type="button" onClick={() => { void Promise.resolve(onPurchase(item)).then((message) => setNotice(message ?? `${item.name} added to your collection.`)).catch((cause) => setNotice(cause instanceof Error ? cause.message : "That item could not be purchased.")); }}>{!canAccessItem(subscription.planId, item) ? <Lock aria-hidden="true" /> : null} Buy</button>}</footer>
                   </article>
                 );
               })}
@@ -91,7 +92,7 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
           </> : null}
 
           {tab === "personality" ? <>
-            <div className="section-heading"><div><span className="luma-kicker">Stable, but yours</span><h2>Personality</h2><p>These traits shape how Luma responds over time. One conversation never rewrites them.</p></div></div>
+            <div className="section-heading"><div><span className="luma-kicker">Stable, but yours</span><h2>Personality</h2><p>These traits shape how {companion.name} responds over time. One conversation never rewrites them.</p></div></div>
             <div className="trait-list">{(["warmth", "humor", "curiosity", "assertiveness", "optimism", "energy", "verbosity", "playfulness", "empathy"] as const).map((trait) => <label key={trait}><span><strong>{trait}</strong><small>{Math.round(companion.personality[trait] * 100)}%</small></span><input type="range" min="0" max="100" value={companion.personality[trait] * 100} onChange={(event) => onChange({ ...companion, personality: { ...companion.personality, [trait]: Number(event.target.value) / 100 } })} /></label>)}</div>
           </> : null}
 

@@ -217,6 +217,15 @@ img { display: block; max-width: 100%; }
 .empty-state svg { color: var(--river-strong); }
 .empty-state h2 { margin: 12px 0 4px; font-family: "Cormorant Garamond", Georgia, serif; font-size: 30px; }
 .empty-state p { max-width: 460px; margin: 0; color: color-mix(in srgb, var(--ink) 58%, transparent); font-size: 12px; line-height: 1.6; }
+.incoming-call { position: absolute; z-index: 12; right: 24px; top: 92px; width: min(360px, calc(100% - 32px)); display: grid; grid-template-columns: 54px 1fr 42px 42px; gap: 10px; align-items: center; padding: 12px; border: 1px solid rgba(255,255,255,.24); border-radius: 22px; background: rgba(20,15,34,.82); color: #fff; box-shadow: 0 24px 70px rgba(8,5,18,.38); backdrop-filter: blur(22px); }
+.incoming-call > img { width: 54px; height: 54px; border-radius: 17px; object-fit: cover; }
+.incoming-call > span { display: grid; min-width: 0; }
+.incoming-call small { color: rgba(255,255,255,.62); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.incoming-call strong { font: 600 20px/1.1 "Cormorant Garamond", Georgia, serif; }
+.incoming-call em { overflow: hidden; color: rgba(255,255,255,.78); font-size: 11px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.incoming-call > button { display: grid; width: 40px; height: 40px; place-items: center; border: 0; border-radius: 50%; color: #fff; cursor: pointer; }
+.incoming-call__decline { background: rgba(255,255,255,.14); }
+.incoming-call__accept { background: #6fd39c; box-shadow: 0 8px 24px rgba(63,199,127,.3); }
 
 /* Activities */
 .wallet-pill { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper-raised); }
@@ -390,7 +399,7 @@ img { display: block; max-width: 100%; }
 .memory-demo > p { margin: 10px 0; color: #1a1b19; font-family: "Cormorant Garamond", Georgia, serif; font-size: 30px; line-height: 1.2; }
 .memory-demo > small { color: #878981; font-size: 9px; }
 .memory-demo > div { display: flex; gap: 7px; margin-top: 26px; }
-.memory-demo button { padding: 8px 12px; border: 1px solid rgba(23,24,23,.12); border-radius: 999px; background: transparent; font-size: 9px; }
+.memory-demo > div > span { padding: 8px 12px; border: 1px solid rgba(23,24,23,.12); border-radius: 999px; background: transparent; font-size: 9px; }
 .section-intro { max-width: 760px; margin-bottom: 46px; }
 .section-intro > p { max-width: 670px; }
 .feature-trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -965,6 +974,9 @@ select {
 .scene-switcher__menu button:hover,
 .scene-switcher__menu button[aria-current="true"] { background: rgba(255,255,255,.08); color: var(--text-primary); }
 .scene-switcher__menu img { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
+.scene-switcher__menu span { display: grid; gap: 3px; }
+.scene-switcher__menu small { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 9px; }
+.scene-switcher__menu small svg { width: 11px; height: 11px; }
 
 .luma-home__actions {
   position: absolute;
@@ -1525,8 +1537,9 @@ select {
 .video-call__tools { position: absolute; top: 98px; left: 24px; display: grid; gap: 8px; }
 .video-call__tools label,
 .video-call__tools button { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 13px; border: 1px solid var(--border-luma); border-radius: 999px; background: rgba(20,14,29,.66); color: var(--text-primary); backdrop-filter: blur(14px); font-size: 10px; }
+.video-call__tools button:disabled { cursor: not-allowed; opacity: .48; }
 .video-call__tools select { border: 0; background: transparent; color: inherit; outline: 0; }
-.call-activity-menu { position: absolute; top: 198px; left: 24px; display: grid; width: 220px; padding: 8px; border: 1px solid var(--border-luma); border-radius: 18px; background: rgba(22,15,31,.94); }
+.call-activity-menu { position: absolute; top: 248px; left: 24px; display: grid; width: 220px; padding: 8px; border: 1px solid var(--border-luma); border-radius: 18px; background: rgba(22,15,31,.94); }
 .call-activity-menu button { min-height: 40px; border: 0; border-radius: 11px; background: transparent; color: var(--text-secondary); text-align: left; }
 .call-activity-menu button:hover { background: rgba(255,255,255,.08); }
 .call-activity-card { position: absolute; left: 50%; bottom: 190px; width: min(90vw, 430px); padding: 22px; border: 1px solid rgba(255,255,255,.3); border-radius: 26px; background: rgba(31,22,43,.84); transform: translateX(-50%); backdrop-filter: blur(20px); text-align: center; }
@@ -1557,7 +1570,7 @@ select {
   .video-call__tools { top: 80px; left: 14px; }
   .video-call__tools label { max-width: 165px; }
   .video-call__status { top: 136px; }
-  .call-activity-menu { top: 177px; left: 14px; }
+  .call-activity-menu { top: 230px; left: 14px; }
   .call-activity-card { bottom: 170px; }
   .live-call--video { padding-bottom: 72px; }
   .video-call__captions { width: calc(100% - 28px); margin-bottom: 8px; padding: 9px 11px; }

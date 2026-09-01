@@ -100,4 +100,30 @@ describe("companion turn planning", () => {
     expect(planned.adaptations).toContain("learned-fewer-questions");
     expect(planned.explanation).toContain("Applied your learned preference for fewer follow-up questions.");
   });
+
+  it("responds like a present character when asked what she is doing", () => {
+    const planned = turn("What are you doing?");
+    expect(planned.intent).toBe("self");
+    expect(planned.text.toLowerCase()).toMatch(/here|read|day|arrived/);
+    expect(planned.text.toLowerCase()).not.toContain("how can i help");
+  });
+
+  it("makes a direct everyday choice instead of returning a generic prompt", () => {
+    const planned = turn("Should I wear black or blue?");
+    expect(planned.intent).toBe("choice");
+    expect(planned.text.toLowerCase()).toMatch(/black|blue/);
+    expect(planned.text).not.toContain("Keep going");
+  });
+
+  it("reacts to an ordinary life update with its actual detail", () => {
+    const planned = turn("I just ate pizza");
+    expect(planned.intent).toBe("everyday");
+    expect(planned.text.toLowerCase()).toContain("pizza");
+  });
+
+  it("keeps compliments warm and characterful", () => {
+    const planned = turn("You look beautiful today");
+    expect(planned.intent).toBe("affection");
+    expect(planned.text.toLowerCase()).toMatch(/smile|blush|sweet|compliment/);
+  });
 });

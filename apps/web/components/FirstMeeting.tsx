@@ -36,8 +36,8 @@ export function FirstMeeting({ userName, companionName, onComplete }: { userName
         <span>First meeting</span>
         <AnimatePresence mode="wait"><motion.h1 key={line} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>{lines[line]!(userName)}</motion.h1></AnimatePresence>
         <div>
-          <button type="button" className="round-glass" onClick={speak} aria-label="Hear Luma say this"><SpeakerHigh aria-hidden="true" /></button>
-          <button type="button" className="luma-button luma-button--accent" onClick={onComplete}>{line === lines.length - 1 ? "Say hello" : "Meet Luma"}<ArrowRight aria-hidden="true" /></button>
+          <button type="button" className="round-glass" onClick={speak} aria-label={`Hear ${companionName} say this`}><SpeakerHigh aria-hidden="true" /></button>
+          <button type="button" className="luma-button luma-button--accent" onClick={onComplete}>{line === lines.length - 1 ? "Say hello" : `Meet ${companionName}`}<ArrowRight aria-hidden="true" /></button>
         </div>
       </div>
       <small>AI companion · Adults 18+ · You control memory</small>

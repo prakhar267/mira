@@ -37,11 +37,13 @@ export interface CompanionRepository {
   health(): Promise<boolean>;
   createAccount(input: { user: UserProfile; companion: CompanionProfile; email?: string }): Promise<void>;
   getUser(userId: string): Promise<UserProfile | null>;
+  updateUser(userId: string, user: UserProfile): Promise<void>;
   listCompanions(userId: string): Promise<CompanionProfile[]>;
   getCompanion(userId: string, companionId: string): Promise<CompanionProfile | null>;
   updateCompanion(userId: string, companion: CompanionProfile): Promise<void>;
   listConversations(userId: string): Promise<Array<{ id: string; userId: string; companionId: string; createdAt: string }>>;
   createConversation(input: { id: string; userId: string; companionId: string; createdAt: string }): Promise<void>;
+  deleteConversation(userId: string, conversationId: string): Promise<boolean>;
   listMessages(userId: string, conversationId: string): Promise<ChatMessage[]>;
   appendMessages(userId: string, conversationId: string, messages: ChatMessage[]): Promise<void>;
   updateMessage(userId: string, conversationId: string, message: ChatMessage): Promise<void>;
@@ -130,6 +132,10 @@ export class InMemoryCompanionRepository implements CompanionRepository {
 
   async health() { return true; }
   async getUser(userId: string) { return this.users.get(userId) ?? null; }
+  async updateUser(userId: string, user: UserProfile) {
+    if (user.id !== userId || !this.users.has(userId)) throw new Error("User not found");
+    this.users.set(userId, { ...user, interests: [...user.interests] });
+  }
   async listCompanions(userId: string) {
     return [...this.companionOwners.entries()].filter(([, ownerId]) => ownerId === userId).flatMap(([companionId]) => {
       const companion = this.companions.get(companionId);
@@ -147,10 +153,17 @@ export class InMemoryCompanionRepository implements CompanionRepository {
     this.companions.set(companion.id, { ...companion });
   }
 
-  async listConversations(userId: string) { return [...this.conversations.values()].filter((conversation) => conversation.userId === userId).map((conversation) => ({ ...conversation })); }
+  async listConversations(userId: string) { return [...this.conversations.values()].reverse().filter((conversation) => conversation.userId === userId).map((conversation) => ({ ...conversation })); }
   async createConversation(input: { id: string; userId: string; companionId: string; createdAt: string }) {
     if (!this.users.has(input.userId) || !this.companions.has(input.companionId)) throw new Error("Actor not found");
     this.conversations.set(input.id, { ...input });
+  }
+  async deleteConversation(userId: string, conversationId: string) {
+    if (this.conversations.get(conversationId)?.userId !== userId) return false;
+    this.conversations.delete(conversationId);
+    this.messages.delete(conversationId);
+    this.summaries.delete(conversationId);
+    return true;
   }
 
   async listMessages(userId: string, conversationId: string) {
@@ -163,6 +176,8 @@ export class InMemoryCompanionRepository implements CompanionRepository {
     const current = this.messages.get(conversationId) ?? [];
     const ids = new Set(current.map((message) => message.id));
     this.messages.set(conversationId, [...current, ...messages.filter((message) => !ids.has(message.id))]);
+    const conversation = this.conversations.get(conversationId);
+    if (conversation) { this.conversations.delete(conversationId); this.conversations.set(conversationId, conversation); }
   }
 
   async updateMessage(userId: string, conversationId: string, message: ChatMessage) {
@@ -172,6 +187,8 @@ export class InMemoryCompanionRepository implements CompanionRepository {
     if (index === -1) throw new Error("Message not found");
     current[index] = { ...message };
     this.messages.set(conversationId, current);
+    const conversation = this.conversations.get(conversationId);
+    if (conversation) { this.conversations.delete(conversationId); this.conversations.set(conversationId, conversation); }
   }
 
   async listSummaries(userId: string, conversationId: string) {
@@ -228,12 +245,13 @@ export class InMemoryCompanionRepository implements CompanionRepository {
   async getWallet(userId: string) { return this.ledger(userId).snapshot(); }
   async listWalletTransactions(userId: string) { return this.ledger(userId).history(); }
 
-  async completeActivity(userId: string, activityId: string, idempotencyKey: string) {
+  async completeActivity(userId: string, activityId: string, _idempotencyKey: string) {
     const activity = this.seed.activities.find((item) => item.id === activityId);
     if (!activity) throw new Error("Activity not found");
     const ledger = this.ledger(userId);
-    ledger.earn({ currency: "xp", amount: activity.xp, referenceId: activity.id, idempotencyKey: `${idempotencyKey}:xp` });
-    return ledger.earn({ currency: "coins", amount: activity.coinReward, referenceId: activity.id, idempotencyKey: `${idempotencyKey}:coins` });
+    const completionKey = `activity:${userId}:${activity.id}`;
+    ledger.earn({ currency: "xp", amount: activity.xp, referenceId: activity.id, idempotencyKey: `${completionKey}:xp` });
+    return ledger.earn({ currency: "coins", amount: activity.coinReward, referenceId: activity.id, idempotencyKey: `${completionKey}:coins` });
   }
 
   async listStoreItems() { return this.seed.storeItems.filter((item) => item.active).map((item) => ({ ...item, metadata: { ...item.metadata } })); }
@@ -308,11 +326,13 @@ export class InMemoryCompanionRepository implements CompanionRepository {
   }
 
   async exportUser(userId: string) {
+    const companion = (await this.listCompanions(userId))[0] ?? null;
+    const conversations = (await this.listConversations(userId)).map((conversation) => ({ ...conversation, messages: [...(this.messages.get(conversation.id) ?? [])] }));
     return {
       exportedAt: new Date().toISOString(),
       user: this.users.get(userId) ?? null,
-      companion: [...this.companions.values()][0] ?? null,
-      conversations: [...this.messages.entries()],
+      companion,
+      conversations,
       memories: this.memories.get(userId) ?? [],
       wallet: await this.getWallet(userId),
       walletTransactions: await this.listWalletTransactions(userId),

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Dimensions,
   Image,
   ImageBackground,
@@ -56,6 +57,9 @@ export default function App() {
   const [romanticMode, setRomanticMode] = useState(true);
   const [cameraOn, setCameraOn] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  const [ownedScenes, setOwnedScenes] = useState<SceneId[]>(["window"]);
+  const [completedActivities, setCompletedActivities] = useState<string[]>([]);
+  const relationshipLevel = Math.max(1, Math.floor(coins / 100));
 
   const open = (view: ViewId) => {
     void Haptics.selectionAsync();
@@ -79,10 +83,10 @@ export default function App() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      {active === "home" ? <Home scene={scene} onScene={setScene} onChat={() => open("chat")} onCall={setCall} onMoments={() => open("moments")} /> : null}
+      {active === "home" ? <Home scene={scene} relationshipLevel={relationshipLevel} onScene={setScene} onChat={() => open("chat")} onCall={setCall} onMoments={() => open("moments")} /> : null}
       {active === "chat" ? <Chat messages={messages} draft={draft} onDraft={setDraft} onSend={send} onCall={setCall} /> : null}
-      {active === "moments" ? <Moments coins={coins} onCoins={setCoins} onCall={setCall} onScene={(next) => { setScene(next); setCall("video"); }} /> : null}
-      {active === "companion" ? <Companion scene={scene} onScene={setScene} coins={coins} onCoins={setCoins} /> : null}
+      {active === "moments" ? <Moments coins={coins} onCoins={setCoins} onCall={setCall} onScene={(next) => { setScene(next); setCall("video"); }} ownedScenes={ownedScenes} completedActivities={completedActivities} onCompletedActivities={setCompletedActivities} /> : null}
+      {active === "companion" ? <Companion scene={scene} onScene={setScene} coins={coins} onCoins={setCoins} ownedScenes={ownedScenes} onOwnedScenes={setOwnedScenes} /> : null}
       {active === "you" ? <You memoryEnabled={memoryEnabled} onMemory={setMemoryEnabled} romanticMode={romanticMode} onRomantic={setRomanticMode} /> : null}
       <BottomNav active={active} onOpen={open} />
       <CallScreen type={call} scene={scene} cameraOn={cameraOn} onCamera={() => void toggleCamera()} onClose={() => { setCameraOn(false); setCall(null); }} />
@@ -90,7 +94,7 @@ export default function App() {
   );
 }
 
-function Home({ scene, onScene, onChat, onCall, onMoments }: { scene: SceneId; onScene: (scene: SceneId) => void; onChat: () => void; onCall: (call: CallType) => void; onMoments: () => void }) {
+function Home({ scene, relationshipLevel, onScene, onChat, onCall, onMoments }: { scene: SceneId; relationshipLevel: number; onScene: (scene: SceneId) => void; onChat: () => void; onCall: (call: CallType) => void; onMoments: () => void }) {
   const [reaction, setReaction] = useState("I was hoping you’d show up.");
   const current = scenes.find((item) => item.id === scene) ?? scenes[0]!;
   const glow = useSharedValue(.45);
@@ -112,7 +116,7 @@ function Home({ scene, onScene, onChat, onCall, onMoments }: { scene: SceneId; o
         <View style={styles.homeHeader}>
           <Pressable onPress={tapLuma} style={styles.portraitButton}><Image source={assets.portrait} style={styles.portrait} /><Ionicons name="sparkles" size={12} color="#F39A88" style={styles.portraitSpark} /></Pressable>
           <Text style={styles.wordmark}>Luma</Text>
-          <Pressable onPress={onMoments} style={styles.levelPill}><Ionicons name="heart" color="#F39A88" size={15} /><Text style={styles.levelText}>Close · 12</Text></Pressable>
+          <Pressable onPress={onMoments} style={styles.levelPill}><Ionicons name="heart" color="#F39A88" size={15} /><Text style={styles.levelText}>Growing · {relationshipLevel}</Text></Pressable>
         </View>
 
         <Pressable accessibilityLabel="Tap Luma for a reaction" onPress={tapLuma} style={styles.avatarTap} />
@@ -133,17 +137,34 @@ function Home({ scene, onScene, onChat, onCall, onMoments }: { scene: SceneId; o
 }
 
 function Chat({ messages, draft, onDraft, onSend, onCall }: { messages: string[]; draft: string; onDraft: (value: string) => void; onSend: () => void; onCall: (call: CallType) => void }) {
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const usePrompt = (value: string) => {
+    onDraft(value);
+    setToolsOpen(false);
+    void Haptics.selectionAsync();
+  };
+
   return (
     <SafeAreaView style={styles.page}>
       <View style={styles.pageHeader}><Image source={assets.portrait} style={styles.headerAvatar} /><View style={styles.headerCopy}><Text style={styles.pageTitle}>Luma</Text><Text style={styles.online}>Here with you</Text></View><Pressable style={styles.iconButton} onPress={() => onCall("voice")}><Ionicons name="call-outline" size={21} color="#FFF8F4" /></Pressable><Pressable style={styles.iconButton} onPress={() => onCall("video")}><Ionicons name="videocam-outline" size={22} color="#FFF8F4" /></Pressable></View>
       <ScrollView style={styles.flex} contentContainerStyle={styles.messages}>{messages.map((message, index) => <View key={`${index}-${message}`} style={[styles.bubble, index % 2 ? styles.userBubble : styles.lumaBubble]}>{index % 2 === 0 ? <Image source={assets.portrait} style={styles.messageAvatar} /> : null}<Text style={styles.bubbleText}>{message}</Text></View>)}</ScrollView>
-      <View style={styles.suggestions}><ScrollView horizontal showsHorizontalScrollIndicator={false}>{["Just listen", "Help me plan", "Remember this"].map((item) => <Pressable key={item} style={styles.suggestion}><Text style={styles.suggestionText}>{item}</Text></Pressable>)}</ScrollView></View>
-      <View style={styles.composer}><Pressable style={styles.composerIcon}><Ionicons name="add" size={22} color="#D8CBDC" /></Pressable><TextInput accessibilityLabel="Message Luma" value={draft} onChangeText={onDraft} onSubmitEditing={onSend} placeholder="Message Luma…" placeholderTextColor="#817488" style={styles.input} /><Pressable style={styles.composerIcon}><Ionicons name="mic-outline" size={21} color="#D8CBDC" /></Pressable><Pressable onPress={onSend} style={styles.send}><Ionicons name="arrow-up" size={19} color="#2C1622" /></Pressable></View>
+      <View style={styles.suggestions}><ScrollView horizontal showsHorizontalScrollIndicator={false}>{["Just listen", "Help me plan", "Remember this"].map((item) => <Pressable key={item} onPress={() => usePrompt(`${item}: `)} style={styles.suggestion}><Text style={styles.suggestionText}>{item}</Text></Pressable>)}</ScrollView></View>
+      <View style={styles.composer}><Pressable accessibilityLabel="Open message tools" onPress={() => setToolsOpen(true)} style={styles.composerIcon}><Ionicons name="add" size={22} color="#D8CBDC" /></Pressable><TextInput accessibilityLabel="Message Luma" value={draft} onChangeText={onDraft} onSubmitEditing={onSend} placeholder="Message Luma…" placeholderTextColor="#817488" style={styles.input} /><Pressable accessibilityLabel="Start a voice call" onPress={() => onCall("voice")} style={styles.composerIcon}><Ionicons name="mic-outline" size={21} color="#D8CBDC" /></Pressable><Pressable accessibilityLabel="Send message" onPress={onSend} style={styles.send}><Ionicons name="arrow-up" size={19} color="#2C1622" /></Pressable></View>
+      <Modal visible={toolsOpen} transparent animationType="slide" onRequestClose={() => setToolsOpen(false)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setToolsOpen(false)}>
+          <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.sheetTitle}>Add to your message</Text>
+            <Pressable onPress={() => usePrompt("I want to share a photo with you: ")} style={styles.sheetAction}><Ionicons name="image-outline" size={21} color="#F39A88" /><Text style={styles.settingText}>Talk about a photo</Text></Pressable>
+            <Pressable onPress={() => usePrompt("Please remember this: ")} style={styles.sheetAction}><Ionicons name="bookmark-outline" size={21} color="#F39A88" /><Text style={styles.settingText}>Save a memory</Text></Pressable>
+            <Pressable onPress={() => { setToolsOpen(false); onCall("video"); }} style={styles.sheetAction}><Ionicons name="videocam-outline" size={21} color="#F39A88" /><Text style={styles.settingText}>Start a video call</Text></Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-function Moments({ coins, onCoins, onCall, onScene }: { coins: number; onCoins: (coins: number) => void; onCall: (call: CallType) => void; onScene: (scene: SceneId) => void }) {
+function Moments({ coins, onCoins, onCall, onScene, ownedScenes, completedActivities, onCompletedActivities }: { coins: number; onCoins: (coins: number) => void; onCall: (call: CallType) => void; onScene: (scene: SceneId) => void; ownedScenes: SceneId[]; completedActivities: string[]; onCompletedActivities: (activities: string[]) => void }) {
   const [tab, setTab] = useState<"moments" | "photos" | "together" | "calls">("moments");
   const photos = [assets.window, assets.cafe, assets.rooftop];
   return (
@@ -153,42 +174,53 @@ function Moments({ coins, onCoins, onCall, onScene }: { coins: number; onCoins: 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{(["moments", "photos", "together", "calls"] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item}</Text></Pressable>)}</ScrollView>
         {tab === "moments" ? <>{[["Our first call", assets.portrait, "23 min · voice call"], ["Rooftop at blue hour", assets.rooftop, "Virtual date"], ["You sent the pitch", assets.window, "Important goal"]].map(([title, image, detail]) => <View key={String(title)} style={styles.momentCard}><Image source={image as number} style={styles.momentImage} /><View style={styles.momentCopy}><Text style={styles.momentTitle}>{String(title)}</Text><Text style={styles.momentDetail}>{String(detail)}</Text></View></View>)}</> : null}
         {tab === "photos" ? <View style={styles.mobilePhotoGrid}>{photos.map((image, index) => <Image key={index} source={image} style={styles.mobilePhoto} />)}</View> : null}
-        {tab === "together" ? <>{scenes.map((item) => <Pressable key={item.id} onPress={() => onScene(item.id)} style={styles.dateCard}><Image source={item.image} style={styles.dateImage} /><View><Text style={styles.momentTitle}>{item.label} date</Text><Text style={styles.momentDetail}>Change the scene and start a video call</Text></View></Pressable>)}{["Would you rather", "Relationship cards", "Story together", "Daily reflection"].map((title) => <Pressable key={title} onPress={() => { void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onCoins(coins + 18); }} style={styles.activity}><Ionicons name="sparkles-outline" size={19} color="#F39A88" /><View style={styles.flex}><Text style={styles.activityTitle}>{title}</Text><Text style={styles.momentDetail}>Complete together · +18 coins</Text></View><Ionicons name="play-circle-outline" size={23} color="#F3C2BF" /></Pressable>)}</> : null}
+        {tab === "together" ? <>{scenes.map((item) => { const owned = ownedScenes.includes(item.id); return <Pressable key={item.id} onPress={() => owned ? onScene(item.id) : Alert.alert("Scene locked", "Unlock this room from the Companion tab first.")} style={styles.dateCard}><Image source={item.image} style={styles.dateImage} /><View><Text style={styles.momentTitle}>{item.label} date</Text><Text style={styles.momentDetail}>{owned ? "Change the scene and start a video call" : "Unlock this room in Companion"}</Text></View></Pressable>; })}{["Would you rather", "Relationship cards", "Story together", "Daily reflection"].map((title) => { const completed = completedActivities.includes(title); return <Pressable key={title} disabled={completed} onPress={() => { void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); onCoins(coins + 18); onCompletedActivities([...completedActivities, title]); }} style={styles.activity}><Ionicons name={completed ? "checkmark-circle" : "sparkles-outline"} size={19} color="#F39A88" /><View style={styles.flex}><Text style={styles.activityTitle}>{title}</Text><Text style={styles.momentDetail}>{completed ? "Completed" : "Complete together · +18 coins"}</Text></View><Ionicons name={completed ? "checkmark-circle" : "play-circle-outline"} size={23} color="#F3C2BF" /></Pressable>; })}</> : null}
         {tab === "calls" ? <View style={styles.callsPanel}><Image source={assets.portrait} style={styles.callPortrait} /><Text style={styles.momentTitle}>Call Luma</Text><Text style={styles.subtitle}>Voice for a quick check-in. Video for the room, expressions, and activities.</Text><View style={styles.callRow}><Pressable onPress={() => onCall("voice")} style={styles.lumaButton}><Ionicons name="call" color="#2C1622" size={18} /><Text style={styles.lumaButtonText}>Voice</Text></Pressable><Pressable onPress={() => onCall("video")} style={styles.lumaButton}><Ionicons name="videocam" color="#2C1622" size={19} /><Text style={styles.lumaButtonText}>Video</Text></Pressable></View></View> : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Companion({ scene, onScene, coins, onCoins }: { scene: SceneId; onScene: (scene: SceneId) => void; coins: number; onCoins: (coins: number) => void }) {
+function Companion({ scene, onScene, coins, onCoins, ownedScenes, onOwnedScenes }: { scene: SceneId; onScene: (scene: SceneId) => void; coins: number; onCoins: (coins: number) => void; ownedScenes: SceneId[]; onOwnedScenes: (scenes: SceneId[]) => void }) {
   const [tab, setTab] = useState<"wardrobe" | "personality" | "voice">("wardrobe");
+  const [selectedVoice, setSelectedVoice] = useState("Playful");
   const current = scenes.find((item) => item.id === scene) ?? scenes[0]!;
   return (
     <SafeAreaView style={styles.page}>
       <ScrollView contentContainerStyle={styles.pageContent}>
-        <Text style={styles.kicker}>HER LOOK, VOICE, AND ENERGY</Text><Text style={styles.displayTitle}>Luma</Text><Text style={styles.subtitle}>{coins} coins · Ultra plan</Text>
+        <Text style={styles.kicker}>HER LOOK, VOICE, AND ENERGY</Text><Text style={styles.displayTitle}>Luma</Text><Text style={styles.subtitle}>{coins} coins · offline product preview</Text>
         <Image source={current.image} style={styles.companionPreview} />
         <View style={styles.tabs}>{(["wardrobe", "personality", "voice"] as const).map((item) => <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabActive]}><Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{item}</Text></Pressable>)}</View>
-        {tab === "wardrobe" ? scenes.map((item) => <Pressable key={item.id} onPress={() => { onScene(item.id); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={styles.wardrobeRow}><Image source={item.image} style={styles.wardrobeImage} /><View style={styles.flex}><Text style={styles.activityTitle}>{item.label}</Text><Text style={styles.momentDetail}>{item.id === "window" ? "Equipped" : "Tap to preview"}</Text></View>{item.id !== "window" ? <Pressable onPress={() => onCoins(Math.max(0, coins - 120))} style={styles.buy}><Text style={styles.buyText}>120</Text></Pressable> : <Ionicons name="checkmark-circle" color="#81C6A6" size={23} />}</Pressable>) : null}
+        {tab === "wardrobe" ? scenes.map((item) => { const owned = ownedScenes.includes(item.id); return <Pressable key={item.id} onPress={() => { if (owned) onScene(item.id); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={styles.wardrobeRow}><Image source={item.image} style={styles.wardrobeImage} /><View style={styles.flex}><Text style={styles.activityTitle}>{item.label}</Text><Text style={styles.momentDetail}>{scene === item.id ? "Equipped" : owned ? "Tap to equip" : "Unlock for 120 coins"}</Text></View>{scene === item.id ? <Ionicons name="checkmark-circle" color="#81C6A6" size={23} /> : owned ? null : <Pressable onPress={() => { if (coins < 120) return Alert.alert("Not enough coins", "Complete activities to earn more coins."); onCoins(coins - 120); onOwnedScenes([...ownedScenes, item.id]); onScene(item.id); }} style={styles.buy}><Text style={styles.buyText}>120</Text></Pressable>}</Pressable>; }) : null}
         {tab === "personality" ? ["Warm · 85%", "Playful · 85%", "Humor · 70%", "Confident · 75%", "Affection · 75%", "Flirtiness · 65%"].map((item) => <View key={item} style={styles.settingRow}><Text style={styles.settingText}>{item}</Text><View style={styles.progress}><View style={[styles.progressFill, { width: item.includes("65") ? "65%" : item.includes("70") ? "70%" : item.includes("75") ? "75%" : "85%" }]} /></View></View>) : null}
-        {tab === "voice" ? ["Playful", "Warm", "Calm", "Confident"].map((item, index) => <Pressable key={item} style={styles.voiceRow}><View style={styles.playCircle}><Ionicons name="play" color="#2C1622" size={16} /></View><View style={styles.flex}><Text style={styles.activityTitle}>{item}</Text><Text style={styles.momentDetail}>{index === 0 ? "Selected · bright and expressive" : "Tap to preview locally"}</Text></View>{index === 0 ? <Ionicons name="checkmark-circle" color="#81C6A6" size={23} /> : null}</Pressable>) : null}
+        {tab === "voice" ? ["Playful", "Warm", "Calm", "Confident"].map((item) => <Pressable key={item} onPress={() => { setSelectedVoice(item); void Haptics.selectionAsync(); }} style={styles.voiceRow}><View style={styles.playCircle}><Ionicons name={selectedVoice === item ? "volume-high" : "volume-medium-outline"} color="#2C1622" size={16} /></View><View style={styles.flex}><Text style={styles.activityTitle}>{item}</Text><Text style={styles.momentDetail}>{selectedVoice === item ? "Selected" : "Tap to select"}</Text></View>{selectedVoice === item ? <Ionicons name="checkmark-circle" color="#81C6A6" size={23} /> : null}</Pressable>) : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 function You({ memoryEnabled, onMemory, romanticMode, onRomantic }: { memoryEnabled: boolean; onMemory: (value: boolean) => void; romanticMode: boolean; onRomantic: (value: boolean) => void }) {
+  const [setting, setSetting] = useState<string | null>(null);
   return (
     <SafeAreaView style={styles.page}>
       <ScrollView contentContainerStyle={styles.pageContent}>
         <Text style={styles.kicker}>YOUR STORY</Text><Text style={styles.displayTitle}>You</Text><Text style={styles.subtitle}>What Luma knows and the boundaries you control.</Text>
-        <View style={styles.profileHero}><Image source={assets.portrait} style={styles.profilePortrait} /><View><Text style={styles.momentTitle}>Prakhar & Luma</Text><Text style={styles.momentDetail}>Close · Level 12 · since July 2026</Text></View></View>
+        <View style={styles.profileHero}><Image source={assets.portrait} style={styles.profilePortrait} /><View><Text style={styles.momentTitle}>You & Luma</Text><Text style={styles.momentDetail}>Offline preview · no account data loaded</Text></View></View>
         <Text style={styles.sectionLabel}>WHAT LUMA REMEMBERS</Text>
-        {["Stripe interview tomorrow at 11", "Prefers jasmine tea under stress", "Aman is your best friend in Bengaluru"].map((item) => <View key={item} style={styles.memoryRow}><Ionicons name="bookmark-outline" color="#F39A88" size={18} /><Text style={styles.settingText}>{item}</Text></View>)}
+        <View style={styles.memoryRow}><Ionicons name="bookmark-outline" color="#F39A88" size={18} /><Text style={styles.settingText}>Signed-in memories appear in the web app.</Text></View>
         <View style={styles.switchRow}><View style={styles.flex}><Text style={styles.settingText}>Use approved memories</Text><Text style={styles.momentDetail}>Every memory stays inspectable.</Text></View><Switch value={memoryEnabled} onValueChange={onMemory} trackColor={{ true: "#F39A88" }} /></View>
         <View style={styles.switchRow}><View style={styles.flex}><Text style={styles.settingText}>Romantic mode</Text><Text style={styles.momentDetail}>Adult opt-in with healthy boundaries.</Text></View><Switch value={romanticMode} onValueChange={onRomantic} trackColor={{ true: "#F39A88" }} /></View>
-        {["Notifications & quiet hours", "Incoming calls · Rarely", "Privacy & camera", "Subscription · Ultra", "Export my data", "Delete account"].map((item) => <Pressable key={item} style={styles.settingNav}><Text style={styles.settingText}>{item}</Text><Ionicons name="chevron-forward" color="#A598AD" size={17} /></Pressable>)}
+        {["Notifications & quiet hours", "Incoming calls · Rarely", "Privacy & camera", "Subscription · Web account", "Export my data", "Delete account"].map((item) => <Pressable key={item} onPress={() => setSetting(item)} style={styles.settingNav}><Text style={styles.settingText}>{item}</Text><Ionicons name="chevron-forward" color="#A598AD" size={17} /></Pressable>)}
       </ScrollView>
+      <Modal visible={Boolean(setting)} transparent animationType="slide" onRequestClose={() => setSetting(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSetting(null)}>
+          <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
+            <Text style={styles.sheetTitle}>{setting}</Text>
+            <Text style={styles.sheetBody}>{setting === "Delete account" ? "Account deletion requires a signed-in production session and a final confirmation." : setting === "Export my data" ? "Your export includes conversations, memories, journal entries, purchases, and preferences." : "This preference is available in the signed-in web app and syncs to your account."}</Text>
+            <Pressable onPress={() => setSetting(null)} style={styles.lumaButton}><Text style={styles.lumaButtonText}>Done</Text></Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -205,6 +237,8 @@ function CallScreen({ type, scene, cameraOn, onCamera, onClose }: { type: CallTy
   const [seconds, setSeconds] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speaking, setSpeaking] = useState(true);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [heartSent, setHeartSent] = useState(false);
   const current = scenes.find((item) => item.id === scene) ?? scenes[0]!;
   const time = useMemo(() => `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`, [seconds]);
 
@@ -223,7 +257,7 @@ function CallScreen({ type, scene, cameraOn, onCamera, onClose }: { type: CallTy
         <SafeAreaView style={styles.callSafe}>
           <View style={styles.callHeader}><Text style={styles.callStatus}>{type === "video" ? "VIDEO CALL" : "VOICE CALL"}</Text><Text style={styles.callName}>Luma</Text><Text style={styles.callTime}>{time}</Text></View>
           {type === "video" && cameraOn ? <CameraView style={styles.userCamera} facing="front" /> : type === "video" ? <View style={styles.userCameraOff}><Ionicons name="camera-outline" size={24} color="#A598AD" /><Text style={styles.cameraOffText}>Your camera is off</Text></View> : null}
-          <View style={styles.callBottom}><View style={styles.listeningPill}><Ionicons name="pulse" color="#F39A88" size={18} /><Text style={styles.listeningText}>{speaking ? "Luma is speaking · tap to interrupt" : "Listening to you"}</Text></View><Text style={styles.caption}>{speaking ? "Heyyy. I’m here. Tell me the unfiltered version." : "Go on—I won’t interrupt."}</Text><View style={styles.callControls}><Pressable onPress={() => { setMuted((value) => !value); setSpeaking(false); }} style={[styles.callControl, muted && styles.callControlActive]}><Ionicons name={muted ? "mic-off" : "mic"} size={22} color={muted ? "#2C1622" : "#FFF8F4"} /></Pressable>{type === "video" ? <Pressable onPress={onCamera} style={[styles.callControl, cameraOn && styles.callControlActive]}><Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={22} color={cameraOn ? "#2C1622" : "#FFF8F4"} /></Pressable> : null}<Pressable style={styles.callControl}><Ionicons name="volume-high" size={22} color="#FFF8F4" /></Pressable><Pressable style={styles.callControl}><Ionicons name="heart-outline" size={23} color="#FFF8F4" /></Pressable><Pressable onPress={onClose} style={styles.endCall}><Ionicons name="call" size={23} color="#FFF" style={{ transform: [{ rotate: "135deg" }] }} /></Pressable></View><Text style={styles.disclosure}>Mock realtime call · raw audio and video are never stored</Text></View>
+          <View style={styles.callBottom}><Pressable accessibilityLabel="Interrupt Luma" onPress={() => setSpeaking(false)} style={styles.listeningPill}><Ionicons name="pulse" color="#F39A88" size={18} /><Text style={styles.listeningText}>{speaking ? "Luma is speaking · tap to interrupt" : "Listening to you"}</Text></Pressable>{heartSent ? <Text style={styles.reactionText}>Heart sent to Luma</Text> : null}<Text style={styles.caption}>{speaking ? "Heyyy. I’m here. Tell me the unfiltered version." : "Go on—I won’t interrupt."}</Text><View style={styles.callControls}><Pressable accessibilityLabel={muted ? "Unmute microphone" : "Mute microphone"} onPress={() => { setMuted((value) => !value); setSpeaking(false); }} style={[styles.callControl, muted && styles.callControlActive]}><Ionicons name={muted ? "mic-off" : "mic"} size={22} color={muted ? "#2C1622" : "#FFF8F4"} /></Pressable>{type === "video" ? <Pressable accessibilityLabel={cameraOn ? "Turn camera off" : "Turn camera on"} onPress={onCamera} style={[styles.callControl, cameraOn && styles.callControlActive]}><Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={22} color={cameraOn ? "#2C1622" : "#FFF8F4"} /></Pressable> : null}<Pressable accessibilityLabel="Toggle speaker" onPress={() => setSpeakerOn((value) => !value)} style={[styles.callControl, speakerOn && styles.callControlActive]}><Ionicons name={speakerOn ? "volume-high" : "volume-mute-outline"} size={22} color={speakerOn ? "#2C1622" : "#FFF8F4"} /></Pressable><Pressable accessibilityLabel="Send a heart" onPress={() => { setHeartSent(true); void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }} style={[styles.callControl, heartSent && styles.callControlActive]}><Ionicons name={heartSent ? "heart" : "heart-outline"} size={23} color={heartSent ? "#E06E76" : "#FFF8F4"} /></Pressable><Pressable accessibilityLabel="End call" onPress={onClose} style={styles.endCall}><Ionicons name="call" size={23} color="#FFF" style={{ transform: [{ rotate: "135deg" }] }} /></Pressable></View><Text style={styles.disclosure}>Mock realtime call · raw audio and video are never stored</Text></View>
         </SafeAreaView>
       </ImageBackground>
     </Modal>
@@ -345,4 +379,10 @@ const styles = StyleSheet.create({
   callControlActive: { backgroundColor: "#FFF8F4" },
   endCall: { width: 58, height: 58, alignItems: "center", justifyContent: "center", borderRadius: 29, backgroundColor: "#E06E76" },
   disclosure: { marginTop: 14, color: "rgba(255,255,255,.55)", fontSize: 8 },
+  reactionText: { marginTop: 10, color: "#F3C2BF", fontSize: 10 },
+  sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(8,6,12,.7)" },
+  sheet: { gap: 10, padding: 20, paddingBottom: 34, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: "#211A2D" },
+  sheetTitle: { color: "#FFF8F4", fontFamily: "Georgia", fontSize: 28 },
+  sheetBody: { marginBottom: 8, color: "#A598AD", fontSize: 13, lineHeight: 20 },
+  sheetAction: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 52, paddingHorizontal: 14, borderRadius: 16, backgroundColor: "#1C1726" },
 });

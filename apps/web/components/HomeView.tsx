@@ -1,19 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CaretDown,
   ChatCircleDots,
   Heart,
+  Lock,
   Phone,
   SpeakerHigh,
   SpeakerSlash,
   Sparkle,
   TShirt,
   VideoCamera,
+  X,
 } from "@phosphor-icons/react";
 import type { DemoState, EnvironmentId } from "@/lib/state";
+import { environmentForItem } from "@/lib/product-rules";
 
 const environments: Array<{ id: EnvironmentId; label: string; image: string }> = [
   { id: "window-nook", label: "Window nook", image: "/assets/luma/window-nook.png" },
@@ -52,7 +55,13 @@ export function HomeView({
   const [reactionIndex, setReactionIndex] = useState(-1);
   const [sceneMenuOpen, setSceneMenuOpen] = useState(false);
   const [mountedAt] = useState(() => new Date());
+  const [incomingCall, setIncomingCall] = useState(false);
   const environment = environments.find((item) => item.id === state.activeEnvironment) ?? environments[0]!;
+  const ownedEnvironments = new Set(state.ownedItems.flatMap((owned) => {
+    const item = state.storeItems.find((candidate) => candidate.id === owned.itemId);
+    const environmentId = item ? environmentForItem(item) : null;
+    return environmentId ? [environmentId] : [];
+  }));
   const recentMoment = state.moments[0];
   const greeting = useMemo(() => {
     const now = mountedAt.getTime();
@@ -75,6 +84,17 @@ export function HomeView({
     setReactionIndex((current) => (current + 1) % reactions.length);
     window.setTimeout(() => setReactionIndex(-1), 3_200);
   };
+
+  useEffect(() => {
+    if (state.proactiveCalls === "never" || state.notifications.frequency === "off") return;
+    if (window.sessionStorage.getItem("luma-incoming-call-shown")) return;
+    const delay = state.proactiveCalls === "often" ? 2_500 : state.proactiveCalls === "sometimes" ? 4_000 : 6_500;
+    const timer = window.setTimeout(() => {
+      window.sessionStorage.setItem("luma-incoming-call-shown", "1");
+      setIncomingCall(true);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [state.notifications.frequency, state.proactiveCalls]);
 
   return (
     <section className="luma-home" aria-labelledby="luma-home-title">
@@ -99,7 +119,7 @@ export function HomeView({
           <img src="/assets/luma/portrait.png" alt="" />
           <Sparkle aria-hidden="true" weight="fill" />
         </button>
-        <h1 id="luma-home-title">Luma<Sparkle aria-hidden="true" weight="fill" /></h1>
+        <h1 id="luma-home-title">{state.companion.name}<Sparkle aria-hidden="true" weight="fill" /></h1>
         <button type="button" className="relationship-pill" onClick={onMoments} aria-label="Open relationship moments">
           <Heart aria-hidden="true" weight="fill" />
           <span>{state.relationship.stage} · {state.relationship.level}</span>
@@ -119,7 +139,7 @@ export function HomeView({
             {reactionIndex < 0 ? <span>{greeting.detail}</span> : null}
           </motion.div>
         </AnimatePresence>
-        <div className="voice-wave" aria-label="Luma voice is ready">
+        <div className="voice-wave" aria-label={`${state.companion.name} voice is ready`}>
           {[0.48, 0.8, 0.58, 1, 0.72, 0.9, 0.46, 0.78, 0.56].map((scale, index) => (
             <i key={index} style={{ "--wave-scale": scale } as React.CSSProperties} />
           ))}
@@ -136,9 +156,9 @@ export function HomeView({
           {sceneMenuOpen ? (
             <motion.div className="scene-switcher__menu" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
               {environments.map((item) => (
-                <button type="button" key={item.id} aria-current={state.activeEnvironment === item.id} onClick={() => { onEnvironmentChange(item.id); setSceneMenuOpen(false); }}>
+                <button type="button" key={item.id} aria-current={state.activeEnvironment === item.id} onClick={() => { if (ownedEnvironments.has(item.id)) onEnvironmentChange(item.id); else onCompanion(); setSceneMenuOpen(false); }}>
                   <img src={item.image} alt="" />
-                  <span>{item.label}</span>
+                  <span>{item.label}{!ownedEnvironments.has(item.id) ? <small><Lock aria-hidden="true" /> Unlock in Companion</small> : null}</span>
                 </button>
               ))}
             </motion.div>
@@ -163,6 +183,15 @@ export function HomeView({
         <button type="button" onClick={onSpendTime}><Sparkle aria-hidden="true" weight="fill" /> Spend time together</button>
         {recentMoment ? <button type="button" onClick={onMoments}>{recentMoment.title}<span>View moment</span></button> : null}
       </div>
+
+      <AnimatePresence>
+        {incomingCall ? <motion.aside className="incoming-call" role="status" aria-label={`Incoming AI call from ${state.companion.name}`} initial={{ opacity: 0, y: 24, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16 }}>
+          <img src="/assets/luma/portrait.png" alt="" />
+          <span><small>Incoming AI call</small><strong>{state.companion.name}</strong><em>“I have a minute. Want me?”</em></span>
+          <button type="button" className="incoming-call__decline" aria-label="Decline incoming call" onClick={() => setIncomingCall(false)}><X aria-hidden="true" /></button>
+          <button type="button" className="incoming-call__accept" aria-label="Accept incoming call" onClick={() => { setIncomingCall(false); onCall(); }}><Phone aria-hidden="true" weight="fill" /></button>
+        </motion.aside> : null}
+      </AnimatePresence>
     </section>
   );
 }

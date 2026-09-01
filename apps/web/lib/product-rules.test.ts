@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { initialState } from "./state";
-import { canAccessItem, currencyBalance } from "./product-rules";
+import { canAccessItem, currencyBalance, environmentForItem } from "./product-rules";
 
 describe("local product rules", () => {
   it("ships all acceptance seed content", () => {
@@ -15,5 +15,10 @@ describe("local product rules", () => {
     expect(canAccessItem("plus", premium!)).toBe(false);
     expect(canAccessItem("platinum", premium!)).toBe(true);
     expect(currencyBalance(premium!, initialState.wallet)).toBe(initialState.wallet.gems);
+  });
+
+  it("maps room inventory to the environment it unlocks", () => {
+    const room = initialState.storeItems.find((item) => item.id === "window-nook");
+    expect(environmentForItem(room!)).toBe("window-nook");
   });
 });

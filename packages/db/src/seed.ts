@@ -88,8 +88,8 @@ export const seedStoreItems: StoreItemRecord[] = [
   { id: "lavender-cardigan", name: "Moonlight cardigan", description: "Luma's soft lavender starting look.", category: "Clothing", assetUrl: "/assets/luma/window-nook.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "outfit", tone: "lavender" }, active: true },
   { id: "midnight-blue", name: "Midnight blue", description: "A softly tailored rooftop look.", category: "Clothing", assetUrl: "/assets/luma/rooftop-date.png", currency: "coins", price: 180, tierRequired: "plus", metadata: { slot: "outfit", tone: "midnight" }, active: true },
   { id: "star-chain", name: "Little star chain", description: "A subtle gold keepsake.", category: "Accessories", assetUrl: "/assets/luma/portrait.png", currency: "gems", price: 8, tierRequired: "plus", metadata: { slot: "jewelry" }, active: true },
-  { id: "window-nook", name: "Window nook", description: "Moonlight, city glow, and the softest corner.", category: "Room", assetUrl: "/assets/luma/window-nook.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "room", ambience: "moonlight" }, active: true },
-  { id: "rainy-cafe", name: "Rainy café", description: "Coffee and nowhere to rush.", category: "Room", assetUrl: "/assets/luma/cafe-selfie.png", currency: "coins", price: 220, tierRequired: "plus", metadata: { slot: "room", ambience: "rain" }, active: true },
+  { id: "window-nook", name: "Window nook", description: "Moonlight, city glow, and the softest corner.", category: "Room", assetUrl: "/assets/luma/window-nook.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "room", ambience: "moonlight", environment: "window-nook" }, active: true },
+  { id: "rainy-cafe", name: "Rainy café", description: "Coffee and nowhere to rush.", category: "Room", assetUrl: "/assets/luma/cafe-selfie.png", currency: "coins", price: 220, tierRequired: "plus", metadata: { slot: "room", ambience: "rain", environment: "rainy-cafe" }, active: true },
 ];
 
 export const inMemorySeed = { user: seedUser, companion: seedCompanion, memories: seedMemories, activities: seedActivities, storeItems: seedStoreItems };

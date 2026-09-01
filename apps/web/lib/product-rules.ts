@@ -9,3 +9,8 @@ export function canAccessItem(planId: SubscriptionPlanId, item: StoreItemRecord)
 export function currencyBalance(item: StoreItemRecord, wallet: { coins: number; gems: number }): number {
   return item.currency === "free" ? Number.POSITIVE_INFINITY : wallet[item.currency];
 }
+
+export function environmentForItem(item: StoreItemRecord): string | null {
+  if (item.metadata.environment) return item.metadata.environment;
+  return item.category === "Room" && (item.id === "window-nook" || item.id === "rainy-cafe") ? item.id : null;
+}

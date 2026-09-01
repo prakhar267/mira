@@ -140,7 +140,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <span className="eyebrow">Adults only</span>
               <h1>Confirm you’re 18 or older.</h1>
               <p>Your birthday supports eligibility and age-appropriate features. A production launch will require stronger age assurance.</p>
-              <label className="field">Birthday<input type="text" inputMode="numeric" pattern="\d{4}-\d{2}-\d{2}" placeholder="YYYY-MM-DD" value={draft.birthday} onChange={(event) => setDraft({ ...draft, birthday: event.target.value })} /></label>
+              <label className="field">Birthday<input type="date" max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().slice(0, 10)} value={draft.birthday} onChange={(event) => setDraft({ ...draft, birthday: event.target.value })} /></label>
               <label className="check-line"><input type="checkbox" checked={draft.adultConfirmed} onChange={(event) => setDraft({ ...draft, adultConfirmed: event.target.checked })} /><span>I confirm I am 18 or older.</span></label>
             </>
           )}

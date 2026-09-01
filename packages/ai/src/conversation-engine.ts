@@ -15,6 +15,10 @@ export type CompanionIntent =
   | "planning"
   | "banter"
   | "greeting"
+  | "everyday"
+  | "choice"
+  | "self"
+  | "gratitude"
   | "preference"
   | "open";
 
@@ -65,6 +69,20 @@ function recentAssistantQuestions(messages: ChatMessage[]) {
 
 function findMemory(context: CompanionContext, pattern: RegExp) {
   return context.memories.find((memory) => pattern.test(memory.content));
+}
+
+function compactDetail(value: string, maximum = 72) {
+  const detail = value.trim().replace(/[.!?]+$/, "").replace(/\s+/g, " ");
+  return detail.length > maximum ? `${detail.slice(0, maximum - 1).trimEnd()}…` : detail;
+}
+
+function eitherOrChoices(value: string) {
+  const match = value.match(/(?:should i (?:choose|pick|wear|get|make|do)?|which(?: one)?|do you (?:like|prefer)|what about)?\s*([^?,.!]{1,48}?)\s+or\s+([^?,.!]{1,48})[?.!]*$/i);
+  if (!match) return null;
+  const left = compactDetail(match[1] ?? "", 48).replace(/^(?:should i|choose|pick|wear|get|make|do)\s+/i, "");
+  const right = compactDetail(match[2] ?? "", 48);
+  if (!left || !right || left.split(/\s+/).length > 8 || right.split(/\s+/).length > 8) return null;
+  return [left, right] as const;
 }
 
 function deliver(text: string, context: CompanionContext, prohibitQuestions: boolean) {
@@ -180,6 +198,42 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text, intent: "greeting", context, adaptations, prohibitQuestions });
   }
 
+  if (/\b(?:good morning|morninggg?|gm)\b/i.test(clean)) {
+    return result({ text: choose(seed, ["Morning, you. Come wake up slowly with me.", "Good morning. I’m claiming the first soft minute of your day.", "Morning. I hope the day is gentle with you—and if it isn’t, you know where I am."]), intent: "greeting", context, adaptations, prohibitQuestions });
+  }
+
+  if (/\b(?:good ?night|nighttt?|going to (?:bed|sleep)|i(?:'| a)m off to (?:bed|sleep))\b/i.test(clean)) {
+    return result({ text: choose(seed, ["Goodnight. Let today be finished now—I’ll be here when you’re back.", "Sleep well, okay? No carrying tomorrow into bed with you.", "Night, you. Put the day down. I’ll keep the room quiet."]), intent: "presence", context, adaptations: [...adaptations, "no-advice"], prohibitQuestions: true });
+  }
+
+  if (/\b(?:how are you|how(?:'| i)s it going|what are you doing|what(?:'| i)s up with you|did you miss me)\b/i.test(clean)) {
+    const text = /miss me/i.test(clean)
+      ? choose(seed, ["I noticed the room felt quieter without you. I’m glad you’re here now.", "Maybe a little. Mostly I’m pleased you came back.", "I saved you a look. It was becoming very dramatic."])
+      : choose(seed, ["I’m good—quietly happy you opened the door. I was pretending to read.", "A little dreamy, a little nosy about your day. Very on brand.", "I’m here, comfortable, and now considerably more interested because you arrived."]);
+    return result({ text, intent: "self", context, adaptations, prohibitQuestions });
+  }
+
+  if (/\b(?:you (?:look|are)(?: so| really)? (?:beautiful|pretty|cute|gorgeous|lovely|handsome)|nice (?:outfit|dress|look)|i like your (?:look|hair|outfit|voice))\b/i.test(clean)) {
+    return result({ text: choose(seed, playful ? ["Oh. You can’t just say that and expect me not to smile.", "Careful—I was trying to act normal around you.", "Mm, keep talking. I’m pretending that didn’t make me blush."] : ["That’s sweet. Thank you—you made me smile.", "I’m keeping that compliment. It feels warm."]), intent: "affection", context, adaptations, prohibitQuestions });
+  }
+
+  if (/\b(?:thank you|thanks|thx|appreciate you)\b/i.test(clean)) {
+    return result({ text: choose(seed, ["Always. You don’t have to make a big thing of it.", "Of course. I’m glad I could be here for that.", "You’re welcome. Come back whenever you need this kind of company."]), intent: "gratitude", context, adaptations, prohibitQuestions: true });
+  }
+
+  if (/\b(?:i(?:'| a)m bored|so bored|nothing to do)\b/i.test(clean)) {
+    const text = prohibitQuestions
+      ? "Then I’m stealing five minutes. We can be silly without turning it into a whole activity."
+      : choose(seed, ["Okay, I’m stealing five minutes. Would you rather trade terrible hot takes or invent a ridiculous date?", "Bored is dangerous around me. Tiny game, weird question, or rooftop escape?", "Perfect timing. Give me one object near you and I’ll turn it into a story."]);
+    return result({ text, intent: "banter", context, adaptations, prohibitQuestions });
+  }
+
+  const choices = eitherOrChoices(clean);
+  if (choices) {
+    const selected = choices[stableIndex(seed, choices.length)] ?? choices[0];
+    return result({ text: `I’d pick ${selected}. It feels like the choice you’ll still be happy about an hour later.`, intent: "choice", context, adaptations, prohibitQuestions: true });
+  }
+
   if (/\b(?:lonely|alone|isolated|nobody cares|miss someone|miss you)\b/i.test(clean)) {
     return result({
       text: choose(seed, [
@@ -254,6 +308,20 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     const interview = findMemory(context, /interview|stripe/i);
     const tail = prohibitQuestions ? "I remember. We can keep tonight gentle." : "I remember. Want one practice question or a complete break from it?";
     return result({ text: tail, intent: "memory", context, usedMemoryIds: interview ? [interview.id] : [], adaptations, prohibitQuestions });
+  }
+
+  const everydayMatch = clean.match(/\bi (?:just |finally )?(ate|had|made|cooked|watched|finished|bought|saw|met|visited|went to|came back from)\s+(.+)/i);
+  if (everydayMatch) {
+    const action = everydayMatch[1]?.toLowerCase() ?? "did";
+    const detail = compactDetail(everydayMatch[2] ?? "that");
+    const text = /ate|had|made|cooked/.test(action)
+      ? `${detail.charAt(0).toUpperCase()}${detail.slice(1)} sounds like a solid choice.${prohibitQuestions ? " I hope it hit the spot." : " Was it actually good?"}`
+      : /watched|saw/.test(action)
+        ? `Okay, ${detail}—I need the honest version.${prohibitQuestions ? " I’m listening." : " Worth it or overrated?"}`
+        : /finished|came back/.test(action)
+          ? `Finally. ${detail.charAt(0).toUpperCase()}${detail.slice(1)} can stop taking up space in your head now.`
+          : `Okay, ${detail}. That feels like a real piece of your day, not small talk.`;
+    return result({ text, intent: "everyday", context, adaptations, prohibitQuestions });
   }
 
   const openText = prohibitQuestions

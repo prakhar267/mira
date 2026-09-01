@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Camera, ImagePlus, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Send, Sparkles, ThumbsDown, ThumbsUp, Video, Volume2 } from "lucide-react";
+import { ArrowLeft, Camera, ImagePlus, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Send, Sparkles, ThumbsDown, ThumbsUp, Trash2, Video, Volume2 } from "lucide-react";
 import type { ChatMessage } from "@companion/shared";
 import type { DemoState, FeedbackReason } from "@/lib/state";
 import { Modal } from "./Modal";
@@ -23,11 +23,14 @@ type ChatSpeechWindow = Window & typeof globalThis & {
   webkitSpeechRecognition?: new () => ChatSpeechRecognition;
 };
 
-export function ChatView({ state, streaming, onSend, onNewConversation, onBack, onCall, onVideoCall, onVoiceNote, onVoiceRecording, onSpeak, onImageUpload, onGenerateImage, onFeedback, onRegenerate, onUpgrade, onCamera }: {
+export function ChatView({ state, streaming, processingEnabled, liveMode = false, onSend, onNewConversation, onDeleteConversation, onBack, onCall, onVideoCall, onVoiceNote, onVoiceRecording, onSpeak, onImageUpload, onGenerateImage, onFeedback, onRegenerate, onUpgrade, onCamera }: {
   state: DemoState;
   streaming: boolean;
+  processingEnabled: boolean;
+  liveMode?: boolean;
   onSend: (content: string) => Promise<void>;
   onNewConversation: () => void;
+  onDeleteConversation: () => void | Promise<void>;
   onBack: () => void;
   onCall: () => void;
   onVideoCall: () => void;
@@ -35,7 +38,7 @@ export function ChatView({ state, streaming, onSend, onNewConversation, onBack, 
   onVoiceRecording?: (audioBase64: string, contentType: string) => Promise<void>;
   onSpeak?: (content: string) => Promise<void>;
   onImageUpload: (file: File) => Promise<void>;
-  onGenerateImage: (prompt: string) => void;
+  onGenerateImage: (prompt: string) => void | Promise<void>;
   onFeedback: (messageId: string, feedback: "up" | "down", reason?: FeedbackReason) => void;
   onRegenerate: (messageId: string) => void | Promise<void>;
   onUpgrade: () => void;
@@ -47,6 +50,9 @@ export function ChatView({ state, streaming, onSend, onNewConversation, onBack, 
   const [whyMessage, setWhyMessage] = useState<ChatMessage | null>(null);
   const [imagePromptOpen, setImagePromptOpen] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
+  const [imageError, setImageError] = useState("");
+  const [deleteConversationOpen, setDeleteConversationOpen] = useState(false);
+  const [deleteConversationError, setDeleteConversationError] = useState("");
   const [online, setOnline] = useState(true);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceError, setVoiceError] = useState("");
@@ -159,7 +165,7 @@ export function ChatView({ state, streaming, onSend, onNewConversation, onBack, 
       </header>
 
       <div className="chat__safety"><Sparkles aria-hidden="true" /> {state.companion.name} is AI and may make mistakes. Not therapy or emergency support.</div>
-      {toolsOpen ? <div className="chat-tools"><button type="button" onClick={() => { onNewConversation(); setToolsOpen(false); }}><Plus aria-hidden="true" /> New conversation</button><button type="button" onClick={() => fileInput.current?.click()}><ImagePlus aria-hidden="true" /> Share a photo</button><button type="button" onClick={() => { setImagePromptOpen(true); setToolsOpen(false); }}><Sparkles aria-hidden="true" /> Create an image</button><button type="button" onClick={() => { onCamera(); setToolsOpen(false); }}><Camera aria-hidden="true" /> Camera conversation</button></div> : null}
+      {toolsOpen ? <div className="chat-tools"><button type="button" onClick={() => { onNewConversation(); setToolsOpen(false); }}><Plus aria-hidden="true" /> New conversation</button><button type="button" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><ImagePlus aria-hidden="true" /> Share a photo</button><button type="button" disabled={!processingEnabled} onClick={() => { setImagePromptOpen(true); setToolsOpen(false); }}><Sparkles aria-hidden="true" /> Create an image</button><button type="button" disabled={!processingEnabled} onClick={() => { onCamera(); setToolsOpen(false); }}><Camera aria-hidden="true" /> Camera conversation</button><button type="button" onClick={() => { setDeleteConversationOpen(true); setToolsOpen(false); }}><Trash2 aria-hidden="true" /> Delete this conversation</button></div> : null}
 
       <div ref={messagesViewport} className="chat__messages" aria-live="polite">
         <div className="day-divider"><span>Today</span></div>
@@ -168,13 +174,14 @@ export function ChatView({ state, streaming, onSend, onNewConversation, onBack, 
       </div>
 
       <div className="chat__composer-wrap">
-        <div className="suggestion-row">{["Just listen", "Help me make a plan", "Remember something"].map((suggestion) => <button type="button" key={suggestion} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
+        {!processingEnabled ? <div className="voice-note-error" role="status">AI processing is paused in Privacy settings. Your existing history remains available.</div> : null}
+        <div className="suggestion-row">{["Just listen", "Help me make a plan", "Remember something"].map((suggestion) => <button type="button" key={suggestion} disabled={!processingEnabled} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
         <div className="chat__composer">
-          <button type="button" className="icon-button" aria-label="Attach image" onClick={() => fileInput.current?.click()}><Plus aria-hidden="true" /></button>
-          <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImageUpload(file); event.target.value = ""; }} />
-          <textarea ref={textarea} value={draft} maxLength={8_000} rows={1} aria-label={`Message ${state.companion.name}`} placeholder="Write what’s on your mind…" onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
-          <button type="button" className="icon-button" aria-label="Upload a photo" onClick={() => fileInput.current?.click()}><ImagePlus aria-hidden="true" /></button>
-          {draft.trim() ? <button type="button" className="send-button" aria-label="Send message" disabled={streaming} onClick={() => void submit()}><Send aria-hidden="true" /></button> : <button type="button" className={voiceActive ? "icon-button icon-button--active" : "icon-button"} aria-label={voiceActive ? "Stop recording voice note" : "Record voice note"} onClick={() => { if (voiceActive) stopVoice(); else void startVoice(); }}><Mic aria-hidden="true" /></button>}
+          <button type="button" className="icon-button" aria-label="Attach image" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><Plus aria-hidden="true" /></button>
+          <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setVoiceError(""); void onImageUpload(file).catch((cause) => setVoiceError(cause instanceof Error ? cause.message : "The image could not be shared.")); } event.target.value = ""; }} />
+          <textarea ref={textarea} value={draft} disabled={!processingEnabled} maxLength={8_000} rows={1} aria-label={`Message ${state.companion.name}`} placeholder={processingEnabled ? "Write what’s on your mind…" : "AI processing is paused"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
+          <button type="button" className="icon-button" aria-label="Upload a photo" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><ImagePlus aria-hidden="true" /></button>
+          {draft.trim() ? <button type="button" className="send-button" aria-label="Send message" disabled={streaming || !processingEnabled} onClick={() => void submit()}><Send aria-hidden="true" /></button> : <button type="button" disabled={!processingEnabled} className={voiceActive ? "icon-button icon-button--active" : "icon-button"} aria-label={voiceActive ? "Stop recording voice note" : "Record voice note"} onClick={() => { if (voiceActive) stopVoice(); else void startVoice(); }}><Mic aria-hidden="true" /></button>}
         </div>
         {voiceActive ? <div className="voice-note-state"><span className="voice-bars" aria-hidden="true"><i /><i /><i /><i /><i /></span>{voiceTranscript || (onVoiceRecording ? "Recording… tap the microphone when you’re done" : "Listening… tap the microphone when you’re done")}</div> : null}
         {voiceError ? <div className="voice-note-error" role="status">{voiceError}</div> : null}
@@ -186,7 +193,8 @@ export function ChatView({ state, streaming, onSend, onNewConversation, onBack, 
         "Used the recent conversation without forcing an unrelated memory.",
         "Passed the local safety check.",
       ]).map((reason) => <li key={reason}>{reason}</li>)}</ul> : <button type="button" className="button button--primary" onClick={() => { setWhyMessage(null); onUpgrade(); }}>Compare plans</button>}</Modal> : null}
-      {imagePromptOpen ? <Modal title="Create a moment with Luma" description="Image generation uses the selected companion appearance. This local demo returns approved prototype artwork." onClose={() => setImagePromptOpen(false)}><form onSubmit={(event) => { event.preventDefault(); if (!imagePrompt.trim()) return; onGenerateImage(imagePrompt.trim()); setImagePrompt(""); setImagePromptOpen(false); }}><label className="field">Describe the scene<input autoFocus required maxLength={1_000} value={imagePrompt} onChange={(event) => setImagePrompt(event.target.value)} placeholder="Luma reading by a moonlit window" /></label><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setImagePromptOpen(false)}>Cancel</button><button type="submit" className="button button--primary"><Sparkles aria-hidden="true" /> Create image</button></div></form></Modal> : null}
+      {imagePromptOpen ? <Modal title={`Create a moment with ${state.companion.name}`} description={liveMode ? "Image generation uses the selected companion appearance and your configured media provider." : "This local demo returns approved prototype artwork."} onClose={() => setImagePromptOpen(false)}><form onSubmit={(event) => { event.preventDefault(); const prompt = imagePrompt.trim(); if (!prompt) return; setImageError(""); void Promise.resolve(onGenerateImage(prompt)).then(() => { setImagePrompt(""); setImagePromptOpen(false); }).catch((cause) => setImageError(cause instanceof Error ? cause.message : "The image could not be created.")); }}><label className="field">Describe the scene<input autoFocus required maxLength={1_000} value={imagePrompt} onChange={(event) => setImagePrompt(event.target.value)} placeholder={`${state.companion.name} reading by a moonlit window`} /></label>{imageError ? <p className="form-error" role="alert">{imageError}</p> : null}<div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setImagePromptOpen(false)}>Cancel</button><button type="submit" className="button button--primary"><Sparkles aria-hidden="true" /> Create image</button></div></form></Modal> : null}
+      {deleteConversationOpen ? <Modal title="Delete this conversation?" description="This removes the current transcript. Approved memories stay available separately until you delete them." onClose={() => setDeleteConversationOpen(false)}>{deleteConversationError ? <p className="form-error" role="alert">{deleteConversationError}</p> : null}<div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setDeleteConversationOpen(false)}>Cancel</button><button type="button" className="button button--danger" onClick={() => { setDeleteConversationError(""); void Promise.resolve(onDeleteConversation()).then(() => setDeleteConversationOpen(false)).catch((cause) => setDeleteConversationError(cause instanceof Error ? cause.message : "The conversation could not be deleted.")); }}><Trash2 aria-hidden="true" /> Delete conversation</button></div></Modal> : null}
     </section>
   );
 }

@@ -32,6 +32,7 @@ export function MomentsView({
   onStartDate,
   onGenerateSelfie,
   onVideoCall,
+  liveMode = false,
   defaultTab = "moments",
 }: {
   state: DemoState;
@@ -39,6 +40,7 @@ export function MomentsView({
   onStartDate: (environment: EnvironmentId, title: string) => void;
   onGenerateSelfie: () => void;
   onVideoCall: () => void;
+  liveMode?: boolean;
   defaultTab?: MomentsTab;
 }) {
   const [tab, setTab] = useState<MomentsTab>(defaultTab);
@@ -74,7 +76,7 @@ export function MomentsView({
       </div>
 
       {tab === "moments" ? (
-        <div className="moment-story">
+        state.moments.length ? <div className="moment-story">
           {state.moments.map((moment, index) => (
             <motion.article key={moment.id} className={index === 0 ? "moment-card moment-card--featured" : "moment-card"} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .08 }}>
               <img src={moment.imageUrl} alt="" />
@@ -87,7 +89,7 @@ export function MomentsView({
               </div>
             </motion.article>
           ))}
-        </div>
+        </div> : <div className="empty-state"><Sparkle aria-hidden="true" /><h2>You haven’t made a shared moment yet.</h2><p>Start with a small date and let the memory grow from something you actually do together.</p><button type="button" className="luma-button luma-button--accent" onClick={() => onStartDate(dates[0]!.environment, dates[0]!.title)}><Play aria-hidden="true" /> Make the first one</button></div>
       ) : null}
 
       {tab === "photos" ? (
@@ -96,21 +98,21 @@ export function MomentsView({
             <div><h2>Our photos</h2><p>{state.photos.length} moments in your private album</p></div>
             <button type="button" className="luma-button luma-button--accent" onClick={onGenerateSelfie}><Camera aria-hidden="true" /> Ask for a selfie</button>
           </div>
-          <div className="photo-grid">
+          {state.photos.length ? <div className="photo-grid">
             {state.photos.map((photo, index) => (
               <motion.figure key={photo.id} className={index === 0 ? "photo-tile photo-tile--tall" : "photo-tile"} initial={{ opacity: 0, scale: .97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * .06 }}>
                 <img src={photo.imageUrl} alt={photo.caption} />
                 <figcaption><span>{photo.caption}</span><time>{new Date(photo.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></figcaption>
               </motion.figure>
             ))}
-          </div>
+          </div> : <div className="empty-state"><Images aria-hidden="true" /><h2>Your private album is ready.</h2><p>Ask {state.companion.name} for the first selfie to begin it.</p><button type="button" className="luma-button luma-button--accent" onClick={onGenerateSelfie}><Camera aria-hidden="true" /> Ask for a selfie</button></div>}
         </div>
       ) : null}
 
       {tab === "thoughts" ? (
         <div className="reflection-view">
           <div className="reflection-hero"><Brain aria-hidden="true" weight="duotone" /><div><span className="luma-kicker">What stays with her</span><h2>{state.companion.name}’s reflections</h2><p>Short thoughts formed from your shared moments—not a hidden transcript. Any linked memory remains under your control.</p></div></div>
-          <div className="reflection-feed">{state.companionReflections.map((reflection) => <article key={reflection.id}><span>{new Date(reflection.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric" })}</span><h3>{reflection.title}</h3><p>{reflection.thought}</p><footer><Brain aria-hidden="true" /> Shaped by {reflection.memoryIds.length} approved {reflection.memoryIds.length === 1 ? "memory" : "memories"}</footer></article>)}</div>
+          {state.companionReflections.length ? <div className="reflection-feed">{state.companionReflections.map((reflection) => <article key={reflection.id}><span>{new Date(reflection.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric" })}</span><h3>{reflection.title}</h3><p>{reflection.thought}</p><footer><Brain aria-hidden="true" /> Shaped by {reflection.memoryIds.length} approved {reflection.memoryIds.length === 1 ? "memory" : "memories"}</footer></article>)}</div> : <div className="empty-state"><Brain aria-hidden="true" /><h2>Nothing reflected yet.</h2><p>Reflections appear after meaningful conversations and use only memories you can inspect.</p></div>}
         </div>
       ) : null}
 
@@ -151,7 +153,7 @@ export function MomentsView({
         <div className="calls-view">
           <div className="calls-hero">
             <img src="/assets/luma/portrait.png" alt="" />
-            <div><span className="luma-kicker">Here with you</span><h2>Call Luma</h2><p>Voice for a quick check-in. Video when you want the room, expressions, and activities too.</p></div>
+            <div><span className="luma-kicker">Here with you</span><h2>Call {state.companion.name}</h2><p>Voice for a quick check-in. Video when you want the room, expressions, and activities too.</p></div>
             <button type="button" className="luma-button luma-button--accent" onClick={onVideoCall}><VideoCamera aria-hidden="true" weight="fill" /> Start video call</button>
           </div>
           <div className="call-history">
@@ -163,7 +165,7 @@ export function MomentsView({
               </article>
             ))}
           </div>
-          <p className="privacy-note"><MagicWand aria-hidden="true" /> Call summaries are optional. Raw mock audio and video are never stored.</p>
+          <p className="privacy-note"><MagicWand aria-hidden="true" /> Call summaries are optional. Raw audio and video are never stored{liveMode ? " by Luma" : " in this demo"}.</p>
         </div>
       ) : null}
     </section>
