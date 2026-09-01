@@ -16,6 +16,8 @@ const relationships = [
 ] as const;
 
 interface Draft {
+  email: string;
+  password: string;
   name: string;
   birthday: string;
   pronouns: DemoState["user"]["pronouns"];
@@ -39,6 +41,8 @@ interface Draft {
 }
 
 const initialDraft: Draft = {
+  email: "",
+  password: "",
   name: "",
   birthday: "",
   pronouns: "she/her",
@@ -61,10 +65,11 @@ const initialDraft: Draft = {
   sensuality: 20,
 };
 
-export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void }) {
+export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void | Promise<void> }) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState(initialDraft);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const steps = 10;
 
   const isAdult = useMemo(() => {
@@ -74,15 +79,19 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
     return new Date(`${draft.birthday}T00:00:00`) <= cutoff;
   }, [draft.birthday]);
 
-  const next = () => {
+  const next = async () => {
     setError("");
-    if (step === 1 && !draft.name.trim()) return setError("Tell us what you’d like Luma to call you.");
+    if (step === 1 && (!draft.name.trim() || !/^\S+@\S+\.\S+$/.test(draft.email) || draft.password.length < 12)) return setError("Add your name, a valid email, and a password of at least 12 characters.");
     if (step === 2 && (!isAdult || !draft.adultConfirmed)) return setError("Luma is for adults 18+. Add your birthday and confirm eligibility.");
     if (step === 4 && draft.intentions.length === 0) return setError("Choose at least one reason for meeting Luma.");
     if (step === 5 && !draft.companionName.trim()) return setError("Give your companion a name.");
     if (step === 6 && draft.relationshipMode === "romantic" && (!isAdult || !draft.adultConfirmed)) return setError("Romantic mode requires confirmed adult eligibility.");
     if (step === 8 && draft.interests.length === 0) return setError("Choose at least one interest to begin with.");
-    if (step === steps - 1) return onComplete(draft);
+    if (step === steps - 1) {
+      setSubmitting(true);
+      try { await onComplete(draft); } catch (cause) { setError(cause instanceof Error ? cause.message : "Account setup could not be completed."); } finally { setSubmitting(false); }
+      return;
+    }
     setStep((value) => Math.min(steps - 1, value + 1));
   };
 
@@ -119,8 +128,10 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
             <>
               <span className="eyebrow">About you</span>
               <h1>What should Luma call you?</h1>
-              <p>This stays editable in your profile.</p>
+              <p>Your email signs you in securely. Your name stays editable in your profile.</p>
               <label className="field">First name<input autoFocus maxLength={80} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Your first name" /></label>
+              <label className="field">Email<input type="email" autoComplete="email" maxLength={200} value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} placeholder="you@example.com" /></label>
+              <label className="field">Password<input type="password" autoComplete="new-password" minLength={12} maxLength={200} value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} placeholder="At least 12 characters" /></label>
             </>
           )}
 
@@ -221,7 +232,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
           {error ? <p className="form-error" role="alert">{error}</p> : null}
           <div className="onboarding__actions">
             {step > 0 ? <button type="button" className="button button--ghost" onClick={() => { setError(""); setStep((value) => value - 1); }}><ArrowLeft aria-hidden="true" /> Back</button> : <span />}
-            <button type="button" className="button button--primary" onClick={next}>{step === steps - 1 ? "Meet your companion" : step === 0 ? "Begin setup" : "Continue"}<ArrowRight aria-hidden="true" /></button>
+            <button type="button" className="button button--primary" disabled={submitting} onClick={() => void next()}>{submitting ? "Creating your space…" : step === steps - 1 ? "Meet your companion" : step === 0 ? "Begin setup" : "Continue"}<ArrowRight aria-hidden="true" /></button>
           </div>
         </div>
         <aside className="onboarding__visual" aria-label="Preview of Luma in the companion room">

@@ -5,10 +5,6 @@ import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import { z } from "zod";
 import {
-  MockChatProvider,
-  MockImageProvider,
-  MockSpeechProvider,
-  MockVisionProvider,
   applyContradictions,
   assessSafety,
   buildCompanionContext,
@@ -17,7 +13,7 @@ import {
   summarizeConversation,
 } from "@companion/ai";
 import { brand, featureEntitlements, featureFlags, parseServerEnv, plans, type Entitlement, type PlanId } from "@companion/config";
-import { InMemoryCompanionRepository, inMemorySeed, seedCompanion, seedUser } from "@companion/db";
+import { seedCompanion, seedUser } from "@companion/db";
 import {
   chatRequestSchema,
   futureEventSchema,
@@ -27,7 +23,6 @@ import {
   storePurchaseSchema,
   subscriptionWebhookSchema,
   type ChatMessage,
-  type ConversationSummaryRecord,
   type FutureEventRecord,
   type JournalEntryRecord,
   type MemoryRecord,
@@ -35,18 +30,7 @@ import {
   type ProviderUsageRecord,
   type SubscriptionState,
 } from "@companion/shared";
-
-const repository = new InMemoryCompanionRepository(inMemorySeed);
-const provider = new MockChatProvider();
-const visionProvider = new MockVisionProvider();
-const speechProvider = new MockSpeechProvider();
-const imageProvider = new MockImageProvider();
-const passwordChallenges = new Map<string, string>();
-const usageRecords: ProviderUsageRecord[] = [];
-const conversations = new Map<string, { id: string; userId: string; companionId: string; createdAt: string }>();
-const summaries = new Map<string, ConversationSummaryRecord[]>();
-const callSessions = new Map<string, { id: string; userId: string; companionId: string; type: "voice" | "video"; state: string; startedAt: string; environmentId?: string; cameraEnabled: boolean }>();
-const runtimeFeatureFlags: Record<string, boolean> = { ...featureFlags };
+import { createRuntime, type ApiRuntime } from "./runtime";
 
 function actorId(headers: Record<string, string | string[] | undefined>): string {
   const header = headers["x-user-id"];
@@ -61,7 +45,7 @@ function isAdmin(headers: Record<string, string | string[] | undefined>, expecte
   return headers["x-admin-key"] === expected;
 }
 
-export async function createServer(): Promise<FastifyInstance> {
+export async function createServer(options: { runtime?: ApiRuntime } = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL || "info",
@@ -75,7 +59,26 @@ export async function createServer(): Promise<FastifyInstance> {
   });
 
   const env = parseServerEnv(process.env);
+  const runtime = options.runtime ?? await createRuntime(env);
+  const ownsRuntime = !options.runtime;
+  const {
+    repository,
+    auth,
+    infrastructure,
+    chat: provider,
+    moderation,
+    speechToText,
+    textToSpeech,
+    realtime,
+    vision: visionProvider,
+    image: imageProvider,
+  } = runtime;
+  const usageRecords: ProviderUsageRecord[] = [];
+  const callSessions = new Map<string, { id: string; userId: string; companionId: string; type: "voice" | "video"; state: string; startedAt: string; environmentId?: string; cameraEnabled: boolean }>();
+  const runtimeFeatureFlags: Record<string, boolean> = { ...featureFlags };
   const rateWindows = new Map<string, { count: number; resetsAt: number }>();
+  await infrastructure.connect();
+  if (ownsRuntime) app.addHook("onClose", async () => runtime.close());
   await app.register(cors, { origin: env.APP_ORIGIN, credentials: true });
   await app.register(swagger, {
     openapi: {
@@ -90,6 +93,7 @@ export async function createServer(): Promise<FastifyInstance> {
 
   async function entitlementFor(userId: string, entitlement: Entitlement) {
     const subscription = await repository.getSubscription(userId);
+    if (!env.BILLING_ENABLED) return { allowed: true, subscription, minimumPlan: subscription.planId };
     return {
       allowed: featureEntitlements.has(subscription.planId, entitlement),
       subscription,
@@ -97,16 +101,41 @@ export async function createServer(): Promise<FastifyInstance> {
     };
   }
 
+  async function primaryCompanion(userId: string) {
+    return (await repository.listCompanions(userId))[0] ?? null;
+  }
+
   app.addHook("onSend", async (_request, reply, payload) => {
     reply.header("x-content-type-options", "nosniff");
     reply.header("referrer-policy", "no-referrer");
     reply.header("permissions-policy", "camera=(), microphone=(self), geolocation=()");
+    reply.header("content-security-policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+    if (env.APP_ENV === "production") reply.header("strict-transport-security", "max-age=63072000; includeSubDomains; preload");
     return payload;
   });
 
   app.addHook("onRequest", async (request, reply) => {
+    const route = request.routeOptions.url ?? request.url.split("?")[0] ?? "/unknown";
+    const publicRoute = route === "/health" || route === "/ready" || route === "/openapi.json" || route.startsWith("/auth/") || route === "/subscriptions/webhook" || route.startsWith("/admin/");
+    if (!env.AI_MOCK_MODE && !publicRoute) {
+      const authorization = request.headers.authorization;
+      const verified = authorization?.startsWith("Bearer ") ? await auth.verifyAccessToken(authorization.slice(7)) : null;
+      if (!verified) return reply.code(401).send(apiError("authentication_required", "Sign in to continue.", request.id));
+      request.headers["x-user-id"] = verified.userId;
+    }
+
     const now = Date.now();
-    const key = `${actorId(request.headers)}:${request.routeOptions.url}`;
+    const key = `${actorId(request.headers)}:${route}`;
+    try {
+      const distributed = await infrastructure.checkRateLimit(key, 120, 60_000);
+      if (distributed) {
+        reply.header("x-rate-limit-remaining", String(distributed.remaining));
+        if (!distributed.allowed) return reply.code(429).send(apiError("rate_limited", "Please wait a moment and try again.", request.id));
+        return;
+      }
+    } catch (error) {
+      request.log.warn({ err: error }, "Distributed rate limiting unavailable; using process-local fallback");
+    }
     const current = rateWindows.get(key);
     const windowState = !current || current.resetsAt <= now ? { count: 0, resetsAt: now + 60_000 } : current;
     windowState.count += 1;
@@ -121,80 +150,102 @@ export async function createServer(): Promise<FastifyInstance> {
       status: "ok",
       version: "0.1.0",
       mockMode: env.AI_MOCK_MODE,
-      persistence: "in-memory-repository",
+      persistence: env.PERSISTENCE_PROVIDER,
       providers: {
         chat: env.CHAT_PROVIDER,
         embedding: env.EMBEDDING_PROVIDER,
         moderation: env.MODERATION_PROVIDER,
+        realtime: env.REALTIME_VOICE_PROVIDER,
+        speechToText: env.STT_PROVIDER,
+        textToSpeech: env.TTS_PROVIDER,
+        vision: env.VISION_PROVIDER,
+        image: env.IMAGE_GENERATION_PROVIDER,
       },
     },
     requestId: request.id,
   }));
 
   app.get("/ready", async (request, reply) => {
-    const ready = Boolean(await repository.getUser(seedUser.id));
+    const [database, services] = await Promise.all([repository.health(), infrastructure.health()]);
+    const redisReady = env.QUEUE_PROVIDER !== "redis" || services.redis === "ready";
+    const storageReady = env.STORAGE_PROVIDER !== "s3" || services.storage === "ready";
+    const ready = database && redisReady && storageReady;
     return ready
-      ? { ok: true, data: { status: "ready", database: "mock-repository", redis: "mock", storage: "mock-s3" }, requestId: request.id }
+      ? { ok: true, data: { status: "ready", database: env.PERSISTENCE_PROVIDER, redis: services.redis, storage: services.storage }, requestId: request.id }
       : reply.code(503).send(apiError("not_ready", "The API is not ready.", request.id));
   });
 
   app.get("/openapi.json", async () => app.swagger());
 
   app.post("/auth/signup", async (request, reply) => {
-    const parsed = onboardingSchema.safeParse(request.body);
+    const parsed = onboardingSchema.extend({ email: z.email(), password: z.string().min(12).max(200) }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(apiError("invalid_onboarding", "Check the onboarding fields and try again.", request.id));
-    return reply.code(201).send({
-      ok: true,
-      data: {
-        accessToken: `mock.${randomUUID()}`,
-        refreshToken: `mock-refresh.${randomUUID()}`,
-        user: { ...seedUser, name: parsed.data.name, birthday: parsed.data.birthday, pronouns: parsed.data.pronouns },
-        companion: { ...seedCompanion, name: parsed.data.companionName, pronouns: parsed.data.companionPronouns, relationshipMode: parsed.data.relationshipMode },
-      },
-      requestId: request.id,
-    });
+    const userId = randomUUID();
+    const companionId = randomUUID();
+    const now = new Date().toISOString();
+    const user = { ...seedUser, id: userId, name: parsed.data.name, birthday: parsed.data.birthday, pronouns: parsed.data.pronouns, createdAt: now, interests: [...parsed.data.interests] };
+    const companion = { ...seedCompanion, id: companionId, name: parsed.data.companionName, pronouns: parsed.data.companionPronouns, relationshipMode: parsed.data.relationshipMode, createdAt: now, personality: { ...seedCompanion.personality } };
+    try {
+      await repository.createAccount({ user, companion, email: parsed.data.email });
+      const registration = await auth.register(parsed.data.email, parsed.data.password, userId);
+      const delivery = await infrastructure.sendNotification({ kind: "email-verification", userId, email: parsed.data.email, title: "Verify your Luma account", body: "Confirm your email to protect your companion account.", actionUrl: `${env.APP_ORIGIN}/verify-email?token=${encodeURIComponent(registration.verificationToken)}` });
+      return reply.code(201).send({ ok: true, data: { ...registration.tokens, user, companion, verificationDelivery: delivery.provider, ...(env.AI_MOCK_MODE ? { mockVerificationToken: registration.verificationToken } : {}) }, requestId: request.id });
+    } catch (error) {
+      await repository.deleteUser(userId).catch(() => undefined);
+      await auth.rollbackRegistration(parsed.data.email).catch(() => undefined);
+      request.log.info({ err: error }, "Signup rejected");
+      return reply.code(409).send(apiError("account_exists", "An account with this email already exists.", request.id));
+    }
   });
 
   app.post("/auth/login", async (request, reply) => {
-    const parsed = z.object({ email: z.email(), password: z.string().min(8) }).safeParse(request.body);
+    const parsed = z.object({ email: z.email(), password: z.string().min(12).max(200) }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(apiError("invalid_credentials", "Enter a valid email and password.", request.id));
-    return { ok: true, data: { accessToken: `mock.${randomUUID()}`, refreshToken: `mock-refresh.${randomUUID()}`, user: seedUser }, requestId: request.id };
+    const login = await auth.login(parsed.data.email, parsed.data.password);
+    if (!login) return reply.code(401).send(apiError("invalid_credentials", "Email or password is incorrect.", request.id));
+    const user = await repository.getUser(login.identity.userId);
+    return { ok: true, data: { ...login.tokens, user, emailVerified: login.identity.emailVerified }, requestId: request.id };
   });
 
   app.post("/auth/forgot-password", async (request, reply) => {
     const parsed = z.object({ email: z.email() }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(apiError("invalid_email", "Enter a valid email.", request.id));
-    const token = `reset.${randomUUID()}`;
-    passwordChallenges.set(token, parsed.data.email.toLowerCase());
+    const token = await auth.requestPasswordReset(parsed.data.email);
+    if (token) await infrastructure.sendNotification({ kind: "password-reset", email: parsed.data.email, title: "Reset your Luma password", body: "Use this one-time link to choose a new password.", actionUrl: `${env.APP_ORIGIN}/reset-password?token=${encodeURIComponent(token)}` });
     return { ok: true, data: { accepted: true, ...(env.AI_MOCK_MODE ? { mockResetToken: token } : {}) }, requestId: request.id };
   });
 
   app.post("/auth/reset-password", async (request, reply) => {
-    const parsed = z.object({ token: z.string().min(12), password: z.string().min(8).max(200) }).safeParse(request.body);
-    if (!parsed.success || !passwordChallenges.has(parsed.data.token)) return reply.code(400).send(apiError("invalid_reset", "The reset link is invalid or expired.", request.id));
-    passwordChallenges.delete(parsed.data.token);
+    const parsed = z.object({ token: z.string().min(12), password: z.string().min(12).max(200) }).safeParse(request.body);
+    if (!parsed.success || !await auth.resetPassword(parsed.data.token, parsed.data.password)) return reply.code(400).send(apiError("invalid_reset", "The reset link is invalid or expired.", request.id));
     return { ok: true, data: { reset: true }, requestId: request.id };
   });
 
   app.post("/auth/refresh", async (request, reply) => {
-    const parsed = z.object({ refreshToken: z.string().startsWith("mock-refresh.") }).safeParse(request.body);
-    if (!parsed.success) return reply.code(401).send(apiError("invalid_refresh", "Sign in again to continue.", request.id));
-    return { ok: true, data: { accessToken: `mock.${randomUUID()}`, refreshToken: `mock-refresh.${randomUUID()}` }, requestId: request.id };
+    const parsed = z.object({ refreshToken: z.string().min(40) }).safeParse(request.body);
+    const tokens = parsed.success ? await auth.rotate(parsed.data.refreshToken) : null;
+    if (!tokens) return reply.code(401).send(apiError("invalid_refresh", "Sign in again to continue.", request.id));
+    return { ok: true, data: tokens, requestId: request.id };
   });
 
   app.post("/auth/verify-email", async (request, reply) => {
     const parsed = z.object({ token: z.string().min(8) }).safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send(apiError("invalid_verification", "Verification token is invalid.", request.id));
+    if (!parsed.success || !await auth.verifyEmail(parsed.data.token)) return reply.code(400).send(apiError("invalid_verification", "Verification token is invalid or expired.", request.id));
     return { ok: true, data: { verified: true }, requestId: request.id };
   });
 
   app.post("/auth/oauth/:provider", async (request, reply) => {
     const params = z.object({ provider: z.enum(["google", "apple"]) }).safeParse(request.params);
     if (!params.success) return reply.code(404).send(apiError("provider_not_found", "OAuth provider is unavailable.", request.id));
+    if (!env.AI_MOCK_MODE) return reply.code(501).send(apiError("oauth_not_configured", "Use email sign-in for this deployment.", request.id));
     return { ok: true, data: { provider: params.data.provider, authorizationUrl: `${env.APP_ORIGIN}/app?oauth=${params.data.provider}&mock=true`, mock: true }, requestId: request.id };
   });
 
-  app.post("/auth/logout", async (_request, reply) => reply.code(204).send());
+  app.post("/auth/logout", async (request, reply) => {
+    const authorization = request.headers.authorization;
+    if (authorization?.startsWith("Bearer ")) await auth.logout(authorization.slice(7));
+    return reply.code(204).send();
+  });
 
   app.get("/users/me", async (request, reply) => {
     const user = await repository.getUser(actorId(request.headers));
@@ -204,9 +255,9 @@ export async function createServer(): Promise<FastifyInstance> {
 
   app.get("/companions", async (request, reply) => {
     const userId = actorId(request.headers);
-    const companion = await repository.getCompanion(userId, seedCompanion.id);
-    if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
-    return { ok: true, data: [companion], requestId: request.id };
+    const companions = await repository.listCompanions(userId);
+    if (!companions.length) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    return { ok: true, data: companions, requestId: request.id };
   });
 
   app.get("/companions/:companionId", async (request, reply) => {
@@ -263,13 +314,15 @@ export async function createServer(): Promise<FastifyInstance> {
 
   app.get("/companions/:companionId/appearance", async (request) => ({ ok: true, data: { ownedItems: await repository.listOwnedItems(actorId(request.headers)) }, requestId: request.id }));
 
-  app.get("/conversations", async (request) => ({ ok: true, data: [...conversations.values()].filter((conversation) => conversation.userId === actorId(request.headers)), requestId: request.id }));
+  app.get("/conversations", async (request) => ({ ok: true, data: await repository.listConversations(actorId(request.headers)), requestId: request.id }));
 
   app.post("/conversations", async (request, reply) => {
     const body = z.object({ companionId: z.uuid() }).safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_conversation", "Choose a valid companion.", request.id));
-    const conversation = { id: randomUUID(), userId: actorId(request.headers), companionId: body.data.companionId, createdAt: new Date().toISOString() };
-    conversations.set(conversation.id, conversation);
+    const userId = actorId(request.headers);
+    if (!await repository.getCompanion(userId, body.data.companionId)) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    const conversation = { id: randomUUID(), userId, companionId: body.data.companionId, createdAt: new Date().toISOString() };
+    await repository.createConversation(conversation);
     return reply.code(201).send({ ok: true, data: conversation, requestId: request.id });
   });
 
@@ -284,6 +337,8 @@ export async function createServer(): Promise<FastifyInstance> {
     const parsed = chatRequestSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(apiError("invalid_message", "Write a shorter message and try again.", request.id));
     const userId = actorId(request.headers);
+    const conversation = (await repository.listConversations(userId)).find((candidate) => candidate.id === parsed.data.conversationId && candidate.companionId === parsed.data.companionId);
+    if (!conversation) return reply.code(404).send(apiError("conversation_not_found", "Start a conversation before sending a message.", request.id));
     const [user, companion, existingMemories, existingMessages] = await Promise.all([
       repository.getUser(userId),
       repository.getCompanion(userId, parsed.data.companionId),
@@ -292,10 +347,31 @@ export async function createServer(): Promise<FastifyInstance> {
     ]);
     if (!user || !companion) return reply.code(404).send(apiError("actor_not_found", "Account or companion not found.", request.id));
 
-    const safety = assessSafety(parsed.data.content);
+    const userMessageId = `${userId}:${parsed.data.clientMessageId}`;
+    const priorUserMessage = existingMessages.find((message) => message.id === userMessageId);
+    if (priorUserMessage) {
+      const priorAssistant = existingMessages.find((message) => message.role === "assistant" && message.replyToId === userMessageId);
+      reply.hijack();
+      reply.raw.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", connection: "keep-alive", "x-accel-buffering": "no", "x-request-id": request.id });
+      if (priorAssistant) reply.raw.write(`event: token\ndata: ${JSON.stringify({ delta: priorAssistant.content, replayed: true })}\n\n`);
+      reply.raw.write(`event: done\ndata: ${JSON.stringify({ assistantMessageId: priorAssistant?.id ?? null, replayed: true })}\n\n`);
+      reply.raw.end();
+      return;
+    }
+
+    const localSafety = assessSafety(parsed.data.content);
+    let safety = localSafety;
+    if (localSafety.level === "safe") {
+      try {
+        safety = await moderation.assess(parsed.data.content);
+      } catch (error) {
+        request.log.error({ err: error, provider: moderation.id }, "Input moderation failed");
+        return reply.code(503).send(apiError("safety_unavailable", "Safety checks are temporarily unavailable.", request.id));
+      }
+    }
     const now = new Date();
     const userMessage: ChatMessage = {
-      id: `${userId}:${randomUUID()}`,
+      id: userMessageId,
       conversationId: parsed.data.conversationId,
       role: "user",
       content: parsed.data.content,
@@ -324,14 +400,30 @@ export async function createServer(): Promise<FastifyInstance> {
 
     let assistantContent = "";
     let usage = { inputTokens: 0, outputTokens: 0 };
-    if (safety.level !== "safe" && safety.response) {
-      assistantContent = safety.response;
+    if (safety.level !== "safe") {
+      assistantContent = safety.response ?? "I can’t help with that, but I can stay with you and help find a safer next step.";
       reply.raw.write(`event: token\ndata: ${JSON.stringify({ delta: assistantContent })}\n\n`);
     } else {
-      for await (const chunk of provider.stream({ messages: allMessages, context })) {
-        assistantContent += chunk.delta;
-        if (chunk.usage) usage = chunk.usage;
-        reply.raw.write(`event: ${chunk.done ? "usage" : "token"}\ndata: ${JSON.stringify(chunk)}\n\n`);
+      try {
+        for await (const chunk of provider.stream({ messages: allMessages, context })) {
+          assistantContent += chunk.delta;
+          if (chunk.usage) usage = chunk.usage;
+          if (env.AI_MOCK_MODE) reply.raw.write(`event: ${chunk.done ? "usage" : "token"}\ndata: ${JSON.stringify(chunk)}\n\n`);
+        }
+        if (!env.AI_MOCK_MODE) {
+          const outputSafety = await moderation.assess(assistantContent);
+          if (outputSafety.level !== "safe") assistantContent = outputSafety.response ?? "I need to rephrase that more safely. Let’s take a gentler direction.";
+          for (const delta of assistantContent.match(/.{1,48}(?:\s|$)/g) ?? [assistantContent]) reply.raw.write(`event: token\ndata: ${JSON.stringify({ delta, done: false })}\n\n`);
+          reply.raw.write(`event: usage\ndata: ${JSON.stringify({ delta: "", done: true, usage })}\n\n`);
+        }
+      } catch (error) {
+        request.log.error({ err: error, provider: provider.id }, "Chat provider failed");
+        const failedUsage: ProviderUsageRecord = { id: randomUUID(), userId, feature: "text_chat", provider: provider.id, model: env.CHAT_MODEL, inputUnits: usage.inputTokens, outputUnits: usage.outputTokens, estimatedCostUsd: 0, latencyMs: Date.now() - startedAt, success: false, createdAt: new Date().toISOString() };
+        usageRecords.push(failedUsage);
+        await repository.recordProviderUsage(failedUsage).catch(() => undefined);
+        reply.raw.write(`event: error\ndata: ${JSON.stringify({ code: "provider_failed", message: "Luma could not respond just now. Please try again." })}\n\n`);
+        reply.raw.end();
+        return;
       }
     }
 
@@ -342,37 +434,44 @@ export async function createServer(): Promise<FastifyInstance> {
       content: assistantContent,
       createdAt: new Date().toISOString(),
       status: "sent",
+      replyToId: userMessage.id,
     };
     await repository.appendMessages(userId, parsed.data.conversationId, [userMessage, assistantMessage]);
-    usageRecords.push({ id: randomUUID(), userId, feature: "text_chat", provider: provider.id, model: env.CHAT_MODEL, inputUnits: usage.inputTokens, outputUnits: usage.outputTokens, estimatedCostUsd: 0, latencyMs: Date.now() - startedAt, success: true, createdAt: new Date().toISOString() });
+    const successfulUsage: ProviderUsageRecord = { id: randomUUID(), userId, feature: "text_chat", provider: provider.id, model: env.CHAT_MODEL, inputUnits: usage.inputTokens, outputUnits: usage.outputTokens, estimatedCostUsd: 0, latencyMs: Date.now() - startedAt, success: true, createdAt: new Date().toISOString() };
+    usageRecords.push(successfulUsage);
+    await repository.recordProviderUsage(successfulUsage).catch(() => undefined);
 
-    let nextMemories = existingMemories;
-    for (const candidate of extractMemoryCandidates(parsed.data.content)) {
-      nextMemories = applyContradictions(nextMemories, candidate, now);
-      for (const memory of nextMemories) await repository.upsertMemory(userId, memory);
-      const duplicate = nextMemories.some((memory) => memory.status === "active" && memory.normalizedContent === candidate.normalizedContent);
-      if (!duplicate) {
-        await repository.upsertMemory(userId, {
-          id: randomUUID(),
-          userId,
-          companionId: companion.id,
-          type: candidate.type,
-          content: candidate.content,
-          normalizedContent: candidate.normalizedContent,
-          importance: candidate.importance,
-          confidence: candidate.confidence,
-          sourceMessageIds: [userMessage.id],
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-          retrievalCount: 0,
-          status: "active",
-          pinned: false,
-        });
+    try {
+      let nextMemories = existingMemories;
+      for (const candidate of extractMemoryCandidates(parsed.data.content)) {
+        nextMemories = applyContradictions(nextMemories, candidate, now);
+        for (const memory of nextMemories) await repository.upsertMemory(userId, memory);
+        const duplicate = nextMemories.some((memory) => memory.status === "active" && memory.normalizedContent === candidate.normalizedContent);
+        if (!duplicate) {
+          await repository.upsertMemory(userId, {
+            id: randomUUID(),
+            userId,
+            companionId: companion.id,
+            type: candidate.type,
+            content: candidate.content,
+            normalizedContent: candidate.normalizedContent,
+            importance: candidate.importance,
+            confidence: candidate.confidence,
+            sourceMessageIds: [userMessage.id],
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+            retrievalCount: 0,
+            status: "active",
+            pinned: false,
+          });
+        }
       }
+    } catch (error) {
+      request.log.warn({ err: error }, "Optional memory extraction failed");
     }
 
     const summary = summarizeConversation(parsed.data.conversationId, [...allMessages, assistantMessage]);
-    summaries.set(parsed.data.conversationId, [...(summaries.get(parsed.data.conversationId) ?? []), summary]);
+    await repository.addSummary(userId, summary).catch((error) => request.log.warn({ err: error }, "Optional conversation summary failed"));
     reply.raw.write(`event: done\ndata: ${JSON.stringify({ assistantMessageId: assistantMessage.id, summary })}\n\n`);
     reply.raw.end();
   });
@@ -380,7 +479,7 @@ export async function createServer(): Promise<FastifyInstance> {
   app.get("/conversations/:conversationId/summaries", async (request, reply) => {
     const params = z.object({ conversationId: z.uuid() }).safeParse(request.params);
     if (!params.success) return reply.code(400).send(apiError("invalid_conversation", "Conversation ID is invalid.", request.id));
-    return { ok: true, data: summaries.get(params.data.conversationId) ?? [], requestId: request.id };
+    return { ok: true, data: await repository.listSummaries(actorId(request.headers), params.data.conversationId), requestId: request.id };
   });
 
   app.patch("/conversations/:conversationId/messages/:messageId/feedback", async (request, reply) => {
@@ -395,26 +494,32 @@ export async function createServer(): Promise<FastifyInstance> {
     return { ok: true, data: { message: updated, preferenceSignalRecorded: true }, requestId: request.id };
   });
 
-  app.get("/memories", async (request) => ({
-    ok: true,
-    data: await repository.listMemories(actorId(request.headers), seedCompanion.id),
-    requestId: request.id,
-  }));
+  app.get("/memories", async (request, reply) => {
+    const userId = actorId(request.headers);
+    const companion = await primaryCompanion(userId);
+    if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    return { ok: true, data: await repository.listMemories(userId, companion.id), requestId: request.id };
+  });
 
   app.get("/memories/search", async (request, reply) => {
-    const query = z.object({ q: z.string().trim().min(1).max(200), companionId: z.uuid().default(seedCompanion.id) }).safeParse(request.query);
+    const query = z.object({ q: z.string().trim().min(1).max(200), companionId: z.uuid().optional() }).safeParse(request.query);
     if (!query.success) return reply.code(400).send(apiError("invalid_search", "Add a search phrase.", request.id));
-    const memories = await repository.listMemories(actorId(request.headers), query.data.companionId);
+    const userId = actorId(request.headers);
+    const companionId = query.data.companionId ?? (await primaryCompanion(userId))?.id;
+    if (!companionId) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    const memories = await repository.listMemories(userId, companionId);
     const q = query.data.q.toLowerCase();
     return { ok: true, data: memories.filter((memory) => memory.content.toLowerCase().includes(q) || memory.normalizedContent.includes(q)), requestId: request.id };
   });
 
   app.post("/memories", async (request, reply) => {
     const userId = actorId(request.headers);
-    const body = z.object({ companionId: z.uuid().default(seedCompanion.id), type: z.enum(["semantic", "episodic", "preference", "relationship", "goal", "emotional", "shared"]), content: z.string().trim().min(1).max(2_000), pinned: z.boolean().default(false) }).safeParse(request.body);
+    const body = z.object({ companionId: z.uuid().optional(), type: z.enum(["semantic", "episodic", "preference", "relationship", "goal", "emotional", "shared"]), content: z.string().trim().min(1).max(2_000), pinned: z.boolean().default(false) }).safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_memory", "Check the memory fields.", request.id));
+    const companionId = body.data.companionId ?? (await primaryCompanion(userId))?.id;
+    if (!companionId || !await repository.getCompanion(userId, companionId)) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
     const now = new Date().toISOString();
-    const memory: MemoryRecord = { id: randomUUID(), userId, companionId: body.data.companionId, type: body.data.type, content: body.data.content, normalizedContent: body.data.content.toLowerCase(), importance: 0.8, confidence: 1, sourceMessageIds: [], createdAt: now, updatedAt: now, retrievalCount: 0, status: "active", pinned: body.data.pinned };
+    const memory: MemoryRecord = { id: randomUUID(), userId, companionId, type: body.data.type, content: body.data.content, normalizedContent: body.data.content.toLowerCase(), importance: 0.8, confidence: 1, sourceMessageIds: [], createdAt: now, updatedAt: now, retrievalCount: 0, status: "active", pinned: body.data.pinned };
     await repository.upsertMemory(userId, memory);
     return reply.code(201).send({ ok: true, data: memory, requestId: request.id });
   });
@@ -424,7 +529,9 @@ export async function createServer(): Promise<FastifyInstance> {
     const params = z.object({ memoryId: z.uuid() }).safeParse(request.params);
     const body = memoryUpdateSchema.safeParse(request.body);
     if (!params.success || !body.success) return reply.code(400).send(apiError("invalid_memory", "Check the memory update.", request.id));
-    const memories = await repository.listMemories(userId, seedCompanion.id);
+    const companion = await primaryCompanion(userId);
+    if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    const memories = await repository.listMemories(userId, companion.id);
     const memory = memories.find((item) => item.id === params.data.memoryId);
     if (!memory) return reply.code(404).send(apiError("memory_not_found", "Memory not found.", request.id));
     const updated: MemoryRecord = {
@@ -513,11 +620,16 @@ export async function createServer(): Promise<FastifyInstance> {
     const body = futureEventSchema.safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_event", "Check the event details.", request.id));
     const userId = actorId(request.headers);
-    const event: FutureEventRecord = { id: randomUUID(), userId, companionId: seedCompanion.id, ...body.data, createdAt: new Date().toISOString() };
+    const [user, companion] = await Promise.all([repository.getUser(userId), primaryCompanion(userId)]);
+    if (!user || !companion) return reply.code(404).send(apiError("actor_not_found", "Account or companion not found.", request.id));
+    const event: FutureEventRecord = { id: randomUUID(), userId, companionId: companion.id, ...body.data, createdAt: new Date().toISOString() };
     await repository.addFutureEvent(userId, event);
     const settings = await repository.getNotificationSettings(userId);
-    const nudge = generateNudge({ userId, userName: seedUser.name, event, memories: await repository.listMemories(userId, seedCompanion.id), settings });
-    if (nudge) await repository.addNudge(userId, nudge);
+    const nudge = generateNudge({ userId, userName: user.name, event, memories: await repository.listMemories(userId, companion.id), settings });
+    if (nudge) {
+      await repository.addNudge(userId, nudge);
+      await infrastructure.enqueueNudge(nudge);
+    }
     return reply.code(201).send({ ok: true, data: { event, nudge }, requestId: request.id });
   });
 
@@ -539,7 +651,7 @@ export async function createServer(): Promise<FastifyInstance> {
     if (!item) return reply.code(404).send(apiError("item_not_found", "Store item not found.", request.id));
     const subscription = await repository.getSubscription(userId);
     const order: PlanId[] = ["free", "plus", "ultra", "platinum"];
-    if (order.indexOf(subscription.planId) < order.indexOf(item.tierRequired)) return reply.code(403).send(apiError("upgrade_required", `${plans[item.tierRequired].name} is required for this item.`, request.id));
+    if (env.BILLING_ENABLED && order.indexOf(subscription.planId) < order.indexOf(item.tierRequired)) return reply.code(403).send(apiError("upgrade_required", `${plans[item.tierRequired].name} is required for this item.`, request.id));
     try {
       const result = await repository.purchaseItem(userId, item.id, body.data.idempotencyKey);
       return { ok: true, data: result, requestId: request.id };
@@ -573,6 +685,7 @@ export async function createServer(): Promise<FastifyInstance> {
   });
 
   app.post("/subscriptions/webhook", async (request, reply) => {
+    if (!env.BILLING_ENABLED) return reply.code(501).send(apiError("billing_disabled", "Billing is not enabled for this build.", request.id));
     const body = subscriptionWebhookSchema.safeParse(request.body);
     const secret = request.headers["x-webhook-secret"];
     const acceptedSecret = env.STRIPE_WEBHOOK_SECRET ?? env.REVENUECAT_WEBHOOK_SECRET;
@@ -592,24 +705,50 @@ export async function createServer(): Promise<FastifyInstance> {
     const userId = actorId(request.headers);
     const access = await entitlementFor(userId, "voiceNotes");
     if (!access.allowed) return reply.code(402).send(apiError("upgrade_required", `${plans[access.minimumPlan].name} is required for voice notes.`, request.id));
-    const body = z.object({ audioBase64: z.string().max(8_000_000).default(""), contentType: z.string().default("audio/webm") }).safeParse(request.body);
+    const body = z.object({ audioBase64: z.string().min(1).max(8_000_000), contentType: z.enum(["audio/webm", "audio/wav", "audio/mpeg", "audio/mp4"]).default("audio/webm") }).safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_audio", "Audio payload is invalid.", request.id));
-    const result = await speechProvider.transcribe(new TextEncoder().encode(body.data.audioBase64), body.data.contentType);
-    return { ok: true, data: { ...result, provider: speechProvider.id, mock: true }, requestId: request.id };
+    try {
+      const result = await speechToText.transcribe(Buffer.from(body.data.audioBase64, "base64"), body.data.contentType);
+      return { ok: true, data: { ...result, provider: speechToText.id, mock: speechToText.id === "mock" }, requestId: request.id };
+    } catch (error) {
+      request.log.error({ err: error, provider: speechToText.id }, "Transcription failed");
+      return reply.code(502).send(apiError("transcription_failed", "The voice note could not be transcribed.", request.id));
+    }
   });
 
   app.post("/voice/synthesize", async (request, reply) => {
-    const body = z.object({ text: z.string().trim().min(1).max(4_000), voiceId: z.string().default(seedCompanion.voiceId) }).safeParse(request.body);
+    const userId = actorId(request.headers);
+    const body = z.object({ text: z.string().trim().min(1).max(4_000), voiceId: z.string().min(1).max(80).optional() }).safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_speech", "Text is required.", request.id));
-    const result = await speechProvider.synthesize(body.data.text, body.data.voiceId);
-    return { ok: true, data: { audioBase64: Buffer.from(result.audio).toString("base64"), contentType: result.contentType, durationMs: result.durationMs, provider: speechProvider.id, mock: true }, requestId: request.id };
+    const companion = await primaryCompanion(userId);
+    if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    try {
+      const result = await textToSpeech.synthesize(body.data.text, body.data.voiceId ?? companion.voiceId);
+      return { ok: true, data: { audioBase64: Buffer.from(result.audio).toString("base64"), contentType: result.contentType, durationMs: result.durationMs, provider: textToSpeech.id, mock: textToSpeech.id === "mock" }, requestId: request.id };
+    } catch (error) {
+      request.log.error({ err: error, provider: textToSpeech.id }, "Speech synthesis failed");
+      return reply.code(502).send(apiError("speech_failed", "Luma could not speak just now.", request.id));
+    }
   });
 
   app.post("/voice/session", async (request, reply) => {
     const userId = actorId(request.headers);
     const access = await entitlementFor(userId, "voiceCalls");
     if (!access.allowed) return reply.code(402).send(apiError("upgrade_required", `${plans[access.minimumPlan].name} is required for realtime voice.`, request.id));
-    return { ok: true, data: { sessionId: randomUUID(), provider: "mock", state: "ready", expiresAt: new Date(Date.now() + 15 * 60_000).toISOString() }, requestId: request.id };
+    const body = z.object({ companionId: z.uuid().optional() }).safeParse(request.body ?? {});
+    if (!body.success) return reply.code(400).send(apiError("invalid_voice_session", "Voice call settings are invalid.", request.id));
+    const companion = body.data.companionId ? await repository.getCompanion(userId, body.data.companionId) : await primaryCompanion(userId);
+    if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    try {
+      const session = await realtime.createSession({ userId, companionId: companion.id, voiceId: companion.voiceId, instructions: `You are ${companion.name}, a warm AI companion. Be natural, concise in voice, never claim to be human, and respond safely.` });
+      const call = { id: randomUUID(), userId, companionId: companion.id, type: "voice" as const, state: "ready", provider: realtime.id, startedAt: new Date().toISOString(), cameraEnabled: false };
+      callSessions.set(call.id, call);
+      await repository.createCall(userId, call);
+      return { ok: true, data: { ...session, callId: call.id, provider: realtime.id, state: "ready", mock: realtime.id === "mock" }, requestId: request.id };
+    } catch (error) {
+      request.log.error({ err: error, provider: realtime.id }, "Realtime session creation failed");
+      return reply.code(502).send(apiError("voice_session_failed", "A secure voice session could not be created.", request.id));
+    }
   });
 
   app.get("/moments", async (request) => ({
@@ -634,27 +773,25 @@ export async function createServer(): Promise<FastifyInstance> {
     const userId = actorId(request.headers);
     const access = await entitlementFor(userId, "videoCalls");
     if (!access.allowed) return reply.code(402).send(apiError("upgrade_required", `${plans[access.minimumPlan].name} is required for video calls.`, request.id));
-    const body = z.object({ companionId: z.string().default(seedCompanion.id), environmentId: z.string().default("window-nook"), cameraEnabled: z.boolean().default(false) }).safeParse(request.body);
+    const body = z.object({ companionId: z.uuid().optional(), environmentId: z.string().default("window-nook"), cameraEnabled: z.boolean().default(false) }).safeParse(request.body ?? {});
     if (!body.success) return reply.code(400).send(apiError("invalid_video_session", "Video call settings are invalid.", request.id));
-    const session = { id: randomUUID(), userId, companionId: body.data.companionId, type: "video" as const, state: "connecting", startedAt: new Date().toISOString(), environmentId: body.data.environmentId, cameraEnabled: body.data.cameraEnabled };
+    const companion = body.data.companionId ? await repository.getCompanion(userId, body.data.companionId) : await primaryCompanion(userId);
+    if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    const voiceSession = await realtime.createSession({ userId, companionId: companion.id, voiceId: companion.voiceId, instructions: `You are ${companion.name}, a warm AI companion in a video-avatar call. Keep spoken replies natural and brief.` });
+    const session = { id: randomUUID(), userId, companionId: companion.id, type: "video" as const, state: "connecting", startedAt: new Date().toISOString(), environmentId: body.data.environmentId, cameraEnabled: body.data.cameraEnabled };
     callSessions.set(session.id, session);
-    return reply.code(201).send({ ok: true, data: { ...session, provider: "mock", rawRecording: false }, requestId: request.id });
+    await repository.createCall(userId, { ...session, provider: realtime.id });
+    return reply.code(201).send({ ok: true, data: { ...session, realtime: voiceSession, provider: realtime.id, rawRecording: false, mock: realtime.id === "mock" }, requestId: request.id });
   });
 
-  app.get("/calls", async (request) => ({
-    ok: true,
-    data: [
-      { id: "call-today", type: "video", startedAt: "2026-08-31T16:20:00.000Z", durationMs: 1_620_000, summary: "Pitch-deck nerves, one practice answer, then a five-minute reset." },
-      { id: "call-yesterday", type: "voice", startedAt: "2026-08-30T20:15:00.000Z", durationMs: 720_000, summary: "A short check-in about sleep and tomorrow’s priorities." },
-    ],
-    requestId: request.id,
-  }));
+  app.get("/calls", async (request) => ({ ok: true, data: await repository.listCalls(actorId(request.headers)), requestId: request.id }));
 
   app.post("/calls/:callId/barge-in", async (request, reply) => {
     const params = z.object({ callId: z.string().min(8) }).safeParse(request.params);
     if (!params.success) return reply.code(400).send(apiError("invalid_call", "Call id is required.", request.id));
-    const session = callSessions.get(params.data.callId);
-    if (!session || session.userId !== actorId(request.headers)) return reply.code(404).send(apiError("call_not_found", "Call not found.", request.id));
+    const userId = actorId(request.headers);
+    const session = callSessions.get(params.data.callId) ?? (await repository.listCalls(userId)).find((call) => call.id === params.data.callId);
+    if (!session || session.userId !== userId) return reply.code(404).send(apiError("call_not_found", "Call not found.", request.id));
     session.state = "listening";
     return { ok: true, data: { ...session, outputCanceled: true, inputActive: true }, requestId: request.id };
   });
@@ -662,32 +799,41 @@ export async function createServer(): Promise<FastifyInstance> {
   app.post("/calls/:callId/end", async (request, reply) => {
     const params = z.object({ callId: z.string().min(8) }).safeParse(request.params);
     if (!params.success) return reply.code(400).send(apiError("invalid_call", "Call id is required.", request.id));
-    const session = callSessions.get(params.data.callId);
-    if (!session || session.userId !== actorId(request.headers)) return reply.code(404).send(apiError("call_not_found", "Call not found.", request.id));
+    const userId = actorId(request.headers);
+    const session = callSessions.get(params.data.callId) ?? (await repository.listCalls(userId)).find((call) => call.id === params.data.callId);
+    if (!session || session.userId !== userId) return reply.code(404).send(apiError("call_not_found", "Call not found.", request.id));
     session.state = "ended";
     callSessions.delete(session.id);
-    return { ok: true, data: { ...session, endedAt: new Date().toISOString(), rawRecording: false }, requestId: request.id };
+    const endedAt = new Date().toISOString();
+    const persisted = await repository.endCall(userId, session.id, endedAt);
+    return { ok: true, data: { ...(persisted ?? session), endedAt, rawRecording: false }, requestId: request.id };
   });
 
   app.post("/camera/session", async (request, reply) => {
     const userId = actorId(request.headers);
     const access = await entitlementFor(userId, "cameraConversation");
     if (!access.allowed) return reply.code(402).send(apiError("upgrade_required", `${plans[access.minimumPlan].name} is required for camera conversations.`, request.id));
-    return { ok: true, data: { sessionId: randomUUID(), state: "permission-required", consentRequired: true, mock: true }, requestId: request.id };
+    const companion = await primaryCompanion(userId);
+    if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
+    const session = await realtime.createSession({ userId, companionId: companion.id, voiceId: companion.voiceId, instructions: `You are ${companion.name}. Discuss only details the user explicitly shares from their camera and never infer sensitive traits.` });
+    return { ok: true, data: { ...session, state: "permission-required", consentRequired: true, provider: realtime.id, mock: realtime.id === "mock" }, requestId: request.id };
   });
 
   app.post("/media/upload", async (request, reply) => {
     const body = z.object({ name: z.string().min(1).max(180), contentType: z.enum(["image/jpeg", "image/png", "image/webp"]), dataBase64: z.string().max(12_000_000) }).safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_media", "Use a JPEG, PNG, or WebP image.", request.id));
     const assetId = randomUUID();
-    return reply.code(201).send({ ok: true, data: { id: assetId, url: `/mock-media/${assetId}`, name: body.data.name, contentType: body.data.contentType, bytes: Math.round(body.data.dataBase64.length * 0.75), mock: true }, requestId: request.id });
+    const bytes = Buffer.from(body.data.dataBase64, "base64");
+    const extension = body.data.contentType === "image/png" ? "png" : body.data.contentType === "image/webp" ? "webp" : "jpg";
+    const storedUrl = await infrastructure.putMedia({ key: `${actorId(request.headers)}/${assetId}.${extension}`, contentType: body.data.contentType, bytes });
+    return reply.code(201).send({ ok: true, data: { id: assetId, url: storedUrl ?? `/mock-media/${assetId}`, name: body.data.name, contentType: body.data.contentType, bytes: bytes.byteLength, mock: storedUrl === null }, requestId: request.id });
   });
 
   app.post("/media/analyze", async (request, reply) => {
     const body = z.object({ dataBase64: z.string().max(12_000_000).default(""), contentType: z.string().default("image/jpeg"), prompt: z.string().max(1_000).default("Describe this image safely") }).safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_media", "Image request is invalid.", request.id));
-    const description = await visionProvider.describe({ image: new TextEncoder().encode(body.data.dataBase64), contentType: body.data.contentType, prompt: body.data.prompt });
-    return { ok: true, data: { description, provider: visionProvider.id, mock: true }, requestId: request.id };
+    const description = await visionProvider.describe({ image: Buffer.from(body.data.dataBase64, "base64"), contentType: body.data.contentType, prompt: body.data.prompt });
+    return { ok: true, data: { description, provider: visionProvider.id, mock: visionProvider.id === "mock" }, requestId: request.id };
   });
 
   app.post("/media/generate", async (request, reply) => {
@@ -697,7 +843,9 @@ export async function createServer(): Promise<FastifyInstance> {
     const body = z.object({ prompt: z.string().trim().min(1).max(1_000), appearance: z.string().max(1_000).default("Luma in a premium stylized-realistic 3D style") }).safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_prompt", "Describe the image you want.", request.id));
     const result = await imageProvider.generate(body.data);
-    return { ok: true, data: { assetUrl: "/assets/luma/cafe-selfie.png", artifactBase64: Buffer.from(result.bytes).toString("base64"), contentType: result.contentType, provider: imageProvider.id, mock: true }, requestId: request.id };
+    const assetId = randomUUID();
+    const storedUrl = await infrastructure.putMedia({ key: `${userId}/generated/${assetId}.png`, contentType: result.contentType, bytes: result.bytes });
+    return { ok: true, data: { assetUrl: storedUrl ?? "/assets/luma/cafe-selfie.png", artifactBase64: storedUrl ? undefined : Buffer.from(result.bytes).toString("base64"), contentType: result.contentType, provider: imageProvider.id, mock: imageProvider.id === "mock" }, requestId: request.id };
   });
 
   app.get("/responses/:messageId/explanation", async (request, reply) => {
@@ -709,25 +857,46 @@ export async function createServer(): Promise<FastifyInstance> {
     if (!params.success || !query.success) return reply.code(400).send(apiError("invalid_message", "Message and conversation are required.", request.id));
     const message = (await repository.listMessages(userId, query.data.conversationId)).find((candidate) => candidate.id === params.data.messageId);
     if (!message || message.role !== "assistant") return reply.code(404).send(apiError("message_not_found", "Assistant message not found.", request.id));
-    const memories = (await repository.listMemories(userId, seedCompanion.id)).filter((memory) => memory.status === "active").slice(0, 3);
+    const companion = await primaryCompanion(userId);
+    const memories = companion ? (await repository.listMemories(userId, companion.id)).filter((memory) => memory.status === "active").slice(0, 3) : [];
     return { ok: true, data: { messageId: message.id, reasons: ["Matched Luma's warm, playful personality settings.", "Used the recent conversation turn for continuity.", ...memories.map((memory) => `Considered an approved ${memory.type} memory: ${memory.content}`)], safety: "Passed local policy assessment.", model: env.CHAT_MODEL }, requestId: request.id };
   });
 
   app.get("/admin/metrics", async (request, reply) => {
     if (!isAdmin(request.headers, env.ADMIN_API_KEY)) return reply.code(401).send(apiError("admin_required", "Admin key is required.", request.id));
-    const successful = usageRecords.filter((record) => record.success);
+    const records = await repository.listProviderUsage();
+    const successful = records.filter((record) => record.success);
     const averageLatencyMs = successful.length ? Math.round(successful.reduce((total, record) => total + record.latencyMs, 0) / successful.length) : 0;
-    return { ok: true, data: { conversations: conversations.size, requests: usageRecords.length, successfulRequests: successful.length, averageLatencyMs, estimatedCostUsd: usageRecords.reduce((total, record) => total + record.estimatedCostUsd, 0), privacy: "Conversation content is excluded from admin telemetry." }, requestId: request.id };
+    return { ok: true, data: { chatTurns: records.filter((record) => record.feature === "text_chat").length, requests: records.length, successfulRequests: successful.length, averageLatencyMs, estimatedCostUsd: records.reduce((total, record) => total + record.estimatedCostUsd, 0), privacy: "Conversation content is excluded from admin telemetry." }, requestId: request.id };
   });
 
   app.get("/admin/usage", async (request, reply) => {
     if (!isAdmin(request.headers, env.ADMIN_API_KEY)) return reply.code(401).send(apiError("admin_required", "Admin key is required.", request.id));
-    return { ok: true, data: usageRecords.map(({ userId: _userId, ...record }) => record), requestId: request.id };
+    const records = await repository.listProviderUsage();
+    return { ok: true, data: records.map(({ userId: _userId, ...record }) => record), requestId: request.id };
   });
 
   app.get("/admin/providers", async (request, reply) => {
     if (!isAdmin(request.headers, env.ADMIN_API_KEY)) return reply.code(401).send(apiError("admin_required", "Admin key is required.", request.id));
-    return { ok: true, data: { chat: provider.id, speech: speechProvider.id, vision: visionProvider.id, image: imageProvider.id, model: env.CHAT_MODEL, mockMode: env.AI_MOCK_MODE }, requestId: request.id };
+    return { ok: true, data: { chat: provider.id, moderation: moderation.id, speechToText: speechToText.id, textToSpeech: textToSpeech.id, realtime: realtime.id, vision: visionProvider.id, image: imageProvider.id, model: env.CHAT_MODEL, mockMode: env.AI_MOCK_MODE }, requestId: request.id };
+  });
+
+  app.get("/admin/metrics.prom", async (request, reply) => {
+    if (!isAdmin(request.headers, env.ADMIN_API_KEY)) return reply.code(401).send(apiError("admin_required", "Admin key is required.", request.id));
+    const records = await repository.listProviderUsage();
+    const successful = records.filter((record) => record.success);
+    const failed = records.length - successful.length;
+    const body = [
+      "# HELP companion_provider_requests_total Provider requests observed by this API process.",
+      "# TYPE companion_provider_requests_total counter",
+      `companion_provider_requests_total{status=\"success\"} ${successful.length}`,
+      `companion_provider_requests_total{status=\"failed\"} ${failed}`,
+      "# HELP companion_provider_latency_ms Provider latency in milliseconds.",
+      "# TYPE companion_provider_latency_ms gauge",
+      `companion_provider_latency_ms ${successful.length ? Math.round(successful.reduce((sum, record) => sum + record.latencyMs, 0) / successful.length) : 0}`,
+      "",
+    ].join("\n");
+    return reply.type("text/plain; version=0.0.4; charset=utf-8").send(body);
   });
 
   app.get("/admin/feature-flags", async (request, reply) => {
@@ -748,7 +917,9 @@ export async function createServer(): Promise<FastifyInstance> {
   app.post("/account/delete", async (request, reply) => {
     const parsed = z.object({ confirmation: z.literal("DELETE") }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(apiError("confirmation_required", "Type DELETE to confirm.", request.id));
-    await repository.deleteUser(actorId(request.headers));
+    const userId = actorId(request.headers);
+    await repository.deleteUser(userId);
+    await auth.deleteUser(userId);
     return reply.code(204).send();
   });
 

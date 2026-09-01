@@ -1,5 +1,5 @@
 import type { ChatMessage, MemoryRecord } from "@companion/shared";
-import type { ChatChunk, ChatProvider, CompanionContext, EmbeddingProvider, ImageGenerationProvider, SpeechToTextProvider, TextToSpeechProvider, VisionProvider } from "./providers";
+import type { ChatChunk, ChatProvider, CompanionContext, EmbeddingProvider, ImageGenerationProvider, ModerationProvider, RealtimeVoiceProvider, SpeechToTextProvider, TextToSpeechProvider, VisionProvider } from "./providers";
 import { planCompanionTurn } from "./conversation-engine";
 
 export class MockChatProvider implements ChatProvider {
@@ -59,6 +59,24 @@ export class MockImageProvider implements ImageGenerationProvider {
   readonly id = "mock";
   async generate(input: { prompt: string; appearance: string }) {
     return { bytes: new TextEncoder().encode(`${input.appearance}:${input.prompt}`), contentType: "application/x-companion-mock-image" };
+  }
+}
+
+export class MockModerationProvider implements ModerationProvider {
+  readonly id = "local";
+  async assess(_input: string) {
+    return { level: "safe" as const };
+  }
+}
+
+export class MockRealtimeVoiceProvider implements RealtimeVoiceProvider {
+  readonly id = "mock";
+  async createSession(_input: { companionId: string; userId: string; instructions?: string; voiceId?: string }) {
+    return {
+      sessionId: crypto.randomUUID(),
+      clientSecret: `mock-realtime.${crypto.randomUUID()}`,
+      expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    };
   }
 }
 

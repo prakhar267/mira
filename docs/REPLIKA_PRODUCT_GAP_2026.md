@@ -12,19 +12,19 @@ The important lesson is behavioral: emotional intelligence is not the length of 
 
 | Product area | Luma status | Notes |
 | --- | --- | --- |
-| Natural text conversation | Strong local prototype | New turn planner avoids reflective paraphrase, detects explicit boundaries, tracks question fatigue, varies tone, and uses multi-message pacing. A hosted model is still required for unrestricted open-domain conversation. |
+| Natural text conversation | Live-capable | The web streams from the authenticated API. The OpenAI Responses adapter uses structured companion context; deterministic turn planning remains the credential-free fallback. |
 | Memory and continuity | Working | Selective retrieval, user-visible memory controls, source/confidence metadata, event reminders, and relevant-only response explanations. |
-| Proactive presence | Working prototype | Home greeting can surface a nearby event without turning it into a compulsory conversation. Native push delivery still requires production infrastructure. |
+| Proactive presence | Live-capable | Events create quiet-hours-aware nudges, Redis schedules them, and the worker delivers due messages through a configured notification webhook. |
 | Feedback and training | Working locally | “Too scripted,” “Too many questions,” “Missed what I said,” and “Wrong tone” feedback persists and changes future response preferences. |
-| Voice call | Working browser mode | Speech recognition when available, typed fallback, barge-in, captions, short call turns, and per-voice rate/pitch. A realtime neural voice service is needed for truly human prosody and low latency. |
-| Video call | Working browser mode | Animated companion presence, scene/activity controls, local camera preview, captions, and context-aware spoken replies. Luma does not falsely claim to see camera frames. |
+| Voice call | Live-capable | Short-lived Realtime client secrets, browser WebRTC audio, semantic VAD, interruption, captions, mute/speaker controls, persistent call records, and a browser fallback are implemented. |
+| Video call | Live-capable avatar call | Realtime audio, animated original companion art, scene/activity controls, explicit local camera preview, captions, and persistent call records work. This is a 2D avatar experience, not a rigged photoreal 3D human. |
 | Backstory and personality | Working | Editable backstory plus existing personality sliders, voice, relationship, wardrobe, and room state. |
 | Companion reflections | Working prototype | User-visible reflections linked to approved memories; not a hidden transcript. |
 | Activities, dates, progression, store | Working test mode | Activities, virtual dates, XP, levels, currency, feature gates, purchases, and equipment state. |
-| Photos and image generation | Prototype assets | Upload, album, selfie request, and approved local image outputs work. Production image/video generation requires a provider. |
+| Photos and image generation | Live-capable | User uploads use S3-compatible storage, vision analyzes explicitly shared images/frames, and generated images preserve a structured original-character appearance prompt. |
 | Internet and app integrations | Not connected | Current Replika promotes internet access, app integrations, contacts/share flows, and visual sharing. These require explicit third-party integrations and permissions. |
 | AR and realtime 3D avatar | Not built | Requires a rigged 3D asset, mobile rendering, tracking, lip sync, and native AR support. |
-| Production platform | Scaffolded, not deployed | Authentication, database, billing, moderation operations, push notifications, analytics, and app-store delivery require production services and credentials. |
+| Production platform | Implemented, not publicly deployed | Secure email auth, PostgreSQL/pgvector migration, Redis, S3, notification worker, moderation, persistent aggregate provider metrics, readiness, and private admin APIs are implemented. Payment, public domain/hosting, native app-store release, and independent production review remain excluded. |
 
 ## Conversation defects found and corrected
 

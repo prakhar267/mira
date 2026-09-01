@@ -43,9 +43,9 @@ describe("Companion API", () => {
     expect(event.json().data.nudge.content).toContain("final interview");
   });
 
-  it("enforces and updates subscription entitlements in test mode", async () => {
-    const gated = await app.inject({ method: "POST", url: "/voice/session" });
-    expect(gated.statusCode).toBe(402);
+  it("keeps premium capabilities usable while billing is intentionally disabled", async () => {
+    const voiceBeforeBilling = await app.inject({ method: "POST", url: "/voice/session" });
+    expect(voiceBeforeBilling.statusCode).toBe(200);
     const upgrade = await app.inject({ method: "POST", url: "/subscriptions/mock-upgrade", payload: { planId: "ultra", idempotencyKey: "upgrade-test-0001" } });
     expect(upgrade.statusCode).toBe(200);
     expect(upgrade.json().data.entitlements).toContain("voiceCalls");

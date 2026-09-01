@@ -13,6 +13,10 @@ COPY packages/ai packages/ai
 COPY packages/config packages/config
 COPY packages/shared packages/shared
 COPY packages/ui packages/ui
+ARG NEXT_PUBLIC_API_ORIGIN=http://localhost:4000
+ARG NEXT_PUBLIC_API_MODE=live
+ENV NEXT_PUBLIC_API_ORIGIN=$NEXT_PUBLIC_API_ORIGIN
+ENV NEXT_PUBLIC_API_MODE=$NEXT_PUBLIC_API_MODE
 RUN pnpm --filter @companion/web build
 EXPOSE 3000
 CMD ["pnpm", "--filter", "@companion/web", "start"]

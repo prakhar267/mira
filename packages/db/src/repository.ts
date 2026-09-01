@@ -2,11 +2,13 @@ import type {
   ActivityDefinition,
   ChatMessage,
   CompanionProfile,
+  ConversationSummaryRecord,
   FutureEventRecord,
   JournalEntryRecord,
   MemoryRecord,
   NotificationSettings,
   OwnedItemRecord,
+  ProviderUsageRecord,
   ScheduledNudgeRecord,
   StoreItemRecord,
   SubscriptionState,
@@ -16,13 +18,40 @@ import type {
 } from "@companion/shared";
 import { WalletLedger } from "./ledger";
 
+export interface CallRecord {
+  id: string;
+  userId: string;
+  companionId: string;
+  type: "voice" | "video";
+  state: string;
+  provider: string;
+  startedAt: string;
+  endedAt?: string;
+  durationMs?: number;
+  summary?: string;
+  environmentId?: string;
+  cameraEnabled: boolean;
+}
+
 export interface CompanionRepository {
+  health(): Promise<boolean>;
+  createAccount(input: { user: UserProfile; companion: CompanionProfile; email?: string }): Promise<void>;
   getUser(userId: string): Promise<UserProfile | null>;
+  listCompanions(userId: string): Promise<CompanionProfile[]>;
   getCompanion(userId: string, companionId: string): Promise<CompanionProfile | null>;
   updateCompanion(userId: string, companion: CompanionProfile): Promise<void>;
+  listConversations(userId: string): Promise<Array<{ id: string; userId: string; companionId: string; createdAt: string }>>;
+  createConversation(input: { id: string; userId: string; companionId: string; createdAt: string }): Promise<void>;
   listMessages(userId: string, conversationId: string): Promise<ChatMessage[]>;
   appendMessages(userId: string, conversationId: string, messages: ChatMessage[]): Promise<void>;
   updateMessage(userId: string, conversationId: string, message: ChatMessage): Promise<void>;
+  listSummaries(userId: string, conversationId: string): Promise<ConversationSummaryRecord[]>;
+  addSummary(userId: string, summary: ConversationSummaryRecord): Promise<void>;
+  listCalls(userId: string): Promise<CallRecord[]>;
+  createCall(userId: string, call: CallRecord): Promise<void>;
+  endCall(userId: string, callId: string, endedAt: string): Promise<CallRecord | null>;
+  recordProviderUsage(record: ProviderUsageRecord): Promise<void>;
+  listProviderUsage(): Promise<ProviderUsageRecord[]>;
   listMemories(userId: string, companionId: string): Promise<MemoryRecord[]>;
   upsertMemory(userId: string, memory: MemoryRecord): Promise<void>;
   deleteMemory(userId: string, memoryId: string): Promise<boolean>;
@@ -60,7 +89,12 @@ export interface InMemorySeed {
 export class InMemoryCompanionRepository implements CompanionRepository {
   private users = new Map<string, UserProfile>();
   private companions = new Map<string, CompanionProfile>();
+  private companionOwners = new Map<string, string>();
   private messages = new Map<string, ChatMessage[]>();
+  private conversations = new Map<string, { id: string; userId: string; companionId: string; createdAt: string }>();
+  private summaries = new Map<string, ConversationSummaryRecord[]>();
+  private calls = new Map<string, CallRecord>();
+  private providerUsage: ProviderUsageRecord[] = [];
   private memories = new Map<string, MemoryRecord[]>();
   private ledgers = new Map<string, WalletLedger>();
   private notificationSettings = new Map<string, NotificationSettings>();
@@ -74,6 +108,7 @@ export class InMemoryCompanionRepository implements CompanionRepository {
   constructor(private readonly seed: InMemorySeed) {
     this.users.set(seed.user.id, seed.user);
     this.companions.set(seed.companion.id, seed.companion);
+    this.companionOwners.set(seed.companion.id, seed.user.id);
     this.memories.set(seed.user.id, seed.memories.map((memory) => ({ ...memory })));
     this.ledgers.set(seed.user.id, new WalletLedger(seed.user.id, { xp: 180, level: 3, coins: 240, gems: 12 }));
     this.notificationSettings.set(seed.user.id, { frequency: "normal", quietStart: "22:00", quietEnd: "08:00", timezone: seed.user.timezone, enabledTopics: ["future-events", "goals"] });
@@ -81,38 +116,86 @@ export class InMemoryCompanionRepository implements CompanionRepository {
     this.subscriptions.set(seed.user.id, { planId: "free", status: "active", testMode: true });
   }
 
+  async createAccount(input: { user: UserProfile; companion: CompanionProfile; email?: string }) {
+    if (this.users.has(input.user.id)) throw new Error("User already exists");
+    this.users.set(input.user.id, { ...input.user, interests: [...input.user.interests] });
+    this.companions.set(input.companion.id, { ...input.companion, personality: { ...input.companion.personality } });
+    this.companionOwners.set(input.companion.id, input.user.id);
+    this.memories.set(input.user.id, []);
+    this.ledgers.set(input.user.id, new WalletLedger(input.user.id, { xp: 0, level: 1, coins: 0, gems: 0 }));
+    this.notificationSettings.set(input.user.id, { frequency: "normal", quietStart: "22:00", quietEnd: "08:00", timezone: input.user.timezone, enabledTopics: ["future-events", "goals"] });
+    this.ownedItems.set(input.user.id, this.seed.storeItems.filter((item) => item.currency === "free").map((item) => ({ itemId: item.id, purchasedAt: input.companion.createdAt, equipped: true })));
+    this.subscriptions.set(input.user.id, { planId: "free", status: "active", testMode: true });
+  }
+
+  async health() { return true; }
   async getUser(userId: string) { return this.users.get(userId) ?? null; }
+  async listCompanions(userId: string) {
+    return [...this.companionOwners.entries()].filter(([, ownerId]) => ownerId === userId).flatMap(([companionId]) => {
+      const companion = this.companions.get(companionId);
+      return companion ? [{ ...companion, personality: { ...companion.personality } }] : [];
+    });
+  }
 
   async getCompanion(userId: string, companionId: string) {
-    if (!this.users.has(userId)) return null;
+    if (!this.users.has(userId) || this.companionOwners.get(companionId) !== userId) return null;
     return this.companions.get(companionId) ?? null;
   }
 
   async updateCompanion(userId: string, companion: CompanionProfile) {
-    if (!this.users.has(userId) || !this.companions.has(companion.id)) throw new Error("Companion not found");
+    if (!this.users.has(userId) || this.companionOwners.get(companion.id) !== userId) throw new Error("Companion not found");
     this.companions.set(companion.id, { ...companion });
   }
 
+  async listConversations(userId: string) { return [...this.conversations.values()].filter((conversation) => conversation.userId === userId).map((conversation) => ({ ...conversation })); }
+  async createConversation(input: { id: string; userId: string; companionId: string; createdAt: string }) {
+    if (!this.users.has(input.userId) || !this.companions.has(input.companionId)) throw new Error("Actor not found");
+    this.conversations.set(input.id, { ...input });
+  }
+
   async listMessages(userId: string, conversationId: string) {
-    if (!this.users.has(userId)) return [];
+    if (!this.users.has(userId) || this.conversations.get(conversationId)?.userId !== userId) return [];
     return [...(this.messages.get(conversationId) ?? [])];
   }
 
   async appendMessages(userId: string, conversationId: string, messages: ChatMessage[]) {
-    if (!this.users.has(userId)) throw new Error("User not found");
+    if (!this.users.has(userId) || this.conversations.get(conversationId)?.userId !== userId) throw new Error("Conversation not found");
     const current = this.messages.get(conversationId) ?? [];
     const ids = new Set(current.map((message) => message.id));
     this.messages.set(conversationId, [...current, ...messages.filter((message) => !ids.has(message.id))]);
   }
 
   async updateMessage(userId: string, conversationId: string, message: ChatMessage) {
-    if (!this.users.has(userId)) throw new Error("User not found");
+    if (!this.users.has(userId) || this.conversations.get(conversationId)?.userId !== userId) throw new Error("Conversation not found");
     const current = this.messages.get(conversationId) ?? [];
     const index = current.findIndex((candidate) => candidate.id === message.id);
     if (index === -1) throw new Error("Message not found");
     current[index] = { ...message };
     this.messages.set(conversationId, current);
   }
+
+  async listSummaries(userId: string, conversationId: string) {
+    if (!this.users.has(userId) || this.conversations.get(conversationId)?.userId !== userId) return [];
+    return (this.summaries.get(conversationId) ?? []).map((summary) => ({ ...summary, sourceMessageIds: [...summary.sourceMessageIds] }));
+  }
+  async addSummary(userId: string, summary: ConversationSummaryRecord) {
+    if (this.conversations.get(summary.conversationId)?.userId !== userId) throw new Error("Conversation not found");
+    this.summaries.set(summary.conversationId, [...(this.summaries.get(summary.conversationId) ?? []), { ...summary, sourceMessageIds: [...summary.sourceMessageIds] }]);
+  }
+  async listCalls(userId: string) { return [...this.calls.values()].filter((call) => call.userId === userId).sort((left, right) => right.startedAt.localeCompare(left.startedAt)).map((call) => ({ ...call })); }
+  async createCall(userId: string, call: CallRecord) {
+    if (call.userId !== userId || this.companionOwners.get(call.companionId) !== userId) throw new Error("Cross-user call write rejected");
+    this.calls.set(call.id, { ...call });
+  }
+  async endCall(userId: string, callId: string, endedAt: string) {
+    const call = this.calls.get(callId);
+    if (!call || call.userId !== userId) return null;
+    const next = { ...call, state: "ended", endedAt, durationMs: Math.max(0, Date.parse(endedAt) - Date.parse(call.startedAt)) };
+    this.calls.set(callId, next);
+    return { ...next };
+  }
+  async recordProviderUsage(record: ProviderUsageRecord) { this.providerUsage.push({ ...record }); }
+  async listProviderUsage() { return this.providerUsage.map((record) => ({ ...record })); }
 
   async listMemories(userId: string, companionId: string) {
     return (this.memories.get(userId) ?? []).filter((memory) => memory.companionId === companionId && memory.status !== "deleted");
@@ -243,6 +326,7 @@ export class InMemoryCompanionRepository implements CompanionRepository {
   }
 
   async deleteUser(userId: string) {
+    for (const [companionId, ownerId] of this.companionOwners) if (ownerId === userId) { this.companionOwners.delete(companionId); this.companions.delete(companionId); }
     this.users.delete(userId);
     this.memories.delete(userId);
     this.ledgers.delete(userId);
@@ -252,6 +336,9 @@ export class InMemoryCompanionRepository implements CompanionRepository {
     this.journals.delete(userId);
     this.futureEvents.delete(userId);
     this.nudges.delete(userId);
+    for (const [callId, call] of this.calls) if (call.userId === userId) this.calls.delete(callId);
+    this.providerUsage = this.providerUsage.filter((record) => record.userId !== userId);
+    for (const [conversationId, conversation] of this.conversations) if (conversation.userId === userId) { this.conversations.delete(conversationId); this.summaries.delete(conversationId); }
     for (const [conversationId, messages] of this.messages) if (messages.some((message) => message.id.startsWith(`${userId}:`))) this.messages.delete(conversationId);
   }
 }

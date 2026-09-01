@@ -28,7 +28,12 @@ export interface TextToSpeechProvider {
 
 export interface RealtimeVoiceProvider {
   readonly id: string;
-  createSession(input: { companionId: string; userId: string }): Promise<{ sessionId: string; clientSecret: string; expiresAt: string }>;
+  createSession(input: {
+    companionId: string;
+    userId: string;
+    instructions?: string;
+    voiceId?: string;
+  }): Promise<{ sessionId: string; clientSecret: string; expiresAt: string }>;
 }
 
 export interface VisionProvider {

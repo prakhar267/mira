@@ -59,6 +59,7 @@ model User {
   authIdentities     AuthIdentity[]
   preferences        UserPreference[]
   sessions           Session[]
+  authChallenges     AuthChallenge[]
   companions         Companion[]
   conversations      Conversation[]
   messages           Message[]
@@ -105,6 +106,21 @@ model Session {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model AuthChallenge {
+  id        String   @id @default(uuid())
+  userId    String?
+  email     String
+  tokenHash String   @unique
+  kind      String
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, kind])
   @@index([expiresAt])
 }
 

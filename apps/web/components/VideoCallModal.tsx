@@ -60,6 +60,7 @@ export function VideoCallModal({
   voiceId,
   initialEnvironment,
   onUserTurn,
+  onRealtimeConnect,
   onClose,
 }: {
   companionName: string;
@@ -67,6 +68,7 @@ export function VideoCallModal({
   voiceId: string;
   initialEnvironment: EnvironmentId;
   onUserTurn: (content: string) => Promise<string>;
+  onRealtimeConnect?: () => Promise<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void }>;
   onClose: (durationSeconds: number) => void;
 }) {
   const greeting = `There you are, ${userName}. I’m here with you. Take your time.`;
@@ -86,17 +88,44 @@ export function VideoCallModal({
   const [userLine, setUserLine] = useState("");
   const [draft, setDraft] = useState("");
   const [replyOpen, setReplyOpen] = useState(false);
+  const [transport, setTransport] = useState<"connecting" | "realtime" | "fallback">(onRealtimeConnect ? "connecting" : "fallback");
+  const realtimeRef = useRef<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const greetingSpoken = useRef(false);
 
   const speak = useCallback((text: string, force = false) => {
+    if (transport === "realtime") { setSpeaking(false); return; }
     if (!speaker && !force) {
       setSpeaking(false);
       return;
     }
     speakLine(text, voiceId, () => setSpeaking(true), () => setSpeaking(false));
-  }, [speaker, voiceId]);
+  }, [speaker, transport, voiceId]);
+
+  useEffect(() => {
+    if (!onRealtimeConnect) return;
+    let active = true;
+    void onRealtimeConnect().then((connection) => {
+      if (!active) { connection.disconnect(); return; }
+      realtimeRef.current = connection;
+      setTransport("realtime");
+      connection.events.addEventListener("open", () => connection.events.send(JSON.stringify({ type: "response.create", response: { instructions: `Greet ${userName} naturally in one sentence for this video-avatar call.` } })));
+      connection.events.addEventListener("message", (event) => {
+        try {
+          const payload = JSON.parse(String(event.data)) as { type?: string; delta?: string; transcript?: string };
+          if (payload.type === "response.output_audio_transcript.delta" && payload.delta) { setSpeaking(true); setCompanionLine((line) => `${line}${payload.delta}`); }
+          if (payload.type === "response.output_audio_transcript.done") setSpeaking(false);
+          if (payload.type === "conversation.item.input_audio_transcription.completed" && payload.transcript) setUserLine(payload.transcript);
+        } catch { /* Ignore unknown provider events. */ }
+      });
+    }).catch((cause) => {
+      if (!active) return;
+      setTransport("fallback");
+      setCameraError(cause instanceof Error ? `${cause.message} Using browser voice fallback.` : "Using browser voice fallback.");
+    });
+    return () => { active = false; realtimeRef.current?.disconnect(); realtimeRef.current = null; };
+  }, [onRealtimeConnect, userName]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setSeconds((value) => value + 1), 1_000);
@@ -109,10 +138,11 @@ export function VideoCallModal({
 
   useEffect(() => {
     if (greetingSpoken.current) return;
+    if (transport !== "fallback") return;
     greetingSpoken.current = true;
     const connect = window.setTimeout(() => speak(greeting), 550);
     return () => window.clearTimeout(connect);
-  }, [greeting, speak]);
+  }, [greeting, speak, transport]);
 
   const toggleCamera = async () => {
     if (cameraOn) {
@@ -143,6 +173,12 @@ export function VideoCallModal({
     setDraft("");
     setUserLine(clean);
     setThinking(true);
+    if (transport === "realtime" && realtimeRef.current?.events.readyState === "open") {
+      realtimeRef.current.events.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text: clean }] } }));
+      realtimeRef.current.events.send(JSON.stringify({ type: "response.create" }));
+      setThinking(false);
+      return;
+    }
     try {
       const reply = await onUserTurn(clean);
       setCompanionLine(reply);
@@ -184,15 +220,15 @@ export function VideoCallModal({
       {replyOpen ? <form className="video-call__reply" onSubmit={(event) => { event.preventDefault(); void submitTurn(); }}><input autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Say something to ${companionName}…`} /><button type="submit" disabled={!draft.trim() || thinking} aria-label="Send call reply"><PaperPlaneTilt aria-hidden="true" weight="fill" /></button></form> : null}
 
       <div className="live-call__controls">
-        <button type="button" className={muted ? "call-orb call-orb--active" : "call-orb"} onClick={() => setMuted((value) => !value)} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicrophoneSlash aria-hidden="true" /> : <Microphone aria-hidden="true" />}</button>
+        <button type="button" className={muted ? "call-orb call-orb--active" : "call-orb"} onClick={() => setMuted((value) => { const next = !value; realtimeRef.current?.peer.getSenders().forEach((sender) => { if (sender.track?.kind === "audio") sender.track.enabled = !next; }); return next; })} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicrophoneSlash aria-hidden="true" /> : <Microphone aria-hidden="true" />}</button>
         <button type="button" className={cameraOn ? "call-orb call-orb--active" : "call-orb"} onClick={() => void toggleCamera()} aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}>{cameraOn ? <VideoCamera aria-hidden="true" weight="fill" /> : <CameraSlash aria-hidden="true" />}</button>
-        <button type="button" className={speaker ? "call-orb call-orb--active" : "call-orb"} onClick={() => { if (speaker) window.speechSynthesis?.cancel(); else speak(companionLine, true); setSpeaker((value) => !value); }} aria-label={speaker ? "Turn speaker off" : "Turn speaker on"}>{speaker ? <SpeakerHigh aria-hidden="true" /> : <SpeakerSlash aria-hidden="true" />}</button>
+        <button type="button" className={speaker ? "call-orb call-orb--active" : "call-orb"} onClick={() => { if (speaker) window.speechSynthesis?.cancel(); else speak(companionLine, true); setSpeaker((value) => { const next = !value; if (realtimeRef.current) realtimeRef.current.audio.muted = !next; return next; }); }} aria-label={speaker ? "Turn speaker off" : "Turn speaker on"}>{speaker ? <SpeakerHigh aria-hidden="true" /> : <SpeakerSlash aria-hidden="true" />}</button>
         <button type="button" className={replyOpen ? "call-orb call-orb--active" : "call-orb"} onClick={() => { setReplyOpen((value) => !value); setCaptions(true); }} aria-label={replyOpen ? "Close typed reply" : "Open typed reply"}><ChatCircleDots aria-hidden="true" /></button>
         <button type="button" className={heartSent ? "call-orb call-orb--heart" : "call-orb"} onClick={() => { setHeartSent(true); window.setTimeout(() => setHeartSent(false), 1_500); }} aria-label="Send heart"><Heart aria-hidden="true" weight={heartSent ? "fill" : "regular"} /></button>
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End video call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.4, y: -110 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Camera preview stays in this browser · this demo does not record your call</small>
+      <small className="live-call__disclosure">Camera preview stays in this browser · raw call media is not recorded · {transport === "realtime" ? "secure realtime audio connected" : transport === "connecting" ? "connecting secure audio…" : "browser voice fallback"}</small>
     </motion.div>
   );
 }

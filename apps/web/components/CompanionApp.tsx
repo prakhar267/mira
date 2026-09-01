@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { applyContradictions, assessSafety, buildCompanionContext, extractMemoryCandidates, planCompanionTurn, type CompanionTurn } from "@companion/ai";
 import type { ActivityDefinition, ChatMessage, CompanionMood, MemoryRecord, MemoryType, StoreItemRecord } from "@companion/shared";
 import type { PlanId } from "@companion/config";
@@ -20,11 +20,13 @@ import { VideoCallModal } from "./VideoCallModal";
 import { VoiceCallModal } from "./VoiceCallModal";
 import { initialState, storageKey, type AppView, type DemoState, type EnvironmentId, type FeedbackReason } from "@/lib/state";
 import { canAccessItem, currencyBalance } from "@/lib/product-rules";
+import { companionApi } from "@/lib/api-client";
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 const chooseTypingDelay = (content: string) => Math.min(680, 320 + content.trim().length * 3);
 
 export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
+  const liveMode = companionApi.enabled && !forceDemo;
   const [state, setState] = useState<DemoState>(initialState);
   const [hydrated, setHydrated] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -48,6 +50,24 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       setHydrated(true);
       return;
     }
+    if (liveMode && companionApi.hasSession()) {
+      void (async () => {
+        try {
+          const [user, companions, conversations] = await Promise.all([companionApi.me(), companionApi.companions(), companionApi.conversations()]);
+          const companion = companions[0];
+          if (!companion) throw new Error("Companion not found");
+          const conversation = conversations[0] ?? await companionApi.createConversation(companion.id);
+          const messages = await companionApi.messages(conversation.id);
+          setState((current) => ({ ...current, onboardingComplete: true, firstMeetingComplete: true, user, companion, activeConversationId: conversation.id, messages, currentView: "home" }));
+        } catch {
+          companionApi.clearSession();
+          setState({ ...initialState, onboardingComplete: false, firstMeetingComplete: false });
+        } finally {
+          setHydrated(true);
+        }
+      })();
+      return;
+    }
     try {
       const saved = window.localStorage.getItem(storageKey);
       if (saved) {
@@ -63,7 +83,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       // A clean local demo remains available when saved state is malformed.
     }
     setHydrated(true);
-  }, [forceDemo]);
+  }, [forceDemo, liveMode]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -83,6 +103,8 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   }, [state.currentView]);
 
   const activeMemories = useMemo(() => state.memories.filter((memory) => memory.status === "active"), [state.memories]);
+  const connectVoiceRealtime = useCallback(() => companionApi.connectRealtime("voice", state.companion.id), [state.companion.id]);
+  const connectVideoRealtime = useCallback(() => companionApi.connectRealtime("video", state.companion.id), [state.companion.id]);
   const navigate = (view: AppView) => setState((current) => ({ ...current, currentView: view }));
 
   const openMoments = (tab: MomentsTab) => {
@@ -90,15 +112,39 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     navigate("moments");
   };
 
-  const completeOnboarding = (draft: OnboardingDraft) => {
+  const completeOnboarding = async (draft: OnboardingDraft) => {
+    let liveAccount: Awaited<ReturnType<typeof companionApi.signup>> | null = null;
+    let liveConversationId: string | null = null;
+    if (liveMode) {
+      liveAccount = await companionApi.signup({
+        email: draft.email,
+        password: draft.password,
+        name: draft.name.trim(),
+        birthday: draft.birthday,
+        pronouns: draft.pronouns,
+        adultConfirmed: true,
+        goals: draft.intentions,
+        interests: draft.interests,
+        companionName: draft.companionName.trim() || "Luma",
+        companionPronouns: draft.companionPronouns,
+        relationshipMode: draft.relationshipMode,
+      });
+      await Promise.all([
+        companionApi.updateCompanion(liveAccount.companion.id, { name: draft.companionName.trim() || "Luma", relationshipMode: draft.relationshipMode, voiceId: draft.voiceId }),
+        companionApi.updatePersonality(liveAccount.companion.id, { warmth: draft.warmth / 100, playfulness: draft.playfulness / 100, energy: draft.energy / 100, humor: draft.humor / 100, verbosity: draft.expressiveness / 100 }),
+      ]);
+      liveConversationId = (await companionApi.createConversation(liveAccount.companion.id)).id;
+    }
     setState((current) => ({
       ...current,
       onboardingComplete: true,
       firstMeetingComplete: false,
       currentView: "home",
-      user: { ...current.user, name: draft.name.trim(), birthday: draft.birthday, pronouns: draft.pronouns, interests: draft.interests, adultConfirmed: draft.adultConfirmed },
+      activeConversationId: liveConversationId ?? current.activeConversationId,
+      user: { ...current.user, ...(liveAccount?.user ?? {}), name: draft.name.trim(), birthday: draft.birthday, pronouns: draft.pronouns, interests: draft.interests, adultConfirmed: draft.adultConfirmed },
       companion: {
         ...current.companion,
+        ...(liveAccount?.companion ?? {}),
         name: draft.companionName.trim() || "Luma",
         pronouns: draft.companionPronouns,
         presentation: draft.presentation,
@@ -129,7 +175,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       },
       messages: [{
         id: crypto.randomUUID(),
-        conversationId: current.activeConversationId,
+        conversationId: liveConversationId ?? current.activeConversationId,
         role: "assistant",
         content: `Hi ${draft.name.trim()}. I’m ${draft.companionName.trim() || "Luma"}. What makes an ordinary day feel good to you?`,
         createdAt: new Date().toISOString(),
@@ -170,6 +216,22 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       ...current,
       messages: [...current.messages, userMessage],
     }));
+
+    if (liveMode) {
+      const assistantId = `pending:${crypto.randomUUID()}`;
+      setState((current) => ({ ...current, messages: [...current.messages, { id: assistantId, conversationId: current.activeConversationId, role: "assistant", content: "", createdAt: new Date().toISOString(), status: "sending" }] }));
+      try {
+        const result = await companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: userMessage.id, content }, (delta) => {
+          setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: `${message.content}${delta}` } : message) }));
+        });
+        setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, id: result.assistantMessageId || assistantId, status: "sent" } : message) }));
+      } catch (cause) {
+        setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: cause instanceof Error ? cause.message : "Luma could not respond just now.", status: "failed" } : message) }));
+      } finally {
+        setStreaming(false);
+      }
+      return;
+    }
 
     const safety = assessSafety(content);
     const turn = createCompanionTurn(content, [...state.messages, userMessage], now);
@@ -234,8 +296,8 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     setStreaming(false);
   };
 
-  const newConversation = () => {
-    const conversationId = crypto.randomUUID();
+  const newConversation = async () => {
+    const conversationId = liveMode ? (await companionApi.createConversation(state.companion.id)).id : crypto.randomUUID();
     const memory = [...activeMemories].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
     setState((current) => ({
       ...current,
@@ -254,7 +316,8 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const addMockExchange = (userMessage: ChatMessage, assistantMessage: ChatMessage) => setState((current) => ({ ...current, messages: [...current.messages, userMessage, assistantMessage] }));
 
   const sendVoiceNote = async (transcript: string) => {
-    if (state.subscription.planId === "free") { setPlansOpen(true); return; }
+    if (!liveMode && state.subscription.planId === "free") { setPlansOpen(true); return; }
+    if (liveMode) { await sendMessage(transcript); return; }
     const now = new Date();
     const userMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "user", content: transcript, createdAt: now.toISOString(), status: "sent", attachments: [{ id: crypto.randomUUID(), type: "audio", url: "browser://voice-transcript", name: "Voice note", transcript, durationMs: Math.max(1_000, transcript.split(/\s+/).length * 420) }] };
     const turn = createCompanionTurn(transcript, [...state.messages, userMessage], now, "voice");
@@ -264,9 +327,31 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     addMockExchange(userMessage, assistantMessage);
   };
 
+  const sendVoiceRecording = async (audioBase64: string, contentType: string) => {
+    const transcription = await companionApi.transcribe(audioBase64, contentType);
+    if (!transcription.text.trim()) throw new Error("I couldn’t hear words in that voice note.");
+    await sendMessage(transcription.text);
+  };
+
+  const speakWithProvider = async (content: string) => {
+    const speech = await companionApi.synthesize(content, state.companion.voiceId);
+    const audio = new Audio(`data:${speech.contentType};base64,${speech.audioBase64}`);
+    await audio.play();
+  };
+
   const uploadImage = async (file: File) => {
     if (!file.type.match(/^image\/(jpeg|png|webp)$/) || file.size > 8_000_000) return;
     const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
+    if (liveMode) {
+      const dataBase64 = dataUrl.split(",")[1] ?? "";
+      const [asset, analysis] = await Promise.all([
+        companionApi.uploadImage(file.name, file.type, dataBase64),
+        companionApi.analyzeImage(dataBase64, file.type, "Describe what is visible and respond naturally to the person who shared it."),
+      ]);
+      const now = new Date().toISOString();
+      setState((current) => ({ ...current, mediaLibrary: [...current.mediaLibrary, { id: asset.id, type: "image", name: file.name, url: asset.url, createdAt: now }], photos: [{ id: asset.id, imageUrl: asset.url, caption: file.name, createdAt: now, kind: "shared" }, ...current.photos], messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "user", content: "Look at this.", createdAt: now, status: "sent", attachments: [{ id: asset.id, type: "image", url: asset.url, name: file.name }] }, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: analysis.description, createdAt: new Date().toISOString(), status: "sent" }] }));
+      return;
+    }
     const now = new Date().toISOString();
     const attachmentId = crypto.randomUUID();
     const userMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "user", content: "Look at this.", createdAt: now, status: "sent", attachments: [{ id: attachmentId, type: "image", url: dataUrl, name: file.name }] };
@@ -274,8 +359,16 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     setState((current) => ({ ...current, mediaLibrary: [...current.mediaLibrary, { id: attachmentId, type: "image", name: file.name, url: dataUrl, createdAt: now }], photos: [{ id: attachmentId, imageUrl: dataUrl, caption: file.name, createdAt: now, kind: "shared" }, ...current.photos], messages: [...current.messages, userMessage, assistantMessage] }));
   };
 
-  const generateImage = (prompt: string) => {
-    if (state.subscription.planId === "free") { setPlansOpen(true); return; }
+  const generateImage = async (prompt: string) => {
+    if (!liveMode && state.subscription.planId === "free") { setPlansOpen(true); return; }
+    if (liveMode) {
+      const result = await companionApi.generateImage(prompt, `${state.companion.name}, ${state.companion.presentation}, original stylized-realistic 3D companion`);
+      const imageUrl = result.artifactBase64 ? `data:${result.contentType};base64,${result.artifactBase64}` : result.assetUrl;
+      const now = new Date().toISOString();
+      const attachmentId = crypto.randomUUID();
+      setState((current) => ({ ...current, mediaLibrary: [{ id: attachmentId, type: "generated-image", name: prompt, url: imageUrl, createdAt: now }, ...current.mediaLibrary], photos: [{ id: attachmentId, imageUrl, caption: prompt, createdAt: now, kind: "selfie" }, ...current.photos], messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: `I made this for you—“${prompt}.”`, createdAt: now, status: "sent", attachments: [{ id: attachmentId, type: "generated-image", url: imageUrl, name: prompt }] }] }));
+      return;
+    }
     const now = new Date().toISOString();
     const attachmentId = crypto.randomUUID();
     const imageUrl = prompt.toLowerCase().includes("rooftop") ? "/assets/luma/rooftop-date.png" : "/assets/luma/cafe-selfie.png";
@@ -284,7 +377,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const addSelfie = () => {
-    if (state.subscription.planId === "free") { setPlansOpen(true); return; }
+    if (!liveMode && state.subscription.planId === "free") { setPlansOpen(true); return; }
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
     setState((current) => ({
@@ -405,15 +498,19 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const openVoiceCall = () => {
-    if (state.subscription.planId === "free") setPlansOpen(true);
+    if (!liveMode && state.subscription.planId === "free") setPlansOpen(true);
     else setVoiceCallOpen(true);
   };
   const openVideoCall = () => {
-    if (state.subscription.planId === "free" || state.subscription.planId === "plus") setPlansOpen(true);
+    if (!liveMode && (state.subscription.planId === "free" || state.subscription.planId === "plus")) setPlansOpen(true);
     else setVideoCallOpen(true);
   };
 
   const replyDuringCall = (content: string, delivery: "voice" | "video") => {
+    if (liveMode) {
+      let reply = "";
+      return companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: crypto.randomUUID(), content }, (delta) => { reply += delta; }).then(() => reply);
+    }
     const now = new Date();
     const userTurn: ChatMessage = {
       id: crypto.randomUUID(),
@@ -448,7 +545,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const renderView = () => {
     switch (state.currentView) {
       case "home": return <HomeView state={state} onChat={() => navigate("chat")} onCall={openVoiceCall} onVideoCall={openVideoCall} onMoments={() => openMoments("moments")} onCompanion={() => navigate("companion")} onSpendTime={() => openMoments("together")} onEnvironmentChange={(activeEnvironment) => setState((current) => ({ ...current, activeEnvironment }))} onAmbienceChange={() => setState((current) => ({ ...current, ambienceEnabled: !current.ambienceEnabled }))} />;
-      case "chat": return <ChatView state={state} streaming={streaming} onSend={sendMessage} onNewConversation={newConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={regenerateResponse} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (state.subscription.planId === "free" || state.subscription.planId === "plus") setPlansOpen(true); else setCameraOpen(true); }} />;
+      case "chat": return <ChatView state={state} streaming={streaming} onSend={sendMessage} onNewConversation={newConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} {...(liveMode ? { onVoiceRecording: sendVoiceRecording, onSpeak: speakWithProvider } : {})} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={regenerateResponse} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!liveMode && (state.subscription.planId === "free" || state.subscription.planId === "plus")) setPlansOpen(true); else setCameraOpen(true); }} />;
       case "moments": return <MomentsView key={momentsTab} defaultTab={momentsTab} state={state} onCompleteActivity={completeActivity} onStartDate={startDate} onGenerateSelfie={addSelfie} onVideoCall={openVideoCall} />;
       case "companion": return <CompanionView companion={state.companion} backstory={state.companionBackstory} storeItems={state.storeItems} ownedItems={state.ownedItems} wallet={state.wallet} subscription={state.subscription} onChange={(companion) => setState((current) => ({ ...current, companion }))} onBackstoryChange={(companionBackstory) => setState((current) => ({ ...current, companionBackstory }))} onPurchase={purchaseItem} onEquip={equipItem} onUpgrade={() => setPlansOpen(true)} />;
       case "memory": return <MemoryView memories={state.memories} enabled={state.memoryEnabled} onToggle={() => setState((current) => ({ ...current, memoryEnabled: !current.memoryEnabled }))} onUpdate={updateMemory} onDelete={deleteMemory} onAdd={addMemory} />;
@@ -460,9 +557,9 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   return (
     <>
       <AppShell active={state.currentView} onNavigate={navigate} onCall={openVoiceCall} companionName={state.companion.name} immersive={state.currentView === "home"}>{renderView()}</AppShell>
-      {voiceCallOpen ? <VoiceCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} onUserTurn={(content) => replyDuringCall(content, "voice")} onClose={(seconds) => finishCall("voice", seconds)} /> : null}
-      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} onClose={(seconds) => finishCall("video", seconds)} /> : null}
-      {cameraOpen ? <CameraConversationModal companionName={state.companion.name} onClose={() => setCameraOpen(false)} /> : null}
+      {voiceCallOpen ? <VoiceCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} onUserTurn={(content) => replyDuringCall(content, "voice")} {...(liveMode ? { onRealtimeConnect: connectVoiceRealtime } : {})} onClose={(seconds) => finishCall("voice", seconds)} /> : null}
+      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} {...(liveMode ? { onRealtimeConnect: connectVideoRealtime } : {})} onClose={(seconds) => finishCall("video", seconds)} /> : null}
+      {cameraOpen ? <CameraConversationModal companionName={state.companion.name} {...(liveMode ? { onSessionStart: companionApi.startCameraSession, onAnalyzeFrame: async (dataBase64: string, contentType: string) => (await companionApi.analyzeImage(dataBase64, contentType, "Discuss the visible object or surroundings naturally and safely.")).description } : {})} onClose={() => setCameraOpen(false)} /> : null}
       {plansOpen ? <PlanModal current={state.subscription.planId} onSelect={choosePlan} onClose={() => setPlansOpen(false)} /> : null}
     </>
   );

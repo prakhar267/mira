@@ -14,17 +14,17 @@ With the development server running, open:
 - [Ten-step signup](http://127.0.0.1:3000/signup)
 - [Operations console](http://127.0.0.1:3000/admin) — local key: `local-admin-key-change-me`
 
-The deterministic mock runtime needs no external AI, voice, billing, or media credentials.
+The deterministic demo needs no external credentials. Setting `NEXT_PUBLIC_API_MODE=live` connects the same web experience to the authenticated API, persistent data, media storage, and provider-backed AI/voice paths.
 
 ## What is built
 
 | Area | Current implementation |
 |---|---|
-| Web | Responsive Next.js PWA with public pages, auth recovery, adult onboarding and first meeting, avatar-led home, streaming social chat, realtime voice/video simulations, Moments, album, dates, memory, media, activities, journal/events, wardrobe/room store, billing test mode, settings, privacy, export, deletion, and protected admin flows |
-| Mobile | Expo/React Native client with functional home, chat, companion, memory, activity/reward, and profile surfaces |
-| API | Fastify service with auth/OAuth-ready mocks, rate limiting, SSE chat, summaries, memory, journal/events/nudges, immutable wallet, store/inventory, subscriptions/webhooks, entitlements, voice/camera/media, telemetry/admin, export, and deletion routes |
-| AI | Provider contracts and deterministic adapters, structured context, summary rollups, memory extraction/ranking/contradiction handling, quiet-hours nudges, safety routing, timeout/retry/fallback, and circuit breaker |
-| Data | Comprehensive Prisma/PostgreSQL + pgvector schema, data-driven seeds, immutable ledger, and an authorization-aware in-memory repository for credential-free development |
+| Web | Responsive Next.js PWA with credential-backed signup/login/recovery, adult onboarding, API-connected streaming chat, provider TTS/STT, WebRTC realtime voice/video with graceful local fallback, explicit camera-frame analysis, media generation/storage, memories, activities, journal/events, store, settings, privacy, export, deletion, and live aggregate admin controls |
+| Mobile | Expo/React Native companion shell with home, chat, companion, memory, activity/reward, camera, and profile surfaces; native release signing and store distribution remain outside this website deployment |
+| API | Fastify service with scrypt passwords, signed short access tokens, rotating one-time refresh tokens, recovery/verification challenges, owner-scoped routes, Redis rate limits/jobs, SSE chat, input/output moderation, voice/camera/media, persistent calls and provider usage, export, deletion, readiness, and Prometheus metrics |
+| AI | Current OpenAI Responses, Realtime, moderation, embedding, STT, TTS, vision, and image adapters plus deterministic offline adapters; structured context, summary rollups, memory extraction/ranking/contradiction handling, timeout and circuit-breaker utilities |
+| Data | Prisma/PostgreSQL + pgvector repository, initial production migration, data-driven seeds, call/usage persistence, immutable wallet, S3-compatible media storage, Redis nudge queue, and an owner-scoped in-memory development repository |
 | Shared platform | Strict TypeScript contracts, Zod validation, inherited plan entitlements, feature flags, design tokens, analytics redaction, PWA support, Docker packaging, CI, and Turborepo tasks |
 
 The defining tested loop is:
@@ -33,7 +33,7 @@ The defining tested loop is:
 conversation → candidate memory → user-visible memory → relevant recall
 ```
 
-Every acceptance flow is usable in deterministic mock mode. This is not yet a public production service: real identity, database/queue/storage adapters, AI/voice/media credentials, payment processing, notification delivery, legal approval, and independent safety/security review remain deployment gates rather than missing UX.
+Every acceptance flow is usable in deterministic mock mode. Live mode is production-capable but still requires operator-supplied infrastructure/provider credentials, a transactional notification webhook, legal/privacy approval, monitoring ownership, and independent security/safety review. Payment and a public production domain are intentionally excluded.
 
 ## Run locally
 
@@ -49,7 +49,10 @@ Optional API and local infrastructure:
 
 ```bash
 docker compose up -d
+pnpm db:migrate
+pnpm db:seed
 pnpm dev:api
+pnpm --filter @companion/worker dev
 ```
 
 The default web origin is `http://127.0.0.1:3000`; the API defaults to `http://127.0.0.1:4000`.

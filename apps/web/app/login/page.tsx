@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Apple, ArrowRight, Globe, ShieldCheck } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
+import { LoginForm } from "@/components/LoginForm";
 
 export default function LoginPage() {
-  return <main className="auth-page"><section className="auth-panel"><Link href="/"><BrandMark /></Link><span className="eyebrow">Welcome back</span><h1>Continue the conversation.</h1><p>Authentication is running in local mock mode. Use any valid email and an 8+ character test password.</p><div className="oauth-row"><Link className="button button--ghost" href="/app?oauth=google"><Globe aria-hidden="true" /> Google</Link><Link className="button button--ghost" href="/app?oauth=apple"><Apple aria-hidden="true" /> Apple</Link></div><form action="/app"><label className="field">Email<input name="email" type="email" autoComplete="email" required placeholder="you@example.com" /></label><label className="field">Password<input name="password" type="password" autoComplete="current-password" minLength={8} required placeholder="At least 8 characters" /></label><Link className="forgot-link" href="/forgot-password">Forgot password?</Link><button className="button button--primary" type="submit">Log in <ArrowRight aria-hidden="true" /></button></form><small><ShieldCheck aria-hidden="true" /> No production identity provider is connected.</small><Link href="/signup">Need an account? Start setup</Link></section><aside className="auth-visual" aria-label="Luma in the moonlit companion room" /></main>;
+  return <main className="auth-page"><section className="auth-panel"><Link href="/"><BrandMark /></Link><span className="eyebrow">Welcome back</span><h1>Continue the conversation.</h1><p>Sign in with the account you created during companion setup.</p><LoginForm /><Link href="/signup">Need an account? Start setup</Link></section><aside className="auth-visual" aria-label="Luma in the moonlit companion room" /></main>;
 }

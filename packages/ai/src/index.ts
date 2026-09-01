@@ -7,3 +7,4 @@ export * from "./safety";
 export * from "./summaries";
 export * from "./nudges";
 export * from "./resilience";
+export * from "./openai-provider";
