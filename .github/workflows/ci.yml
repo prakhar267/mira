@@ -1,4 +1,4 @@
-name: CI
+name: Companion CI
 
 on:
   push:
@@ -10,18 +10,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: companion-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   verify:
-    name: Build, audit, test, and bundle
+    name: Lint, typecheck, test, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: app
-        shell: bash
+    timeout-minutes: 20
 
     steps:
       - name: Check out source
@@ -30,50 +26,27 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
+          node-version: 24
+
+      - name: Enable the locked package manager
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.19.0 --activate
 
       - name: Install locked dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Block high-severity dependency advisories
-        run: npm audit --audit-level=high
+      - name: Generate the Prisma client
+        run: pnpm db:generate
 
-      - name: Build production artifact
-        run: npm run build
+      - name: Verify the workspace
+        run: pnpm check
 
-      - name: Test Worker packaging and route fallback
-        run: npm run test:sites
-
-      - name: Test API, safety, tenancy, and scheduled jobs
-        run: node --test test-api/*.test.mjs
-
-      - name: Reject obvious Google API keys in browser artifacts
-        run: |
-          if grep -RIE 'AIza[0-9A-Za-z_-]{30,}' dist/client; then
-            echo "::error::A value shaped like a Google API key is present in the client build."
-            exit 1
-          fi
-
-      - name: Dry-run the integrated Cloudflare Worker
-        run: >-
-          npx --yes wrangler@4.123.0 deploy
-          --config wrangler.jsonc
-          --dry-run
-          --outdir "${RUNNER_TEMP}/saathkind-wrangler"
-
-      - name: Upload reviewed build artifact
-        if: always() && hashFiles('app/dist/client/index.html') != ''
+      - name: Upload the web build
+        if: always() && hashFiles('apps/web/.next/BUILD_ID') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: saathkind-integrated-${{ github.sha }}
-          path: |
-            app/dist/client
-            app/dist/server
-            app/dist/.openai
-            app/cloudflare
-            app/migrations
-            app/wrangler.jsonc
+          name: companion-web-${{ github.sha }}
+          path: apps/web/.next
           if-no-files-found: error
           retention-days: 7

@@ -1,4 +1,4 @@
-name: Deploy Cloudflare production
+name: Legacy Saathkind deploy (disabled)
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy Worker backend and Pages entry point
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:

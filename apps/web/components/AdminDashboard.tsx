@@ -1,0 +1,17 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Activity, ArrowLeft, Bot, CheckCircle2, Gauge, KeyRound, ShieldCheck, ToggleLeft } from "lucide-react";
+import { BrandMark } from "./BrandMark";
+
+const initialFlags = { voice: true, camera: true, imageGeneration: true, romanticMode: true, proactiveMessaging: true, advancedMemory: true, store: true, journal: true };
+
+export function AdminDashboard() {
+  const [key, setKey] = useState("");
+  const [authorized, setAuthorized] = useState(false);
+  const [flags, setFlags] = useState(initialFlags);
+  if (!authorized) return <main className="admin-page"><section className="admin-login"><BrandMark /><KeyRound aria-hidden="true" /><span className="eyebrow">Operations console</span><h1>Private, aggregate controls.</h1><p>Admin surfaces never expose private conversation content. In local mode use <code>local-admin-key-change-me</code>.</p><form onSubmit={(event) => { event.preventDefault(); setAuthorized(key === "local-admin-key-change-me"); }}><label className="field">Admin API key<input type="password" value={key} onChange={(event) => setKey(event.target.value)} required /></label><button type="submit" className="button button--primary">Open console</button></form><Link href="/"><ArrowLeft aria-hidden="true" /> Back to Companion</Link></section></main>;
+  const metrics = [{ label: "Provider requests", value: "24", detail: "100% successful", icon: Activity }, { label: "Average latency", value: "312 ms", detail: "mock adapter", icon: Gauge }, { label: "Estimated cost", value: "$0.00", detail: "local providers", icon: Bot }, { label: "Safety checks", value: "24", detail: "local policy pass", icon: ShieldCheck }];
+  return <main className="admin-page"><header className="admin-header"><BrandMark /><div><span><CheckCircle2 aria-hidden="true" /> Admin authenticated</span><Link href="/app?preview=home">Open product</Link></div></header><section className="admin-content"><div className="section-intro"><span className="eyebrow">Privacy-safe operations</span><h1>System health, without private conversations.</h1><p>Aggregate usage, provider state, flags, and safety outcomes for the deterministic local runtime.</p></div><div className="admin-metrics">{metrics.map(({ label, value, detail, icon: Icon }) => <article key={label}><Icon aria-hidden="true" /><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div><div className="admin-panels"><section><div className="settings-section__heading"><ToggleLeft aria-hidden="true" /><div><h2>Feature flags</h2><p>Changes affect this local console session.</p></div></div>{Object.entries(flags).map(([name, enabled]) => <label className="toggle-line" key={name}><span><strong>{name.replace(/([A-Z])/g, " $1")}</strong><small>{enabled ? "Available" : "Paused"}</small></span><input type="checkbox" checked={enabled} onChange={(event) => setFlags((current) => ({ ...current, [name]: event.target.checked }))} /></label>)}</section><section><div className="settings-section__heading"><Bot aria-hidden="true" /><div><h2>Provider status</h2><p>Adapters keep credentials server-side.</p></div></div>{["Chat · mock-companion-v1", "Speech · mock", "Vision · mock", "Images · mock", "Postgres · in-memory adapter", "Redis · mock queue"].map((provider) => <div key={provider} className="provider-row"><i /><span>{provider}</span><strong>healthy</strong></div>)}</section></div></section></main>;
+}

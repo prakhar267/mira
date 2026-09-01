@@ -1,0 +1,28 @@
+{
+  "name": "companion-platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "turbo dev --parallel",
+    "dev:web": "pnpm --filter @companion/web dev",
+    "dev:api": "pnpm --filter @companion/api dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "format": "prettier --write .",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "db:generate": "pnpm --filter @companion/db db:generate",
+    "db:migrate": "pnpm --filter @companion/db db:migrate",
+    "db:seed": "pnpm --filter @companion/db db:seed"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2",
+    "turbo": "2.10.12",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: companion
+      POSTGRES_USER: companion
+      POSTGRES_PASSWORD: companion_local_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - companion_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U companion -d companion"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - companion_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: companion
+      MINIO_ROOT_PASSWORD: companion_local_only
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - companion_minio:/data
+
+volumes:
+  companion_postgres:
+  companion_redis:
+  companion_minio:

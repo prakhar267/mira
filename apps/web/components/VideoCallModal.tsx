@@ -1,0 +1,198 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Camera,
+  CameraSlash,
+  ChatCircleDots,
+  Heart,
+  Microphone,
+  MicrophoneSlash,
+  PaperPlaneTilt,
+  PhoneDisconnect,
+  SpeakerHigh,
+  SpeakerSlash,
+  Sparkle,
+  VideoCamera,
+  Waveform,
+} from "@phosphor-icons/react";
+import type { EnvironmentId } from "@/lib/state";
+
+const scenes: Array<{ id: EnvironmentId; label: string; image: string }> = [
+  { id: "window-nook", label: "Window nook", image: "/assets/luma/window-nook.png" },
+  { id: "rainy-cafe", label: "Rainy café", image: "/assets/luma/cafe-selfie.png" },
+  { id: "rooftop", label: "Rooftop", image: "/assets/luma/rooftop-date.png" },
+];
+
+const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
+
+function videoVoiceProfile(voiceId: string) {
+  if (voiceId.includes("calm")) return { rate: .88, pitch: .98 };
+  if (voiceId.includes("confident")) return { rate: .97, pitch: 1 };
+  if (voiceId.includes("warm")) return { rate: .91, pitch: 1.01 };
+  return { rate: .98, pitch: 1.04 };
+}
+
+function speakLine(text: string, voiceId: string, onStart: () => void, onEnd: () => void) {
+  if (!("speechSynthesis" in window)) {
+    onEnd();
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  const voices = window.speechSynthesis.getVoices();
+  utterance.voice = voices.find((voice) => /^en[-_]/i.test(voice.lang) && /samantha|ava|zira|serena|aria|female|google uk english/i.test(voice.name))
+    ?? voices.find((voice) => /^en[-_]/i.test(voice.lang))
+    ?? null;
+  const profile = videoVoiceProfile(voiceId);
+  utterance.rate = profile.rate;
+  utterance.pitch = profile.pitch;
+  utterance.onstart = onStart;
+  utterance.onend = onEnd;
+  utterance.onerror = onEnd;
+  window.speechSynthesis.speak(utterance);
+}
+
+export function VideoCallModal({
+  companionName,
+  userName,
+  voiceId,
+  initialEnvironment,
+  onUserTurn,
+  onClose,
+}: {
+  companionName: string;
+  userName: string;
+  voiceId: string;
+  initialEnvironment: EnvironmentId;
+  onUserTurn: (content: string) => Promise<string>;
+  onClose: (durationSeconds: number) => void;
+}) {
+  const greeting = `There you are, ${userName}. I’m here with you. Take your time.`;
+  const [seconds, setSeconds] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [speaker, setSpeaker] = useState(true);
+  const [captions, setCaptions] = useState(true);
+  const [heartSent, setHeartSent] = useState(false);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [environment, setEnvironment] = useState(initialEnvironment);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activity, setActivity] = useState("");
+  const [speaking, setSpeaking] = useState(false);
+  const [thinking, setThinking] = useState(false);
+  const [companionLine, setCompanionLine] = useState(greeting);
+  const [userLine, setUserLine] = useState("");
+  const [draft, setDraft] = useState("");
+  const [replyOpen, setReplyOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const greetingSpoken = useRef(false);
+
+  const speak = useCallback((text: string, force = false) => {
+    if (!speaker && !force) {
+      setSpeaking(false);
+      return;
+    }
+    speakLine(text, voiceId, () => setSpeaking(true), () => setSpeaking(false));
+  }, [speaker, voiceId]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1_000);
+    return () => {
+      window.clearInterval(timer);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (greetingSpoken.current) return;
+    greetingSpoken.current = true;
+    const connect = window.setTimeout(() => speak(greeting), 550);
+    return () => window.clearTimeout(connect);
+  }, [greeting, speak]);
+
+  const toggleCamera = async () => {
+    if (cameraOn) {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      setCameraOn(false);
+      return;
+    }
+    setCameraError("");
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera preview is unavailable in this browser.");
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraOn(true);
+    } catch {
+      setCameraError("Camera stayed off. You can keep calling or try again after allowing camera access.");
+    }
+  };
+
+  const submitTurn = async () => {
+    const clean = draft.trim();
+    if (!clean || thinking) return;
+    setDraft("");
+    setUserLine(clean);
+    setThinking(true);
+    try {
+      const reply = await onUserTurn(clean);
+      setCompanionLine(reply);
+      speak(reply);
+    } catch {
+      setCompanionLine("I’m still with you. I missed that for a second—say it once more?");
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const currentScene = scenes.find((scene) => scene.id === environment) ?? scenes[0]!;
+  const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+
+  return (
+    <motion.div className="live-call live-call--video" role="dialog" aria-modal="true" aria-label={`Video call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <motion.img key={currentScene.id} className="video-call__avatar" src={currentScene.image} alt={`${companionName} in ${currentScene.label.toLowerCase()}`} initial={{ opacity: 0, scale: 1.03 }} animate={speaking ? { opacity: 1, scale: [1, 1.012, 1], x: [0, 2, 0] } : { opacity: 1, scale: 1, x: 0 }} transition={{ duration: 3.2, repeat: speaking ? Infinity : 0 }} />
+      <div className="live-call__veil live-call__veil--video" />
+      <header className="live-call__header"><span><i className="status-dot" /> Live together</span><strong>{companionName}</strong><time>{time}</time></header>
+
+      <div className="video-call__status"><Waveform aria-hidden="true" /><span>{thinking ? "Thinking about that" : speaking ? `${companionName} is speaking` : "Here with you"}</span></div>
+
+      <div className="video-call__camera">
+        <video ref={videoRef} muted playsInline aria-label="Your local camera preview" />
+        {cameraOn ? <span><Camera aria-hidden="true" weight="fill" /> Your camera</span> : <div><CameraSlash aria-hidden="true" /><small>Your camera is off</small><button type="button" onClick={() => void toggleCamera()}>Turn it on</button></div>}
+      </div>
+
+      <div className="video-call__tools">
+        <label>Scene<select value={environment} onChange={(event) => setEnvironment(event.target.value as EnvironmentId)}>{scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.label}</option>)}</select></label>
+        <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
+      </div>
+
+      {activityOpen ? <div className="call-activity-menu">{callActivities.map((item) => <button type="button" key={item} onClick={() => { setActivity(item); setActivityOpen(false); }}>{item}</button>)}</div> : null}
+      {activity ? <div className="call-activity-card"><span>Playing together</span><strong>{activity}</strong><p>{activity === "Would you rather" ? "Sunrise coffee or a midnight city walk? Tell me why." : "Take turns. There are no perfect answers."}</p><button type="button" onClick={() => setActivity("")}>Close card</button></div> : null}
+
+      {cameraError ? <p className="camera-error" role="status">{cameraError}</p> : null}
+      {captions ? <div className="video-call__captions" aria-live="polite">{userLine ? <p><span>You</span>{userLine}</p> : null}<p><span>{companionName}</span>{thinking ? "…" : companionLine}</p></div> : null}
+
+      {replyOpen ? <form className="video-call__reply" onSubmit={(event) => { event.preventDefault(); void submitTurn(); }}><input autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`Say something to ${companionName}…`} /><button type="submit" disabled={!draft.trim() || thinking} aria-label="Send call reply"><PaperPlaneTilt aria-hidden="true" weight="fill" /></button></form> : null}
+
+      <div className="live-call__controls">
+        <button type="button" className={muted ? "call-orb call-orb--active" : "call-orb"} onClick={() => setMuted((value) => !value)} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicrophoneSlash aria-hidden="true" /> : <Microphone aria-hidden="true" />}</button>
+        <button type="button" className={cameraOn ? "call-orb call-orb--active" : "call-orb"} onClick={() => void toggleCamera()} aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}>{cameraOn ? <VideoCamera aria-hidden="true" weight="fill" /> : <CameraSlash aria-hidden="true" />}</button>
+        <button type="button" className={speaker ? "call-orb call-orb--active" : "call-orb"} onClick={() => { if (speaker) window.speechSynthesis?.cancel(); else speak(companionLine, true); setSpeaker((value) => !value); }} aria-label={speaker ? "Turn speaker off" : "Turn speaker on"}>{speaker ? <SpeakerHigh aria-hidden="true" /> : <SpeakerSlash aria-hidden="true" />}</button>
+        <button type="button" className={replyOpen ? "call-orb call-orb--active" : "call-orb"} onClick={() => { setReplyOpen((value) => !value); setCaptions(true); }} aria-label={replyOpen ? "Close typed reply" : "Open typed reply"}><ChatCircleDots aria-hidden="true" /></button>
+        <button type="button" className={heartSent ? "call-orb call-orb--heart" : "call-orb"} onClick={() => { setHeartSent(true); window.setTimeout(() => setHeartSent(false), 1_500); }} aria-label="Send heart"><Heart aria-hidden="true" weight={heartSent ? "fill" : "regular"} /></button>
+        <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End video call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
+      </div>
+      <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.4, y: -110 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
+      <small className="live-call__disclosure">Camera preview stays in this browser · this demo does not record your call</small>
+    </motion.div>
+  );
+}

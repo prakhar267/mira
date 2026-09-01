@@ -1,5 +1,8 @@
 # Dependencies and build artifacts
 node_modules/
+.pnpm-store/
+.turbo/
+.next/
 dist/
 build/
 coverage/
@@ -60,3 +63,13 @@ temp/
 # Superseded browser captures (retain the final QA evidence)
 app/design-implementation-full.png
 app/design-implementation-desktop.png
+design-qa-comparison.png
+implementation-desktop.png
+implementation-mobile.png
+design-qa-*.png
+implementation-*.png
+
+# Local research captures and redundant regression runs
+audit/luma-full-regression-*/
+audit/replika-source/
+audit/luma-companion-depth-*/05-replika-current-product.png

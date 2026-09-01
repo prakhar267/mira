@@ -1,0 +1,23 @@
+{
+  "name": "@companion/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@companion/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

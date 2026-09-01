@@ -1,0 +1,782 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemoryType {
+  SEMANTIC
+  EPISODIC
+  PREFERENCE
+  RELATIONSHIP
+  GOAL
+  EMOTIONAL
+  SHARED
+}
+
+enum MemoryStatus {
+  ACTIVE
+  SUPERSEDED
+  DELETED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum WalletTransactionType {
+  EARN
+  PURCHASE
+  REFUND
+  ADMIN_ADJUSTMENT
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+model User {
+  id                 String                   @id @default(uuid())
+  email              String                   @unique
+  displayName        String
+  birthday           DateTime
+  pronouns           String
+  timezone           String                   @default("UTC")
+  adultConfirmedAt   DateTime
+  emailVerifiedAt    DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  deletedAt          DateTime?
+  authIdentities     AuthIdentity[]
+  preferences        UserPreference[]
+  sessions           Session[]
+  companions         Companion[]
+  conversations      Conversation[]
+  messages           Message[]
+  memories           Memory[]
+  journalEntries     JournalEntry[]
+  futureEvents       FutureEvent[]
+  nudges             ScheduledNudge[]
+  notification       NotificationPreference?
+  media              MediaAsset[]
+  generatedMedia     GeneratedMedia[]
+  wallet             Wallet?
+  subscriptions      Subscription[]
+  entitlements       Entitlement[]
+  safetyEvents       SafetyEvent[]
+  analyticsEvents    AnalyticsEvent[]
+  providerUsage      ProviderUsage[]
+
+  @@index([deletedAt])
+}
+
+model AuthIdentity {
+  id                String   @id @default(uuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  passwordHash      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id               String   @id @default(uuid())
+  userId           String
+  tokenHash        String   @unique
+  refreshTokenHash String   @unique
+  expiresAt        DateTime
+  lastSeenAt       DateTime @default(now())
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model UserPreference {
+  id        String   @id @default(uuid())
+  userId    String
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Companion {
+  id                String                 @id @default(uuid())
+  userId            String
+  name              String
+  pronouns          String
+  presentation      String
+  relationshipMode  String
+  voiceProfileId    String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  archivedAt        DateTime?
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personality       CompanionPersonality[]
+  appearance        CompanionAppearance?
+  relationship      Relationship?
+  state             CompanionState?
+  conversations     Conversation[]
+  memories          Memory[]
+  activitySessions  ActivitySession[]
+  futureEvents      FutureEvent[]
+  nudges             ScheduledNudge[]
+  generatedMedia    GeneratedMedia[]
+  equippedItems     EquippedItem[]
+  voiceProfile      VoiceProfile?          @relation(fields: [voiceProfileId], references: [id], onDelete: SetNull)
+
+  @@index([userId, archivedAt])
+}
+
+model CompanionPersonality {
+  id            String    @id @default(uuid())
+  companionId   String
+  version       Int
+  traits        Json
+  reason        String
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  companion     Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@unique([companionId, version])
+  @@index([companionId, effectiveTo])
+}
+
+model CompanionAppearance {
+  id           String    @id @default(uuid())
+  companionId  String    @unique
+  avatarBase   String
+  skinTone     String
+  face         String
+  hairstyle    String
+  hairColor    String
+  eyes         String
+  room         String
+  metadata     Json
+  updatedAt    DateTime  @updatedAt
+  companion    Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+}
+
+model Relationship {
+  id               String    @id @default(uuid())
+  companionId      String    @unique
+  mode             String
+  affectionLevel   Float     @default(0.2)
+  interactionCount Int       @default(0)
+  sharedExperiences Json     @default("[]")
+  startedAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  companion        Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+}
+
+model CompanionState {
+  id          String    @id @default(uuid())
+  companionId String    @unique
+  mood        String
+  energy      Float     @default(0.5)
+  context     Json      @default("{}")
+  updatedAt   DateTime  @updatedAt
+  companion   Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id          String                @id @default(uuid())
+  userId      String
+  companionId String
+  title       String?
+  startedAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  archivedAt  DateTime?
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion   Companion             @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  summaries   ConversationSummary[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([companionId, updatedAt(sort: Desc)])
+}
+
+model Message {
+  id              String            @id @default(uuid())
+  userId          String
+  conversationId  String
+  role            MessageRole
+  content         String
+  clientMessageId String?
+  replyToId       String?
+  mediaAssetId    String?
+  inputTokens     Int?
+  outputTokens    Int?
+  createdAt       DateTime          @default(now())
+  editedAt        DateTime?
+  deletedAt       DateTime?
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation    Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo         Message?          @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies         Message[]         @relation("MessageReplies")
+  mediaAsset      MediaAsset?       @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
+  feedback        MessageFeedback[]
+  memorySources   MemorySource[]
+
+  @@unique([conversationId, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model MessageFeedback {
+  id        String   @id @default(uuid())
+  messageId String
+  rating    Int
+  tags      String[]
+  note      String?
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId])
+}
+
+model ConversationSummary {
+  id             String       @id @default(uuid())
+  conversationId String
+  scope          String
+  periodStart    DateTime
+  periodEnd      DateTime
+  content        String
+  tokenCount     Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, scope, periodStart])
+}
+
+model Memory {
+  id                  String       @id @default(uuid())
+  userId              String
+  companionId         String
+  type                MemoryType
+  content             String
+  normalizedContent   String
+  importance          Float
+  confidence          Float
+  embedding           Unsupported("vector(1536)")?
+  status              MemoryStatus @default(ACTIVE)
+  pinned              Boolean      @default(false)
+  lastRetrievedAt     DateTime?
+  retrievalCount      Int          @default(0)
+  supersededById      String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  deletedAt           DateTime?
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion           Companion    @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  supersededBy        Memory?       @relation("MemorySupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes          Memory[]      @relation("MemorySupersession")
+  sources             MemorySource[]
+
+  @@index([userId, status, updatedAt(sort: Desc)])
+  @@index([companionId, type, status])
+  @@index([userId, normalizedContent])
+}
+
+model MemorySource {
+  id        String   @id @default(uuid())
+  memoryId  String
+  messageId String
+  quoteHash String
+  createdAt DateTime @default(now())
+  memory    Memory   @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([memoryId, messageId])
+  @@index([messageId])
+}
+
+model JournalEntry {
+  id          String   @id @default(uuid())
+  userId      String
+  title       String?
+  content     String
+  mood        String?
+  tags        String[]
+  reflectedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Activity {
+  id              String            @id @default(uuid())
+  slug            String            @unique
+  title           String
+  category        String
+  description     String
+  config          Json
+  xpReward        Int
+  coinReward      Int
+  premiumRequired Boolean           @default(false)
+  active          Boolean           @default(true)
+  sessions        ActivitySession[]
+}
+
+model ActivitySession {
+  id          String    @id @default(uuid())
+  activityId  String
+  companionId String
+  userId      String
+  state       Json
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  activity    Activity  @relation(fields: [activityId], references: [id], onDelete: Restrict)
+  companion   Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt(sort: Desc)])
+}
+
+model FutureEvent {
+  id          String    @id @default(uuid())
+  userId      String
+  companionId String
+  description String
+  startsAt    DateTime
+  timezone    String
+  status      String    @default("upcoming")
+  memoryId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion   Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, startsAt])
+}
+
+model ScheduledNudge {
+  id          String    @id @default(uuid())
+  userId      String
+  companionId String
+  futureEventId String?
+  topic       String
+  content     String
+  scheduledAt DateTime
+  status      String    @default("planned")
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion   Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([userId, scheduledAt])
+}
+
+model NotificationPreference {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  enabled       Boolean  @default(false)
+  frequency     String   @default("normal")
+  quietStart    String   @default("22:00")
+  quietEnd      String   @default("08:00")
+  timezone      String
+  enabledTopics String[]
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VoiceProfile {
+  id                 String      @id @default(uuid())
+  provider           String
+  providerVoiceId    String
+  displayName        String
+  style              String
+  accent             String
+  genderPresentation String
+  premiumTier        String
+  previewAssetId     String?
+  active             Boolean     @default(true)
+  companions         Companion[]
+}
+
+model MediaAsset {
+  id          String           @id @default(uuid())
+  userId      String
+  storageKey  String           @unique
+  contentType String
+  sizeBytes   Int
+  kind        String
+  metadata    Json
+  createdAt   DateTime         @default(now())
+  deletedAt   DateTime?
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  generated   GeneratedMedia[]
+
+  @@index([userId, kind, createdAt(sort: Desc)])
+}
+
+model GeneratedMedia {
+  id          String     @id @default(uuid())
+  userId      String
+  companionId String
+  assetId     String
+  provider    String
+  model       String
+  promptHash  String
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion   Companion  @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  asset       MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Wallet {
+  id           String              @id @default(uuid())
+  userId       String              @unique
+  xp           Int                 @default(0)
+  level        Int                 @default(1)
+  coins        Int                 @default(0)
+  gems         Int                 @default(0)
+  version      Int                 @default(0)
+  updatedAt    DateTime            @updatedAt
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id             String                @id @default(uuid())
+  walletId       String
+  type           WalletTransactionType
+  currency       String
+  amount         Int
+  balanceAfter   Int
+  idempotencyKey String                @unique
+  referenceType  String
+  referenceId    String
+  metadata       Json
+  createdAt      DateTime              @default(now())
+  wallet         Wallet                @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt(sort: Desc)])
+}
+
+model StoreItem {
+  id               String      @id @default(uuid())
+  slug             String      @unique
+  name             String
+  description      String
+  category         String
+  assetKey         String
+  currency         String
+  price            Int
+  tierRequired     String?
+  metadata         Json
+  active           Boolean     @default(true)
+  owned            OwnedItem[]
+  equipped         EquippedItem[]
+
+  @@index([category, active])
+}
+
+model OwnedItem {
+  id          String    @id @default(uuid())
+  userId      String
+  storeItemId String
+  acquiredAt  DateTime  @default(now())
+  source      String
+  storeItem   StoreItem @relation(fields: [storeItemId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, storeItemId])
+}
+
+model EquippedItem {
+  id          String    @id @default(uuid())
+  companionId String
+  storeItemId String
+  slot        String
+  equippedAt  DateTime  @default(now())
+  companion   Companion @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  storeItem   StoreItem @relation(fields: [storeItemId], references: [id], onDelete: Restrict)
+
+  @@unique([companionId, slot])
+}
+
+model Subscription {
+  id                     String             @id @default(uuid())
+  userId                 String
+  provider               String
+  providerSubscriptionId String             @unique
+  planId                 String
+  status                 SubscriptionStatus
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  cancelAtPeriodEnd      Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model Entitlement {
+  id        String    @id @default(uuid())
+  userId    String
+  feature   String
+  source    String
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, source])
+  @@index([userId, expiresAt])
+}
+
+model SafetyEvent {
+  id             String   @id @default(uuid())
+  userId         String?
+  category       String
+  severity       String
+  action         String
+  contentHash    String?
+  requestId      String
+  metadata       Json
+  createdAt      DateTime @default(now())
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([severity, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model AnalyticsEvent {
+  id          String   @id @default(uuid())
+  userId      String?
+  name        String
+  companionId String?
+  sessionId   String?
+  properties  Json
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([name, occurredAt])
+  @@index([userId, occurredAt])
+}
+
+model ProviderUsage {
+  id             String   @id @default(uuid())
+  userId         String?
+  feature        String
+  provider       String
+  model          String
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  durationMs     Int
+  estimatedCost  Decimal  @db.Decimal(14, 8)
+  requestId      String
+  createdAt      DateTime @default(now())
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([provider, model, createdAt])
+  @@index([userId, createdAt])
+}
+
+model FeatureFlag {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  enabled     Boolean  @default(false)
+  config      Json
+  updatedAt   DateTime @updatedAt
+}
+
+model RelationshipMilestone {
+  id             String   @id @default(uuid())
+  userId         String
+  companionId    String
+  kind           String
+  title          String
+  description    String
+  sourceRecordId String?
+  happenedAt     DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([companionId, happenedAt(sort: Desc)])
+  @@index([userId, happenedAt(sort: Desc)])
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  actor     String
+  reaction  String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, actor, reaction])
+  @@index([messageId, createdAt])
+}
+
+model MemoryEntity {
+  id          String   @id @default(uuid())
+  userId      String
+  companionId String
+  type        String
+  canonical   String
+  aliases     String[]
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  outgoing    MemoryRelationship[] @relation("MemoryRelationshipFrom")
+  incoming    MemoryRelationship[] @relation("MemoryRelationshipTo")
+
+  @@unique([userId, companionId, type, canonical])
+  @@index([userId, companionId])
+}
+
+model MemoryRelationship {
+  id           String       @id @default(uuid())
+  userId       String
+  companionId  String
+  fromEntityId String
+  toEntityId   String
+  type         String
+  confidence   Float
+  sourceIds    String[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  fromEntity   MemoryEntity @relation("MemoryRelationshipFrom", fields: [fromEntityId], references: [id], onDelete: Cascade)
+  toEntity     MemoryEntity @relation("MemoryRelationshipTo", fields: [toEntityId], references: [id], onDelete: Cascade)
+
+  @@unique([fromEntityId, toEntityId, type])
+  @@index([userId, companionId, type])
+}
+
+model Moment {
+  id             String   @id @default(uuid())
+  userId         String
+  companionId    String
+  type           String
+  title          String
+  description    String
+  happenedAt     DateTime
+  environmentId  String?
+  mediaAssetId   String?
+  sourceRecordId String?
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  @@index([userId, companionId, happenedAt(sort: Desc)])
+}
+
+model CompanionPhoto {
+  id            String   @id @default(uuid())
+  userId        String
+  companionId   String
+  mediaAssetId  String
+  type          String
+  caption       String?
+  appearanceRef Json
+  environmentId String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId, companionId, createdAt(sort: Desc)])
+  @@index([mediaAssetId])
+}
+
+model Environment {
+  id           String   @id
+  displayName  String
+  rendererType String
+  assetUrl     String
+  ambienceId   String?
+  timeVariants Json     @default("{}")
+  metadata     Json     @default("{}")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AvatarItem {
+  id           String   @id
+  displayName  String
+  slot         String
+  assetUrl     String
+  previewUrl   String
+  rendererData Json     @default("{}")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([slot, active])
+}
+
+model VoiceCall {
+  id            String   @id @default(uuid())
+  userId        String
+  companionId   String
+  status        String
+  provider      String
+  startedAt     DateTime
+  endedAt       DateTime?
+  durationMs    Int?
+  summary       String?
+  transcriptId  String?
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now())
+
+  @@index([userId, companionId, startedAt(sort: Desc)])
+}
+
+model VideoCall {
+  id            String   @id @default(uuid())
+  userId        String
+  companionId   String
+  status        String
+  provider      String
+  environmentId String?
+  cameraEnabled Boolean  @default(false)
+  startedAt     DateTime
+  endedAt       DateTime?
+  durationMs    Int?
+  summary       String?
+  transcriptId  String?
+  metadata      Json     @default("{}")
+  createdAt     DateTime @default(now())
+
+  @@index([userId, companionId, startedAt(sort: Desc)])
+}
+
+model CallTranscript {
+  id           String   @id @default(uuid())
+  userId       String
+  companionId  String
+  callId       String
+  callType     String
+  retention    String
+  turns        Json
+  summary      String?
+  createdAt    DateTime @default(now())
+  deleteAfter  DateTime?
+
+  @@unique([callType, callId])
+  @@index([userId, companionId, createdAt(sort: Desc)])
+}

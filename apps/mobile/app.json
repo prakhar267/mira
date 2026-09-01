@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Luma",
+    "slug": "luma-companion",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "luma",
+    "assetBundlePatterns": ["assets/**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.companion.prototype"
+    },
+    "android": {
+      "package": "app.companion.prototype"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Luma to use your camera only during a call you start."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Luma to use your microphone for voice notes and calls you start."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "companion-moments"
+        }
+      ]
+    ]
+  }
+}
