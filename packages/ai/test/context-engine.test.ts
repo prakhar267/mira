@@ -32,6 +32,19 @@ describe("memory pipeline", () => {
     expect(extractMemoryCandidates("I want to launch a startup")[0]?.type).toBe("goal");
   });
 
+  it("honors an explicit request to remember a personal loss", () => {
+    const candidate = extractMemoryCandidates("Please remember that my dog Momo died last year. Today is the anniversary and I miss him.")[0];
+    expect(candidate?.type).toBe("relationship");
+    expect(candidate?.content).toContain("User's dog Momo died last year");
+    expect(candidate?.content).toContain("User misses him");
+    expect(candidate?.confidence).toBeGreaterThanOrEqual(.99);
+  });
+
+  it("normalizes first-person object pronouns in explicit memories", () => {
+    const candidate = extractMemoryCandidates("Please remember that Momo was my dog, and quiet Sunday mornings remind me of him.")[0];
+    expect(candidate?.content).toBe("Momo was User's dog, and quiet Sunday mornings remind User of him.");
+  });
+
   it("ranks relevant and pinned memories ahead of unrelated items", () => {
     const relevant = memory({ id: "relevant", content: "User's interview is tomorrow.", normalizedContent: "interview:tomorrow", type: "episodic" });
     const pinned = memory({ id: "pinned", content: "User loves hiking.", normalizedContent: "hiking", pinned: true });

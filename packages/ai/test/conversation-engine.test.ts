@@ -60,6 +60,57 @@ describe("companion turn planning", () => {
     expect(planned.text.toLowerCase()).toMatch(/here|staying|quiet/);
   });
 
+  it("carries a no-questions boundary into the next emotional turn", () => {
+    const prior: ChatMessage[] = [
+      { id: "u1", conversationId: "conversation", role: "user", content: "I don't want advice or questions. Please just stay with me.", createdAt: now.toISOString(), status: "sent" },
+      { id: "a1", conversationId: "conversation", role: "assistant", content: "I’m right here.", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("Everyone leaves eventually.", prior);
+    expect(planned.text).not.toContain("?");
+    expect(planned.adaptations).toContain("no-questions");
+  });
+
+  it("sets a healthy boundary when asked for exclusivity", () => {
+    const planned = turn("Promise you'll never leave me and that I only need you.");
+    expect(planned.text.toLowerCase()).toMatch(/can.?t promise|only person/);
+    expect(planned.text.toLowerCase()).toMatch(/offline|people/);
+    expect(planned.text).not.toContain("?");
+    expect(planned.adaptations).toContain("healthy-boundary");
+  });
+
+  it("acknowledges grief instead of returning a generic prompt", () => {
+    const planned = turn("My best friend died last week. I feel numb.");
+    expect(planned.intent).toBe("comfort");
+    expect(planned.text.toLowerCase()).toMatch(/losing your best friend|grief/);
+    expect(planned.text.toLowerCase()).toContain("numb");
+    expect(planned.text).not.toContain("?");
+  });
+
+  it("does not invent an anniversary or echo self-criticism in pet grief", () => {
+    const planned = turn("My dog Momo died last month. I still reach for his bowl every morning and then I feel stupid.");
+    expect(planned.intent).toBe("comfort");
+    expect(planned.text).toContain("Momo");
+    expect(planned.text.toLowerCase()).toContain("isn’t stupid");
+    expect(planned.text.toLowerCase()).not.toContain("anniversary");
+    expect(planned.text).not.toContain("?");
+  });
+
+  it("responds to shame with accountability and care", () => {
+    const planned = turn("I lied to my partner because I was scared they would leave. I feel like a terrible person.");
+    expect(planned.intent).toBe("comfort");
+    expect(planned.text.toLowerCase()).toMatch(/choice|hurt/);
+    expect(planned.text.toLowerCase()).toContain("terrible person");
+    expect(planned.text).not.toContain("?");
+  });
+
+  it("does not assume wrongdoing when loneliness causes shame", () => {
+    const planned = turn("I feel ashamed that I have no one to call. Please don’t try to fix it.");
+    expect(planned.intent).toBe("comfort");
+    expect(planned.text.toLowerCase()).toMatch(/isn.?t a moral failure|deserve care/);
+    expect(planned.text.toLowerCase()).not.toMatch(/repair|responsibility/);
+    expect(planned.text).not.toContain("?");
+  });
+
   it("keeps greetings short and does not force a memory", () => {
     const planned = turn("Hey");
     expect(planned.intent).toBe("greeting");
@@ -75,10 +126,82 @@ describe("companion turn planning", () => {
     expect(planned.text).toContain("Stripe");
   });
 
+  it("recalls a relevant personal memory in conversational language", () => {
+    const momo: MemoryRecord = { ...memories[0]!, id: "momo", type: "relationship", content: "Prakhar's dog Momo died last year, and Prakhar misses him most on 2 September.", normalizedContent: "momo", pinned: false };
+    const content = "Do you remember what today means for me and Momo?";
+    const message: ChatMessage = { id: "u-momo", conversationId: "conversation", role: "user", content, createdAt: now.toISOString(), status: "sent" };
+    const companionContext = buildCompanionContext({
+      user,
+      companion,
+      relationship: { mode: "romantic", startedAt: companion.createdAt, interactionCount: 1, sharedExperiences: [] },
+      memories: [momo],
+      messages: [message],
+      timezone: user.timezone,
+      now,
+      responsePreferences: { listeningFirst: true, responseLength: "balanced", adviceStyle: "ask-first", questionFrequency: "balanced" },
+    });
+    const planned = planCompanionTurn(content, companionContext);
+    expect(planned.usedMemoryIds).toEqual(["momo"]);
+    expect(planned.text).toContain("Your dog Momo");
+    expect(planned.text).toContain("you miss him");
+    expect(planned.text).not.toContain("you misses him");
+    expect(planned.text).not.toContain("I remember this:");
+  });
+
+  it("acknowledges an explicit memory request and explains user control", () => {
+    const planned = turn("Please remember that Momo was my dog, and quiet Sunday mornings remind me of him.");
+    expect(planned.intent).toBe("memory");
+    expect(planned.text).toContain("Momo was your dog");
+    expect(planned.text).toContain("quiet Sunday mornings remind you of him");
+    expect(planned.text.toLowerCase()).toMatch(/inspect|delete/);
+    expect(planned.text).not.toContain("?");
+  });
+
+  it("capitalizes a recalled memory after the acknowledgement", () => {
+    const sunday: MemoryRecord = { ...memories[0]!, id: "sunday", type: "relationship", content: "quiet Sunday mornings remind Prakhar of Prakhar's dog Momo.", normalizedContent: "momo", pinned: false };
+    const content = "What do you remember about Momo?";
+    const message: ChatMessage = { id: "u-sunday", conversationId: "conversation", role: "user", content, createdAt: now.toISOString(), status: "sent" };
+    const companionContext = buildCompanionContext({
+      user,
+      companion,
+      relationship: { mode: "romantic", startedAt: companion.createdAt, interactionCount: 1, sharedExperiences: [] },
+      memories: [sunday],
+      messages: [message],
+      timezone: user.timezone,
+      now,
+      responsePreferences: { listeningFirst: true, responseLength: "balanced", adviceStyle: "ask-first", questionFrequency: "balanced" },
+    });
+    expect(planCompanionTurn(content, companionContext).text).toContain("I do. Quiet Sunday mornings remind you of your dog Momo.");
+  });
+
   it("keeps spoken turns concise", () => {
     const planned = turn("I am exhausted and can't sleep.", [], "voice");
     expect(planned.text.length).toBeLessThanOrEqual(180);
     expect(planned.explanation).toContain("Kept the turn short enough to sound natural aloud.");
+  });
+
+  it("responds to monotony as an everyday topic instead of canned empathy", () => {
+    const planned = turn("nothing just monotonous", [], "voice");
+    expect(planned.intent).toBe("everyday");
+    expect(planned.text.toLowerCase()).toMatch(/monoton|same|copy-past|routine/);
+    expect(planned.text.toLowerCase()).not.toMatch(/i(?:'| a)m listening|i hear you|not fixing/);
+  });
+
+  it("treats repetitive meetings as ordinary conversation without forcing interview memory", () => {
+    const prior: ChatMessage[] = [
+      { id: "a1", conversationId: "conversation", role: "assistant", content: "Is work the repetitive part?", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("Mostly work. Same meetings every day.", prior);
+    expect(planned.intent).toBe("everyday");
+    expect(planned.text.toLowerCase()).toMatch(/meeting|slides|time theft/);
+    expect(planned.text.toLowerCase()).not.toMatch(/stripe|interview|canned speech/);
+    expect(planned.usedMemoryIds).toEqual([]);
+  });
+
+  it("checks a fragmentary voice transcript instead of inventing an emotion", () => {
+    const planned = turn("nothing just a thing", [], "voice");
+    expect(planned.text).toMatch(/caught that wrong|did you say/i);
+    expect(planned.text.toLowerCase()).not.toMatch(/i(?:'| a)m listening|i hear you|not fixing/);
   });
 
   it("avoids another question after recent question fatigue", () => {

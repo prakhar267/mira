@@ -24,11 +24,16 @@ import { initialState, storageKey, type AppView, type DemoState, type Environmen
 import { canAccessItem, currencyBalance, environmentForItem } from "@/lib/product-rules";
 import { companionApi } from "@/lib/api-client";
 import { messagesForConversation, previousUserMessage } from "@/lib/conversation-state";
+import { relevantMemoryContents } from "@/lib/memory-relevance";
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 const chooseTypingDelay = (content: string) => Math.min(680, 320 + content.trim().length * 3);
 const optional = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => promise.catch(() => fallback);
 const livePreferencesKey = (userId: string) => `mira-live-preferences-v1:${userId}`;
+const personalizeMemory = (content: string, name: string) => {
+  const personalized = content.replace(/\bUser's\b/g, `${name}'s`).replace(/\bUser\b/g, name);
+  return personalized ? `${personalized[0]!.toUpperCase()}${personalized.slice(1)}` : personalized;
+};
 
 export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const router = useRouter();
@@ -76,7 +81,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
           if (!restored.messages.length) {
             const conversationId = crypto.randomUUID();
             restored.activeConversationId = conversationId;
-            restored.messages = [{ id: crypto.randomUUID(), conversationId, role: "assistant", content: "Fresh start. What would feel good to talk about now?", createdAt: new Date().toISOString(), status: "sent" }];
+            restored.messages = [{ id: crypto.randomUUID(), conversationId, role: "assistant", content: "Fresh chat. What are we getting into?", createdAt: new Date().toISOString(), status: "sent" }];
           }
           setState(restored);
         } else {
@@ -318,15 +323,32 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
         romanticOptIn: draft.relationshipMode === "romantic",
         sensualOptIn: draft.relationshipMode === "romantic" && draft.sensuality > 0,
       },
+      memoryEnabled: draft.memoryEnabled,
+      memories: [],
+      moments: [],
+      photos: [],
+      calls: [],
+      companionReflections: [],
+      feedbackSignals: [],
+      completedActivityIds: [],
+      wallet: { xp: 0, level: 1, coins: 0, gems: 0 },
+      walletTransactions: [],
+      ownedItems: [],
+      subscription: { planId: "free", status: "active", testMode: true },
+      journalEntries: [],
+      futureEvents: [],
+      nudges: [],
+      mediaLibrary: [],
       messages: [{
         id: crypto.randomUUID(),
         conversationId: liveConversationId ?? current.activeConversationId,
         role: "assistant",
-        content: `Hi ${draft.name.trim()}. I’m ${draft.companionName.trim() || "Mira"}. What makes an ordinary day feel good to you?`,
+        content: `Hi ${draft.name.trim()}. I’m ${draft.companionName.trim() || "Mira"}. We can start with whatever feels easy—even a quiet hello.`,
         createdAt: new Date().toISOString(),
         status: "sent",
       }],
     }));
+    router.replace(forceDemo ? "/demo" : "/app");
   };
 
   const createCompanionTurn = (content: string, messages: ChatMessage[], now: Date, delivery: "text" | "voice" | "video" = "text"): CompanionTurn => {
@@ -344,6 +366,29 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       responsePreferences: state.responsePreferences,
     });
     return planCompanionTurn(content, context);
+  };
+
+  const generateDemoReply = async (messages: ChatMessage[], delivery: "text" | "voice" | "video", fallback: CompanionTurn) => {
+    if (fallback.adaptations.includes("safety-support")) return fallback.text;
+    const latestUserText = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    const hasCuratedAnswer = fallback.intent === "self" || fallback.intent === "greeting" || fallback.intent === "choice" || /\b(?:monotonous|monotony|same (?:old )?(?:routine|thing|day)|every day (?:is|feels) the same|repetitive|mundane|stuck in a rut|nothing changes)\b/i.test(latestUserText);
+    if (hasCuratedAnswer) return fallback.text;
+    try {
+      return await companionApi.demoReply({
+        messages: messagesForConversation(messages, state.activeConversationId)
+          .filter((message) => message.role === "user" || message.role === "assistant")
+          .slice(-16)
+          .map((message) => ({ role: message.role as "user" | "assistant", content: message.content })),
+        companion: { name: state.companion.name, backstory: state.companionBackstory, personality: { ...state.companion.personality } },
+        user: { name: state.user.name },
+        relationshipMode: state.companion.relationshipMode,
+        memories: state.memoryEnabled ? relevantMemoryContents(activeMemories, messages) : [],
+        responsePreferences: state.responsePreferences,
+        delivery,
+      });
+    } catch {
+      return fallback.text;
+    }
   };
 
   const sendMessage = async (content: string) => {
@@ -368,10 +413,11 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       const assistantId = `pending:${crypto.randomUUID()}`;
       setState((current) => ({ ...current, messages: [...current.messages, { id: assistantId, conversationId: current.activeConversationId, role: "assistant", content: "", createdAt: new Date().toISOString(), status: "sending" }] }));
       try {
-        const result = await companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: userMessage.id, content, memoryEnabled: state.memoryEnabled }, (delta) => {
+        const result = await companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: userMessage.id, content, memoryEnabled: state.memoryEnabled, responsePreferences: state.responsePreferences }, (delta) => {
           setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: `${message.content}${delta}` } : message) }));
         });
-        setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, id: result.assistantMessageId || assistantId, status: "sent" } : message) }));
+        const memories = state.memoryEnabled ? await optional(companionApi.memories(), state.memories) : state.memories;
+        setState((current) => ({ ...current, memories, messages: current.messages.map((message) => message.id === assistantId ? { ...message, id: result.assistantMessageId || assistantId, status: "sent" } : message) }));
       } catch (cause) {
         setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: cause instanceof Error ? cause.message : `${current.companion.name} could not respond just now.`, status: "failed" } : message) }));
       } finally {
@@ -380,9 +426,11 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       return;
     }
 
+    const conversation = [...messagesForConversation(state.messages, state.activeConversationId), userMessage];
     const safety = assessSafety(content);
-    const turn = createCompanionTurn(content, [...messagesForConversation(state.messages, state.activeConversationId), userMessage], now);
-    const beats = turn.text.split(/\n\n+/).map((beat) => beat.trim()).filter(Boolean);
+    const turn = createCompanionTurn(content, conversation, now);
+    const reply = await generateDemoReply(conversation, "text", turn);
+    const beats = reply.split(/\n\n+/).map((beat) => beat.trim()).filter(Boolean);
     await pause(chooseTypingDelay(content));
 
     for (let beatIndex = 0; beatIndex < beats.length; beatIndex += 1) {
@@ -419,7 +467,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
               userId: current.user.id,
               companionId: current.companion.id,
               type: candidate.type,
-              content: candidate.content.replace(/^User/, current.user.name),
+              content: personalizeMemory(candidate.content, current.user.name),
               normalizedContent: candidate.normalizedContent,
               importance: candidate.importance,
               confidence: candidate.confidence,
@@ -445,7 +493,6 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
 
   const newConversation = async () => {
     const conversationId = liveMode ? (await companionApi.createConversation(state.companion.id)).id : crypto.randomUUID();
-    const memory = [...activeMemories].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
     setState((current) => ({
       ...current,
       activeConversationId: conversationId,
@@ -453,7 +500,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
         id: crypto.randomUUID(),
         conversationId,
         role: "assistant",
-        content: memory ? `New chat, same us. I remembered that ${memory.content.charAt(0).toLowerCase()}${memory.content.slice(1)} Where should we start?` : "New chat. Come tell me what’s on your mind.",
+        content: "Fresh chat. What are we getting into?",
         createdAt: new Date().toISOString(),
         status: "sent",
       }],
@@ -579,7 +626,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     const source = previousUserMessage(state.messages, messageId, state.activeConversationId);
     if (!source) return;
     if (liveMode) {
-      const updated = await companionApi.regenerate(state.activeConversationId, messageId, state.memoryEnabled);
+      const updated = await companionApi.regenerate(state.activeConversationId, messageId, state.memoryEnabled, state.responsePreferences);
       setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === messageId ? updated : message) }));
       return;
     }
@@ -725,7 +772,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const replyDuringCall = (content: string, delivery: "voice" | "video") => {
     if (liveMode) {
       let reply = "";
-      return companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: crypto.randomUUID(), content, memoryEnabled: state.memoryEnabled }, (delta) => { reply += delta; }).then(() => reply);
+      return companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: crypto.randomUUID(), content, memoryEnabled: state.memoryEnabled, responsePreferences: state.responsePreferences }, (delta) => { reply += delta; }).then(() => reply);
     }
     const now = new Date();
     const userTurn: ChatMessage = {
@@ -736,17 +783,20 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       createdAt: now.toISOString(),
       status: "sent",
     };
-    const turn = createCompanionTurn(content, [...messagesForConversation(state.messages, state.activeConversationId), userTurn], now, delivery);
-    const assistantTurn: ChatMessage = {
-      id: crypto.randomUUID(),
-      conversationId: state.activeConversationId,
-      role: "assistant",
-      content: turn.text,
-      createdAt: new Date(now.getTime() + 1).toISOString(),
-      status: "sent",
-    };
-    setState((current) => ({ ...current, messages: [...current.messages, userTurn, assistantTurn] }));
-    return Promise.resolve(turn.text);
+    const conversation = [...messagesForConversation(state.messages, state.activeConversationId), userTurn];
+    const turn = createCompanionTurn(content, conversation, now, delivery);
+    return generateDemoReply(conversation, delivery, turn).then((reply) => {
+      const assistantTurn: ChatMessage = {
+        id: crypto.randomUUID(),
+        conversationId: state.activeConversationId,
+        role: "assistant",
+        content: reply,
+        createdAt: new Date(now.getTime() + 1).toISOString(),
+        status: "sent",
+      };
+      setState((current) => ({ ...current, messages: [...current.messages, userTurn, assistantTurn] }));
+      return reply;
+    });
   };
 
   const exportData = async () => {
@@ -782,7 +832,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
 
   const renderView = () => {
     switch (state.currentView) {
-      case "home": return <HomeView state={state} onChat={() => navigate("chat")} onCall={openVoiceCall} onVideoCall={openVideoCall} onMoments={() => openMoments("moments")} onCompanion={() => navigate("companion")} onSpendTime={() => openMoments("together")} onEnvironmentChange={(activeEnvironment) => setState((current) => ({ ...current, activeEnvironment }))} onAmbienceChange={() => setState((current) => ({ ...current, ambienceEnabled: !current.ambienceEnabled }))} />;
+      case "home": return <HomeView state={state} onChat={() => navigate("chat")} onCall={openVoiceCall} onVideoCall={openVideoCall} onMoments={() => openMoments("moments")} onMemory={() => navigate("memory")} onCompanion={() => navigate("companion")} onSpendTime={() => openMoments("together")} onEnvironmentChange={(activeEnvironment) => setState((current) => ({ ...current, activeEnvironment }))} onAmbienceChange={() => setState((current) => ({ ...current, ambienceEnabled: !current.ambienceEnabled }))} />;
       case "chat": return <ChatView state={state} streaming={streaming} processingEnabled={state.aiProcessingConsent} liveMode={liveMode} onSend={sendMessage} onNewConversation={() => runAction(newConversation(), "A new conversation could not be started.")} onDeleteConversation={deleteConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} {...(liveMode ? { onVoiceRecording: sendVoiceRecording, onSpeak: (content: string) => speakWithProvider(content).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Speech playback failed.")) } : {})} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={(messageId) => runAction(regenerateResponse(messageId), "The response could not be regenerated.")} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!processingAllowed()) return; if (!featureEntitlements.has(state.subscription.planId, "cameraConversation")) setPlansOpen(true); else setCameraOpen(true); }} />;
       case "moments": return <MomentsView key={momentsTab} defaultTab={momentsTab} state={state} liveMode={liveMode} onCompleteActivity={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onStartDate={startDate} onGenerateSelfie={addSelfie} onVideoCall={openVideoCall} />;
       case "companion": return <CompanionView companion={state.companion} backstory={state.companionBackstory} storeItems={state.storeItems} ownedItems={state.ownedItems} wallet={state.wallet} subscription={state.subscription} onChange={changeCompanion} onBackstoryChange={(companionBackstory) => setState((current) => ({ ...current, companionBackstory }))} onPurchase={purchaseItem} onEquip={equipItem} onUpgrade={() => setPlansOpen(true)} />;

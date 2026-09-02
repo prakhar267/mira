@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Bot, Check, ShieldCheck, Sparkles } from "lucide-react";
 import type { DemoState } from "@/lib/state";
 import { BrandMark } from "./BrandMark";
@@ -38,6 +38,7 @@ interface Draft {
   flirtiness: number;
   romance: number;
   sensuality: number;
+  memoryEnabled: boolean;
 }
 
 const initialDraft: Draft = {
@@ -53,16 +54,17 @@ const initialDraft: Draft = {
   companionPronouns: "she/her",
   presentation: "playful and warm",
   voiceId: "mira-playful-01",
-  relationshipMode: "romantic",
+  relationshipMode: "organic",
   warmth: 88,
   playfulness: 58,
   energy: 55,
   humor: 54,
   expressiveness: 62,
   affection: 75,
-  flirtiness: 65,
-  romance: 62,
-  sensuality: 20,
+  flirtiness: 20,
+  romance: 10,
+  sensuality: 0,
+  memoryEnabled: false,
 };
 
 export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void | Promise<void> }) {
@@ -71,6 +73,10 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const steps = 10;
+
+  useEffect(() => {
+    setError("");
+  }, [draft]);
 
   const isAdult = useMemo(() => {
     if (!draft.birthday) return false;
@@ -140,7 +146,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <span className="eyebrow">Adults only</span>
               <h1>Confirm you’re 18 or older.</h1>
               <p>Your birthday supports eligibility and age-appropriate features. A production launch will require stronger age assurance.</p>
-              <label className="field">Birthday<input type="date" max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().slice(0, 10)} value={draft.birthday} onChange={(event) => setDraft({ ...draft, birthday: event.target.value })} /></label>
+              <label className="field">Birthday<input type="date" max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().slice(0, 10)} value={draft.birthday} onInput={(event) => setDraft({ ...draft, birthday: event.currentTarget.value })} onChange={(event) => setDraft({ ...draft, birthday: event.target.value })} /></label>
               <label className="check-line"><input type="checkbox" checked={draft.adultConfirmed} onChange={(event) => setDraft({ ...draft, adultConfirmed: event.target.checked })} /><span>I confirm I am 18 or older.</span></label>
             </>
           )}
@@ -160,7 +166,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <h1>What are you looking for?</h1>
               <p>Choose as many as fit. Mira supports—never replaces—your real relationships or professional care.</p>
               <div className="choice-grid">
-                {intentions.map((item) => <button type="button" key={item} className={draft.intentions.includes(item) ? "choice choice--selected" : "choice"} onClick={() => toggle("intentions", item)}>{draft.intentions.includes(item) ? <Check aria-hidden="true" /> : null}{item}</button>)}
+                {intentions.map((item) => <button type="button" key={item} aria-pressed={draft.intentions.includes(item)} className={draft.intentions.includes(item) ? "choice choice--selected" : "choice"} onClick={() => toggle("intentions", item)}>{draft.intentions.includes(item) ? <Check aria-hidden="true" /> : null}{item}</button>)}
               </div>
             </>
           )}
@@ -184,7 +190,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <span className="eyebrow">Relationship style</span>
               <h1>Choose a starting shape.</h1>
               <div className="relationship-grid">
-                {relationships.map((item) => <button type="button" key={item.id} className={draft.relationshipMode === item.id ? "relationship relationship--selected" : "relationship"} onClick={() => setDraft({ ...draft, relationshipMode: item.id })}><strong>{item.label}</strong><span>{item.description}</span></button>)}
+                {relationships.map((item) => <button type="button" key={item.id} aria-pressed={draft.relationshipMode === item.id} className={draft.relationshipMode === item.id ? "relationship relationship--selected" : "relationship"} onClick={() => setDraft({ ...draft, relationshipMode: item.id })}><strong>{item.label}</strong><span>{item.description}</span></button>)}
               </div>
               {draft.relationshipMode === "romantic" ? <div className="trust-note"><ShieldCheck aria-hidden="true" /><span>Romantic mode is for confirmed adults and never discourages real-world relationships.</span></div> : null}
             </>
@@ -214,7 +220,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <h1>What could you talk about for hours?</h1>
               <p>These are conversation seeds—not ad targeting. You can remove them later.</p>
               <div className="choice-grid choice-grid--compact">
-                {interests.map((item) => <button type="button" key={item} className={draft.interests.includes(item) ? "choice choice--selected" : "choice"} onClick={() => toggle("interests", item)}>{draft.interests.includes(item) ? <Check aria-hidden="true" /> : null}{item}</button>)}
+                {interests.map((item) => <button type="button" key={item} aria-pressed={draft.interests.includes(item)} className={draft.interests.includes(item) ? "choice choice--selected" : "choice"} onClick={() => toggle("interests", item)}>{draft.interests.includes(item) ? <Check aria-hidden="true" /> : null}{item}</button>)}
               </div>
             </>
           )}
@@ -224,7 +230,8 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <span className="eyebrow">First conversation</span>
               <h1>{draft.companionName || "Mira"} is ready to meet you.</h1>
               <p>Your companion will begin with your chosen relationship style, interests, voice, and personality—without inventing facts about your life.</p>
-              <div className="ready-note"><Bot aria-hidden="true" /><span><strong>“Hi {draft.name.trim() || "there"}. I’m {draft.companionName || "Mira"}.”</strong> I feel like I should know one thing about you before we start.</span></div>
+              <div className="ready-note"><Bot aria-hidden="true" /><span><strong>“Hi {draft.name.trim() || "there"}. I’m {draft.companionName || "Mira"}.”</strong> We can start with whatever feels easy—even a quiet hello.</span></div>
+              <label className="check-line"><input type="checkbox" checked={draft.memoryEnabled} onChange={(event) => setDraft({ ...draft, memoryEnabled: event.target.checked })} /><span>Let {draft.companionName || "Mira"} suggest memories from our conversations. I can review, correct, pause, or delete them anytime.</span></label>
               <div className="trust-note"><ShieldCheck aria-hidden="true" /><span>Memory stays inspectable. You can export or delete everything from Settings.</span></div>
             </>
           )}
@@ -237,7 +244,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
         </div>
         <aside className="onboarding__visual" aria-label="Preview of Mira in the companion room">
           <img src="/assets/mira/loft-morning.png" alt="Mira sketching in a sunny loft" />
-          <div className="onboarding__visual-card"><span>Memory is off until you choose it</span><strong>You stay in control</strong></div>
+          <div className="onboarding__visual-card"><span>{draft.memoryEnabled ? "Memory is on because you chose it" : "Memory is off until you choose it"}</span><strong>You stay in control</strong></div>
         </aside>
       </section>
     </main>

@@ -7,6 +7,7 @@ import type {
   MemoryRecord,
   NotificationSettings,
   OwnedItemRecord,
+  ResponsePreferences,
   ScheduledNudgeRecord,
   StoreItemRecord,
   SubscriptionState,
@@ -14,6 +15,7 @@ import type {
   WalletState,
   WalletTransactionRecord,
 } from "@companion/shared";
+import type { EdgeCompanionRequest } from "@/lib/companion-prompt";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://127.0.0.1:4000";
 const TOKEN_KEY = "luma.production-session.v1";
@@ -98,6 +100,17 @@ export const companionApi = {
   hasSession: () => Boolean(storedTokens()?.accessToken),
   clearSession: () => saveTokens(null),
 
+  async demoReply(input: EdgeCompanionRequest) {
+    const response = await fetch("/api/companion-chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const body = await response.json().catch(() => null) as { reply?: string; error?: string } | null;
+    if (!response.ok || !body?.reply) throw new Error(body?.error ?? "Mira could not respond just now.");
+    return body.reply;
+  },
+
   async signup(input: SignupInput) {
     const data = await request<SessionTokens & { user: UserProfile; companion: CompanionProfile }>("/auth/signup", { method: "POST", body: JSON.stringify(input) });
     saveTokens(data);
@@ -153,9 +166,9 @@ export const companionApi = {
   addEvent: (description: string, eventDate: string) => request<{ event: FutureEventRecord; nudge: ScheduledNudgeRecord | null }>("/events", { method: "POST", body: JSON.stringify({ description, eventDate, status: "confirmed" }) }),
   updateNotifications: (settings: NotificationSettings) => request<NotificationSettings>("/notifications/preferences", { method: "PATCH", body: JSON.stringify(settings) }),
   feedback: (conversationId: string, messageId: string, feedback: "up" | "down", note?: string) => request<{ message: ChatMessage }>(`/conversations/${conversationId}/messages/${messageId}/feedback`, { method: "PATCH", body: JSON.stringify({ feedback, ...(note ? { note } : {}) }) }),
-  regenerate: (conversationId: string, messageId: string, memoryEnabled: boolean) => request<ChatMessage>(`/conversations/${conversationId}/messages/${messageId}/regenerate`, { method: "POST", body: JSON.stringify({ memoryEnabled }) }),
+  regenerate: (conversationId: string, messageId: string, memoryEnabled: boolean, responsePreferences?: ResponsePreferences) => request<ChatMessage>(`/conversations/${conversationId}/messages/${messageId}/regenerate`, { method: "POST", body: JSON.stringify({ memoryEnabled, responsePreferences }) }),
 
-  async streamChat(input: { conversationId: string; companionId: string; content: string; clientMessageId: string; memoryEnabled?: boolean }, onDelta: (delta: string) => void) {
+  async streamChat(input: { conversationId: string; companionId: string; content: string; clientMessageId: string; memoryEnabled?: boolean; responsePreferences?: ResponsePreferences }, onDelta: (delta: string) => void) {
     const response = await authorizedFetch("/chat/stream", {
       method: "POST",
       body: JSON.stringify(input),

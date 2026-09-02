@@ -25,12 +25,20 @@ export const onboardingSchema = z.object({
   relationshipMode: relationshipModeSchema,
 });
 
+export const responsePreferencesSchema = z.object({
+  listeningFirst: z.boolean(),
+  responseLength: z.enum(["short", "balanced", "deep"]),
+  adviceStyle: z.enum(["gentle", "direct", "ask-first"]),
+  questionFrequency: z.enum(["rare", "balanced"]),
+});
+
 export const chatRequestSchema = z.object({
   conversationId: z.uuid(),
   companionId: z.uuid(),
   clientMessageId: z.string().min(8).max(120),
   content: z.string().trim().min(1).max(8_000),
   memoryEnabled: z.boolean().default(true),
+  responsePreferences: responsePreferencesSchema.optional(),
 });
 
 export const memoryUpdateSchema = z.object({
@@ -66,3 +74,4 @@ export const subscriptionWebhookSchema = z.object({
 
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
+export type ResponsePreferences = z.infer<typeof responsePreferencesSchema>;

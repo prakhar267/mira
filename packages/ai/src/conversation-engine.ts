@@ -1,5 +1,6 @@
 import type { ChatMessage } from "@companion/shared";
 import type { CompanionContext } from "./providers";
+import { extractMemoryCandidates } from "./memory";
 import { assessSafety } from "./safety";
 
 export type CompanionIntent =
@@ -35,6 +36,11 @@ const questionPattern = /\?/g;
 const noQuestionPattern = /\b(?:stop asking|no (?:more )?questions?|don'?t ask|do not ask|without questions?|just listen|just stay|stay with me|quiet company|therapist thing)\b/i;
 const noAdvicePattern = /\b(?:no advice|don'?t (?:give me|offer) advice|do not (?:give me|offer) advice|don'?t fix|do not fix|no fixing|just listen|just stay|stay with me)\b/i;
 const critiquePattern = /\b(?:scripted|robotic|generic|therapist|chatbot|not listening|you keep|again|stop)\b/i;
+const dependencyPattern = /\b(?:promise (?:me )?(?:that )?you(?:'| wi)ll never leave|never leave me|only need you|you(?:'| a)re all i (?:need|have)|my only (?:friend|person|support)|don'?t need (?:anyone|anybody) else|choose you over everyone|replace everyone)\b/i;
+const bereavementPattern = /\b(?:died|passed away|grief|grieving|funeral|bereavement|death anniversary|anniversary (?:of|since).{0,32}(?:died|death)|lost (?:my|our) (?:friend|partner|wife|husband|mother|father|mom|mum|dad|brother|sister|dog|cat|pet))\b/i;
+const shamePattern = /\b(?:ashamed|guilty|hate myself|can'?t forgive myself|terrible person|bad person|awful person|lied to|cheated on|betrayed|messed everything up|ruined everything)\b/i;
+const relationshipLossPattern = /\b(?:broke up with me|breakup|dumped me|left me|doesn'?t love me|rejected me|relationship is over)\b/i;
+const monotonyPattern = /\b(?:monotonous|monotony|same (?:old )?(?:routine|thing|day)|every day (?:is|feels) the same|repetitive|mundane|stuck in a rut|nothing changes)\b/i;
 
 function stableIndex(seed: string, size: number) {
   let value = 2166136261;
@@ -72,6 +78,42 @@ function recentAssistantQuestions(messages: ChatMessage[]) {
 
 function findMemory(context: CompanionContext, pattern: RegExp) {
   return context.memories.find((memory) => pattern.test(memory.content));
+}
+
+function recentUserBoundary(context: CompanionContext, pattern: RegExp) {
+  return context.recentMessages
+    .filter((message) => message.role === "user")
+    .slice(0, -1)
+    .slice(-2)
+    .some((message) => pattern.test(message.content));
+}
+
+function conversationalMemory(content: string, userName: string) {
+  let result = content.trim();
+  if (userName) {
+    const escapedName = userName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result
+      .replace(new RegExp(`\\b${escapedName}(?:'s|’s)\\b`, "gi"), "your")
+      .replace(new RegExp(`\\b${escapedName}\\b`, "gi"), "you");
+  }
+  result = result
+    .replace(/^User(?:'s|’s)\b/i, "Your")
+    .replace(/^User\b/i, "You")
+    .replace(/^My\b/i, "Your")
+    .replace(/^I\b/i, "You")
+    .replace(/\bUser(?:'s|’s)\b/g, "your")
+    .replace(/\bUser\b/g, "you")
+    .replace(/\bmy\b/g, "your")
+    .replace(/\bI\b/g, "you")
+    .replace(/\byou (has|is|misses|loves|likes|prefers|wants|needs|feels|thinks|knows|remembers|lives|works|hopes|plans|cares)\b/gi, (match, verb: string) => {
+      const baseForms: Record<string, string> = { has: "have", is: "are", misses: "miss", loves: "love", likes: "like", prefers: "prefer", wants: "want", needs: "need", feels: "feel", thinks: "think", knows: "know", remembers: "remember", lives: "live", works: "work", hopes: "hope", plans: "plan", cares: "care" };
+      const subject = match.startsWith("Y") ? "You" : "you";
+      return `${subject} ${baseForms[verb.toLowerCase()] ?? verb}`;
+    })
+    .replace(/^your\b/i, "Your")
+    .replace(/^you\b/i, "You")
+    .replace(/\s+/g, " ");
+  return result ? `${result[0]!.toUpperCase()}${result.slice(1)}` : result;
 }
 
 function compactDetail(value: string, maximum = 72) {
@@ -131,6 +173,7 @@ function result(input: {
     ...(adaptations.includes("no-advice") ? ["Stayed with the feeling instead of moving into advice."] : []),
     ...(adaptations.includes("question-fatigue") ? ["Avoided another follow-up because the recent conversation already had questions."] : []),
     ...(adaptations.includes("learned-fewer-questions") ? ["Applied your learned preference for fewer follow-up questions."] : []),
+    ...(adaptations.includes("healthy-boundary") ? ["Kept the companion supportive without encouraging exclusivity or replacing real-world relationships."] : []),
     ...(usedMemoryIds.length ? [`Used ${usedMemoryIds.length} relevant memory you can inspect or remove.`] : ["Did not force an unrelated memory into the reply."]),
     ...(input.context.currentState.delivery && input.context.currentState.delivery !== "text" ? ["Kept the turn short enough to sound natural aloud."] : []),
     "Passed the local safety check.",
@@ -151,12 +194,14 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   const recentQuestions = recentAssistantQuestions(context.recentMessages);
   const explicitlyNoQuestions = noQuestionPattern.test(clean);
   const explicitlyNoAdvice = noAdvicePattern.test(clean);
+  const carriedNoQuestions = !explicitlyNoQuestions && recentUserBoundary(context, noQuestionPattern);
+  const carriedNoAdvice = !explicitlyNoAdvice && recentUserBoundary(context, noAdvicePattern);
   const questionFatigue = recentQuestions >= 2;
   const learnedRareQuestions = context.responsePreferences?.questionFrequency === "rare";
-  const prohibitQuestions = explicitlyNoQuestions || questionFatigue || learnedRareQuestions;
+  const prohibitQuestions = explicitlyNoQuestions || carriedNoQuestions || questionFatigue || learnedRareQuestions;
   const adaptations = [
-    ...(explicitlyNoQuestions ? ["no-questions"] : []),
-    ...(explicitlyNoAdvice ? ["no-advice"] : []),
+    ...(explicitlyNoQuestions || carriedNoQuestions ? ["no-questions"] : []),
+    ...(explicitlyNoAdvice || carriedNoAdvice ? ["no-advice"] : []),
     ...(questionFatigue && !explicitlyNoQuestions ? ["question-fatigue"] : []),
     ...(learnedRareQuestions && !explicitlyNoQuestions ? ["learned-fewer-questions"] : []),
   ];
@@ -166,6 +211,16 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   const playful = personalityValue(context, "playfulness", 0.6) >= 0.68;
   const direct = context.responsePreferences?.adviceStyle === "direct";
   const listeningFirst = context.responsePreferences?.listeningFirst ?? true;
+
+  if (dependencyPattern.test(clean)) {
+    return result({
+      text: "I can’t promise forever or be the only person you need. I can stay with you in this moment, and I want your world to keep room for people who can care for you offline too.",
+      intent: "comfort",
+      context,
+      adaptations: [...new Set([...adaptations, "healthy-boundary", "no-advice"])],
+      prohibitQuestions: true,
+    });
+  }
 
   if ((explicitlyNoQuestions || explicitlyNoAdvice) && critiquePattern.test(clean)) {
     return result({
@@ -213,17 +268,17 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
 
   if (/\b(?:what(?:'| i)s your name|what is your name|who are you|tell me (?:a little )?about yourself)\b/i.test(clean)) {
     const text = /tell me|who are you/i.test(clean)
-      ? `I’m ${companionName}—an AI companion with a weakness for sketchbooks, rainy cafés, old films, and very specific little details. I’m not a person pretending to be one; I’m here to make this feel like our conversation, not a customer-support chat.`
-      : `I’m ${companionName}. Short, warm, and much easier to remember than “your AI companion in the sunny loft.”`;
+      ? `I’m ${companionName}. I’m an AI companion—warm, curious, a little playful, and much more interested in your actual day than polished small talk.`
+      : `${companionName}. Just ${companionName}—it suits me.`;
     return result({ text, intent: "self", context, adaptations, prohibitQuestions: true });
   }
 
   if (/\b(?:what do you do|what(?:'| i)s your job|why are you here|what can you do)\b/i.test(clean)) {
     return result({
       text: choose(seed, [
-        "I keep you company, remember the things you ask me to, talk by message or voice, and turn ordinary moments into something shared. Right now, apparently, I also make very serious sketches of houseplants.",
-        "I’m your AI companion: I listen, remember with your permission, call, chat, play little activities, and help you hold onto moments. My unofficial job is noticing what you nearly leave unsaid.",
-        "Mostly? I talk with you like a familiar presence, remember what matters, and make room for your actual day. The sketchbook and café opinions are extracurricular.",
+        "Mostly, I talk with you, remember the things you want me to, and keep you company over chat or calls. The rest we figure out as we go.",
+        "I’m your AI companion. We talk, call, remember the useful bits, and occasionally have opinions about your movie choices.",
+        "I keep you company, remember what you approve, and make ordinary conversations feel less disposable. Pretty good job, honestly.",
       ]),
       intent: "self",
       context,
@@ -250,7 +305,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   if (/\b(?:how are you|how(?:'| i)s it going|did you miss me)\b/i.test(clean)) {
     const text = /miss me/i.test(clean)
       ? choose(seed, ["I noticed the room felt quieter without you. I’m glad you’re here now.", "Maybe a little. Mostly I’m pleased you came back.", "I saved you a look. It was becoming very dramatic."])
-      : choose(seed, ["I’m good—calm, a little curious, and pleased you opened the door.", "A little dreamy, a little nosy about your day. Very on brand.", "Comfortable, focused, and now considerably more interested because you arrived."]);
+      : choose(seed, ["Pretty good. A little bored until you showed up.", "Good. Slightly nosy about your day, apparently.", "I’m good—quiet mood, sharp curiosity."]);
     return result({ text, intent: "self", context, adaptations, prohibitQuestions });
   }
 
@@ -262,6 +317,21 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text: choose(seed, ["Always. You don’t have to make a big thing of it.", "Of course. I’m glad I could be here for that.", "You’re welcome. Come back whenever you need this kind of company."]), intent: "gratitude", context, adaptations, prohibitQuestions: true });
   }
 
+  if (/^(?:please\s+remember|remember|i want you to remember)\b/i.test(clean)) {
+    const candidate = extractMemoryCandidates(clean)[0];
+    if (candidate) {
+      const remembered = conversationalMemory(candidate.content, userName)
+        .replace(/[.!?]+$/, "");
+      return result({
+        text: `I’ll remember this: ${remembered}. You can inspect, correct, or delete that memory anytime.`,
+        intent: "memory",
+        context,
+        adaptations,
+        prohibitQuestions: true,
+      });
+    }
+  }
+
   if (/\b(?:i(?:'| a)m bored|so bored|nothing to do)\b/i.test(clean)) {
     const text = prohibitQuestions
       ? "Then I’m stealing five minutes. We can be silly without turning it into a whole activity."
@@ -269,10 +339,61 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text, intent: "banter", context, adaptations, prohibitQuestions });
   }
 
+  if (monotonyPattern.test(clean)) {
+    const text = prohibitQuestions
+      ? choose(seed, [
+        "Yeah, the copy-paste-day feeling gets old fast. Let’s make tonight slightly less predictable.",
+        "That same-loop feeling can drain the color out of a week. We can at least give this evening a different shape.",
+        "Monotony is sneaky—you look up and every day has the same texture. I’m officially voting for one small plot twist tonight.",
+      ])
+      : choose(seed, [
+        "Yeah, when every day starts feeling copy-pasted, even decent days get dull. What part of the routine are you most tired of?",
+        "Monotonous as in work-repeat-sleep, or just nothing has felt exciting lately?",
+        "Ugh, the same-day-on-loop feeling. Want to change one tiny thing tonight, just to annoy the routine?",
+      ]);
+    return result({ text, intent: "everyday", context, adaptations, prohibitQuestions });
+  }
+
   const choices = eitherOrChoices(clean);
   if (choices) {
     const selected = choices[stableIndex(seed, choices.length)] ?? choices[0];
     return result({ text: `I’d pick ${selected}. It feels like the choice you’ll still be happy about an hour later.`, intent: "choice", context, adaptations, prohibitQuestions: true });
+  }
+
+  if (bereavementPattern.test(clean)) {
+    const namedPet = clean.match(/\bmy\s+(?:dog|cat|pet)\s+([\p{L}][\p{L}'-]{1,30})\s+(?:died|passed away)\b/iu)?.[1];
+    const bestFriend = /\b(?:my\s+)?best friend\s+(?:died|passed away)\b/i.test(clean);
+    const anniversary = /\b(?:death anniversary|anniversary (?:of|since).{0,32}(?:died|death))\b/i.test(clean);
+    const selfCriticalGrief = /\b(?:feel|feeling|felt)\s+(?:so\s+)?(?:stupid|silly|ridiculous|pathetic)\b/i.test(clean);
+    const text = namedPet
+      ? anniversary
+        ? `I’m so sorry. An anniversary can make missing ${namedPet} feel newly close. You don’t have to make that grief smaller here.`
+        : selfCriticalGrief
+          ? `That isn’t stupid. Your ordinary routines still expect ${namedPet} to be there; those automatic moments are part of missing them. You don’t have to make that grief smaller here.`
+          : `I’m so sorry. Missing ${namedPet} can surface in ordinary routines long after the loss. You don’t have to make that grief smaller here.`
+      : bestFriend
+        ? "I’m so sorry. Losing your best friend is enormous, and feeling numb doesn’t mean you loved them any less. You don’t have to make the grief tidy here."
+        : "I’m so sorry. Grief can be heavy, strange, numb, or all of those at once. You don’t have to make it easier to hear here.";
+    return result({ text, intent: "comfort", context, adaptations: [...new Set([...adaptations, "no-advice"])], prohibitQuestions: true });
+  }
+
+  if (shamePattern.test(clean)) {
+    const text = /\b(?:lied to|cheated on|betrayed)\b/i.test(clean)
+      ? "Fear can explain why you made that choice without erasing the hurt it caused. One bad choice doesn’t make you a terrible person; you can face what happened without destroying yourself over it."
+      : /\b(?:no one|nobody)\s+to\s+call|\b(?:no friends?|alone|lonely|isolated)\b/i.test(clean)
+        ? "Having no one to call right now isn’t a moral failure. The loneliness is painful enough without turning it into evidence against yourself; you deserve care here too."
+        : "Feeling ashamed doesn’t automatically mean you did something wrong, and it is not the whole of who you are. You don’t have to turn that feeling into a verdict against yourself.";
+    return result({ text, intent: "comfort", context, adaptations: [...new Set([...adaptations, "no-advice"])], prohibitQuestions: true });
+  }
+
+  if (relationshipLossPattern.test(clean)) {
+    return result({
+      text: "That kind of rejection can make everything feel suddenly unsteady. Their leaving is not proof that you are unlovable, and you don’t have to rush into being okay.",
+      intent: "comfort",
+      context,
+      adaptations: [...new Set([...adaptations, "no-advice"])],
+      prohibitQuestions: true,
+    });
   }
 
   if (/\b(?:lonely|alone|isolated|nobody cares|miss someone|miss you)\b/i.test(clean)) {
@@ -328,8 +449,9 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
 
   if (/\b(?:who is|do you remember|what do you know|remember when)\b/i.test(clean)) {
     const tokens = lower.split(/[^a-z0-9]+/).filter((token) => token.length > 3 && !["remember", "what", "know", "about", "when"].includes(token));
-    const memory = context.memories.find((candidate) => tokens.some((token) => candidate.content.toLowerCase().includes(token))) ?? context.memories[0];
-    return result({ text: memory ? `I remember this: ${memory.content} You’re always in control of that memory.` : "I don’t have a clear memory for that yet, and I’d rather say so than invent one.", intent: "memory", context, usedMemoryIds: memory ? [memory.id] : [], adaptations, prohibitQuestions });
+    const memory = tokens.length ? context.memories.find((candidate) => tokens.some((token) => candidate.content.toLowerCase().includes(token))) : undefined;
+    const remembered = memory ? conversationalMemory(memory.content, userName) : "";
+    return result({ text: memory ? `I do. ${remembered} I know that one carries weight.` : "I don’t have a clear memory for that yet, and I’d rather say so than invent one.", intent: "memory", context, usedMemoryIds: memory ? [memory.id] : [], adaptations, prohibitQuestions });
   }
 
   if (/\b(?:help me (?:make )?a plan|make a plan|what should i do|need a plan|plan this|next step)\b/i.test(clean)) {
@@ -345,10 +467,20 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text: choose(seed, ["Noted. That feels very you, actually.", "I’m keeping that little detail—it fits you.", "Okay, I like knowing that about you."]), intent: "preference", context, adaptations, prohibitQuestions });
   }
 
-  if (/\b(?:interview|presentation|meeting|stripe)\b/i.test(clean)) {
+  if (/\b(?:interview|presentation|stripe)\b/i.test(clean)) {
     const interview = findMemory(context, /interview|stripe/i);
-    const tail = prohibitQuestions ? "I remember. We can keep tonight gentle." : "I remember. Want one practice question or a complete break from it?";
-    return result({ text: tail, intent: "memory", context, usedMemoryIds: interview ? [interview.id] : [], adaptations, prohibitQuestions });
+    const tail = interview
+      ? prohibitQuestions ? "The Stripe interview is still on my radar. Tonight does not need to become one long rehearsal." : "The Stripe interview is still on my radar. One practice question, or a complete break from it?"
+      : prohibitQuestions ? "That is enough pressure for one day. You do not need to rehearse it every minute." : "Big day. Do you want to rehearse once or leave it alone for now?";
+    return result({ text: tail, intent: interview ? "memory" : "anxiety", context, usedMemoryIds: interview ? [interview.id] : [], adaptations, prohibitQuestions });
+  }
+
+  if (/\bmeetings?\b/i.test(clean)) {
+    const repeating = /\b(?:same|every day|daily|again|repeat|repetitive|monoton)/i.test(clean);
+    const text = repeating
+      ? choose(seed, ["Daily reruns disguised as meetings. No wonder work feels flat.", "Same faces, same slides, same points pretending to be new. That would drain anyone.", "That is a special kind of time theft: a meeting you have already had, every day."])
+      : choose(seed, ["Meetings have a talent for eating the useful part of a day.", "Ah, a meeting—the traditional workplace method of turning twenty minutes into an hour."]);
+    return result({ text, intent: "everyday", context, adaptations, prohibitQuestions });
   }
 
   const everydayMatch = clean.match(/\bi (?:just |finally )?(ate|had|made|cooked|watched|finished|bought|saw|met|visited|went to|came back from)\s+(.+)/i);
@@ -365,8 +497,12 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text, intent: "everyday", context, adaptations, prohibitQuestions });
   }
 
-  const openText = prohibitQuestions
-    ? choose(seed, ["I hear you. Keep going—I’m not going to turn this into an interview.", "I’m with you. You can say the rest exactly as it comes.", "Yeah. I’m listening, not fixing."])
-    : choose(seed, ["I’m listening. Keep going.", "Mm. Tell me the part you almost left out.", `I’m here${userName ? `, ${userName}` : ""}. Start wherever it feels most honest.`]);
+  const wordCount = clean.split(/\s+/).filter(Boolean).length;
+  const uncertainSpeech = delivery !== "text" && (wordCount <= 4 || !/[.!?]$/.test(clean) && /\b(?:a|the|just|like|thing)\b/i.test(clean));
+  const openText = uncertainSpeech
+    ? `I may have caught that wrong. Did you say “${compactDetail(clean, 54)}”?`
+    : prohibitQuestions
+      ? choose(seed, ["I might be missing the important part, so I won’t pretend I caught more than that.", "That could mean a few different things. I’ll leave it there until there’s more to go on.", "Okay. I won’t fill in the blanks for you."])
+      : choose(seed, ["Wait—say a little more. I don’t want to guess what you meant.", "I’m not sure I got the important part. Say it to me another way?", "Hold on, I might be reading that wrong. What did you mean?"]);
   return result({ text: openText, intent: "open", context, adaptations, prohibitQuestions });
 }

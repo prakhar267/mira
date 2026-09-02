@@ -93,7 +93,7 @@ export function VideoCallModal({
   onRealtimeConnect?: () => Promise<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void }>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const greeting = `There you are, ${userName}. I saved you the good seat—tell me what’s happening.`;
+  const greeting = `Hey ${userName}. You made it—what’s up?`;
   const [seconds, setSeconds] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState(true);
@@ -165,8 +165,11 @@ export function VideoCallModal({
   useEffect(() => {
     if (greetingSpoken.current) return;
     if (transport !== "fallback") return;
-    greetingSpoken.current = true;
-    const connect = window.setTimeout(() => speak(greeting), 550);
+    const connect = window.setTimeout(() => {
+      if (greetingSpoken.current) return;
+      greetingSpoken.current = true;
+      speak(greeting);
+    }, 550);
     return () => window.clearTimeout(connect);
   }, [greeting, speak, transport]);
 
@@ -239,7 +242,7 @@ export function VideoCallModal({
       setCompanionLine(reply);
       speak(reply);
     } catch {
-      setCompanionLine("I’m still with you. I missed that for a second—say it once more?");
+      setCompanionLine("I missed that for a second—say it once more?");
     } finally {
       setThinking(false);
     }

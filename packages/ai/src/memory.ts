@@ -96,6 +96,45 @@ export interface MemoryCandidate {
 export function extractMemoryCandidates(message: string): MemoryCandidate[] {
   const compact = message.trim().replace(/\s+/g, " ");
   const candidates: MemoryCandidate[] = [];
+  const explicit = compact.match(/^(?:please\s+remember|remember|i want you to remember)(?:\s+that)?\s+(.{3,220})/i);
+  if (explicit?.[1]) {
+    const detail = explicit[1].replace(/\s+/g, " ").trim();
+    const content = detail
+      .replace(/\bI am\b/gi, "User is")
+      .replace(/\bI(?:'|’)m\b/gi, "User is")
+      .replace(/\bI have\b/gi, "User has")
+      .replace(/\bI do not\b/gi, "User does not")
+      .replace(/\bI don(?:'|’)t\b/gi, "User doesn't")
+      .replace(/\bI (miss|love|like|prefer|want|need|feel|think|know|remember|live|work|hope|plan|care)\b/gi, (_match, verb: string) => {
+        const irregular: Record<string, string> = { have: "has" };
+        const lower = verb.toLowerCase();
+        const inflected = irregular[lower]
+          ?? (/(?:s|x|z|ch|sh)$/.test(lower)
+            ? `${lower}es`
+            : /[^aeiou]y$/.test(lower)
+              ? `${lower.slice(0, -1)}ies`
+              : `${lower}s`);
+        return `User ${inflected}`;
+      })
+      .replace(/\bmyself\b/gi, "User")
+      .replace(/\bmine\b/gi, "User's")
+      .replace(/\bmy\b/gi, "User's")
+      .replace(/\bme\b/gi, "User")
+      .replace(/\bI\b/g, "User");
+    const type: MemoryType = /\b(?:friend|partner|wife|husband|mother|father|mom|mum|dad|brother|sister|dog|cat|pet)\b/i.test(detail)
+      ? "relationship"
+      : /\b(?:today|tomorrow|tonight|anniversary|birthday|interview|appointment|exam|meeting|trip|died|passed away)\b/i.test(detail)
+        ? "episodic"
+        : "semantic";
+    return [{
+      type,
+      content,
+      normalizedContent: `explicit:${detail.toLowerCase().replace(/[.!?]+$/, "")}`,
+      importance: 0.9,
+      confidence: 0.99,
+    }];
+  }
+
   const preference = compact.match(/\b(?:i (?:really )?(?:like|love|prefer)|my favorite)\s+(.{3,120})/i);
   if (preference?.[1]) {
     const preferenceValue = preference[1].replace(/[.!?]+$/, "");

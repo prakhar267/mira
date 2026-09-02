@@ -69,11 +69,12 @@ describe("production-mode API journey", () => {
     const chat = await app.inject({
       method: "POST",
       url: "/chat/stream",
-      headers: { authorization: `Bearer ${accessToken}` },
+      headers: { authorization: `Bearer ${accessToken}`, origin: "http://localhost:3001" },
       payload: { conversationId, companionId, clientMessageId: "journey-message-0001", content: "I had a long day and want someone to listen." },
     });
     expect(chat.statusCode).toBe(200);
     expect(chat.headers["content-type"]).toContain("text/event-stream");
+    expect(chat.headers["access-control-allow-origin"]).toBe("http://localhost:3001");
     expect(chat.body).toContain("event: token");
     expect(chat.body).toContain("event: done");
 

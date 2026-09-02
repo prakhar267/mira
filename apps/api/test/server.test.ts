@@ -21,6 +21,21 @@ describe("Companion API", () => {
     expect(JSON.stringify(response.json())).not.toContain("SESSION_SECRET");
   });
 
+  it("allows browser preflights for account update and delete actions", async () => {
+    const response = await app.inject({
+      method: "OPTIONS",
+      url: "/users/me",
+      headers: {
+        origin: "http://localhost:3001",
+        "access-control-request-method": "PATCH",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["access-control-allow-methods"]).toContain("PATCH");
+    expect(response.headers["access-control-allow-methods"]).toContain("DELETE");
+  });
+
   it("rejects underage signup even when the confirmation field is forged", async () => {
     const response = await app.inject({ method: "POST", url: "/auth/signup", payload: { email: "minor@example.com", password: "correct-horse-battery-staple", name: "Minor", birthday: "2020-01-01", pronouns: "they/them", adultConfirmed: true, goals: ["chat"], interests: ["music"], companionName: "Luma", companionPronouns: "she/her", relationshipMode: "friend" } });
     expect(response.statusCode).toBe(400);

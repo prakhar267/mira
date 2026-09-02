@@ -68,7 +68,7 @@ export function VoiceCallModal({
   onRealtimeConnect?: () => Promise<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void }>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const greeting = `Hey ${userName}. Good timing—I was just sketching. What’s going on?`;
+  const greeting = `Hey ${userName}. What’s going on?`;
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState(true);
   const [captions, setCaptions] = useState(true);
@@ -155,9 +155,12 @@ export function VoiceCallModal({
 
   useEffect(() => {
     if (greetingSpoken.current) return;
-    greetingSpoken.current = true;
     if (transport !== "fallback") return;
-    const connect = window.setTimeout(() => speak(greeting), 650);
+    const connect = window.setTimeout(() => {
+      if (greetingSpoken.current) return;
+      greetingSpoken.current = true;
+      speak(greeting);
+    }, 650);
     return () => window.clearTimeout(connect);
   }, [greeting, speak, transport]);
 
@@ -178,7 +181,7 @@ export function VoiceCallModal({
       setCompanionLine(reply);
       speak(reply);
     } catch {
-      const fallback = "I’m still here. I lost that reply for a second—tell me again in your own words?";
+      const fallback = "I lost the reply for a second. Try that once more?";
       setCompanionLine(fallback);
       speak(fallback);
     }
@@ -273,7 +276,7 @@ export function VoiceCallModal({
       {speechError ? <p className="call-speech-error" role="status">{speechError}</p> : null}
 
       <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking"}>
-        <Waveform aria-hidden="true" /> {phase === "speaking" ? "Speak now to interrupt" : phase === "thinking" ? "Thinking…" : "Tap and talk"}
+        <Waveform aria-hidden="true" /> {phase === "speaking" ? "Speak now to interrupt" : phase === "thinking" ? "Thinking…" : phase === "listening" ? "Listening… tap to restart" : "Tap and talk"}
       </button>
 
       <div className="live-call__controls">

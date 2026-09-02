@@ -36,6 +36,7 @@ export function HomeView({
   onCall,
   onVideoCall,
   onMoments,
+  onMemory,
   onCompanion,
   onSpendTime,
   onEnvironmentChange,
@@ -46,6 +47,7 @@ export function HomeView({
   onCall: () => void;
   onVideoCall: () => void;
   onMoments: () => void;
+  onMemory: () => void;
   onCompanion: () => void;
   onSpendTime: () => void;
   onEnvironmentChange: (environment: EnvironmentId) => void;
@@ -60,8 +62,13 @@ export function HomeView({
     const environmentId = item ? environmentForItem(item) : null;
     return environmentId ? [environmentId] : [];
   }));
-  const recentMoment = state.moments[0];
-  const highlightedMemory = state.memories.find((memory) => memory.pinned) ?? state.memories[0];
+  const recentMoment = [...state.moments].sort((left, right) => Date.parse(right.date) - Date.parse(left.date))[0];
+  const highlightedMemory = state.memories.find((memory) => {
+    if (memory.status !== "active" || !memory.pinned) return false;
+    if (memory.type !== "episodic") return true;
+    const content = memory.content.toLowerCase();
+    return state.futureEvents.some((event) => event.status === "confirmed" && Date.parse(event.eventDate) >= mountedAt.getTime() && event.description.toLowerCase().split(/\s+/).some((word) => word.length > 3 && content.includes(word)));
+  });
   const greeting = useMemo(() => {
     const now = mountedAt.getTime();
     const nearbyEvent = [...state.futureEvents]
@@ -104,7 +111,7 @@ export function HomeView({
           <span><strong id="mira-home-title">{state.companion.name}<em>AI companion</em></strong><small><i /> Feeling sunny · playful</small></span>
         </button>
         <div className="mira-home__top-actions">
-          <button type="button" className="mira-level-chip" onClick={onMoments} aria-label="Open relationship memories"><Heart weight="fill" /><span>{state.relationship.stage} · {state.relationship.level}</span></button>
+          <button type="button" className="mira-level-chip" onClick={onMoments} aria-label="Open shared moments"><Heart weight="fill" /><span>{state.relationship.stage} · {state.relationship.level}</span></button>
           <button type="button" className="mira-icon-button" onClick={onCompanion} aria-label="Open companion settings"><GearSix /></button>
         </div>
       </header>
@@ -116,7 +123,7 @@ export function HomeView({
       </AnimatePresence>
 
       {highlightedMemory ? (
-        <button type="button" className="mira-memory-cue" onClick={onMoments}>
+        <button type="button" className="mira-memory-cue" onClick={onMemory}>
           <Sparkle weight="fill" />
           <span><small>I remembered</small><strong>{highlightedMemory.content}</strong><em>Open memory</em></span>
         </button>

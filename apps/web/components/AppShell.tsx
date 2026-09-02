@@ -15,7 +15,7 @@ import type { AppView } from "@/lib/state";
 const navigation: Array<{ id: AppView; label: string; icon: Icon }> = [
   { id: "home", label: "Home", icon: House },
   { id: "chat", label: "Chat", icon: ChatCircle },
-  { id: "moments", label: "Memories", icon: Sparkle },
+  { id: "moments", label: "Moments", icon: Sparkle },
   { id: "companion", label: "Wardrobe", icon: Heart },
   { id: "profile", label: "You", icon: UserCircle },
 ];

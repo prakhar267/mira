@@ -20,6 +20,7 @@ import {
   journalEntrySchema,
   memoryUpdateSchema,
   onboardingSchema,
+  responsePreferencesSchema,
   storePurchaseSchema,
   subscriptionWebhookSchema,
   type ChatMessage,
@@ -39,6 +40,11 @@ function actorId(headers: Record<string, string | string[] | undefined>): string
 
 function apiError(code: string, message: string, requestId: string) {
   return { ok: false, error: { code, message }, requestId };
+}
+
+function personalizeMemory(content: string, name: string) {
+  const personalized = content.replace(/\bUser's\b/g, `${name}'s`).replace(/\bUser\b/g, name);
+  return personalized ? `${personalized[0]!.toUpperCase()}${personalized.slice(1)}` : personalized;
 }
 
 function isAdmin(headers: Record<string, string | string[] | undefined>, expected: string): boolean {
@@ -79,7 +85,11 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
   const rateWindows = new Map<string, { count: number; resetsAt: number }>();
   await infrastructure.connect();
   if (ownsRuntime) app.addHook("onClose", async () => runtime.close());
-  await app.register(cors, { origin: env.APP_ORIGIN, credentials: true });
+  await app.register(cors, {
+    origin: env.APP_ORIGIN,
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+  });
   await app.register(swagger, {
     openapi: {
       info: {
@@ -373,7 +383,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     if (priorUserMessage) {
       const priorAssistant = existingMessages.find((message) => message.role === "assistant" && message.replyToId === userMessageId);
       reply.hijack();
-      reply.raw.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", connection: "keep-alive", "x-accel-buffering": "no", "x-request-id": request.id });
+      reply.raw.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", connection: "keep-alive", "x-accel-buffering": "no", "x-request-id": request.id, "access-control-allow-origin": env.APP_ORIGIN, "access-control-allow-credentials": "true", vary: "Origin" });
       if (priorAssistant) reply.raw.write(`event: token\ndata: ${JSON.stringify({ delta: priorAssistant.content, replayed: true })}\n\n`);
       reply.raw.write(`event: done\ndata: ${JSON.stringify({ assistantMessageId: priorAssistant?.id ?? null, replayed: true })}\n\n`);
       reply.raw.end();
@@ -408,6 +418,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
       messages: allMessages,
       timezone: user.timezone,
       now,
+      ...(parsed.data.responsePreferences ? { responsePreferences: parsed.data.responsePreferences } : {}),
     });
 
     reply.hijack();
@@ -417,6 +428,9 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
       connection: "keep-alive",
       "x-accel-buffering": "no",
       "x-request-id": request.id,
+      "access-control-allow-origin": env.APP_ORIGIN,
+      "access-control-allow-credentials": "true",
+      vary: "Origin",
     });
 
     let assistantContent = "";
@@ -474,7 +488,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
             userId,
             companionId: companion.id,
             type: candidate.type,
-            content: candidate.content,
+            content: personalizeMemory(candidate.content, user.name),
             normalizedContent: candidate.normalizedContent,
             importance: candidate.importance,
             confidence: candidate.confidence,
@@ -517,7 +531,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
 
   app.post("/conversations/:conversationId/messages/:messageId/regenerate", async (request, reply) => {
     const params = z.object({ conversationId: z.uuid(), messageId: z.string().min(8) }).safeParse(request.params);
-    const body = z.object({ memoryEnabled: z.boolean().default(true) }).safeParse(request.body ?? {});
+    const body = z.object({ memoryEnabled: z.boolean().default(true), responsePreferences: responsePreferencesSchema.optional() }).safeParse(request.body ?? {});
     if (!params.success || !body.success) return reply.code(400).send(apiError("invalid_message", "Choose an assistant response to try again.", request.id));
     const userId = actorId(request.headers);
     const messages = await repository.listMessages(userId, params.data.conversationId);
@@ -555,6 +569,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
       messages: contextMessages,
       timezone: user.timezone,
       now: new Date(),
+      ...(body.data.responsePreferences ? { responsePreferences: body.data.responsePreferences } : {}),
     });
     let content = "";
     try {
@@ -819,7 +834,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     const companion = body.data.companionId ? await repository.getCompanion(userId, body.data.companionId) : await primaryCompanion(userId);
     if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
     try {
-      const session = await realtime.createSession({ userId, companionId: companion.id, voiceId: companion.voiceId, instructions: `You are ${companion.name}, a warm AI companion. Be natural, concise in voice, never claim to be human, and respond safely.` });
+      const session = await realtime.createSession({ userId, companionId: companion.id, voiceId: companion.voiceId, instructions: `You are ${companion.name}, an adult AI companion. Speak like a familiar, candid person in one or two short sentences. React to the exact subject instead of using canned empathy. Never say “I’m listening”, “I hear you”, “I’m not fixing”, or “that sounds hard”. Do not act like a therapist, force a question, repeat recent phrasing, or invent details. If speech is garbled, say what you caught and ask one plain clarification. Never claim to be human or encourage dependency.` });
       const call = { id: randomUUID(), userId, companionId: companion.id, type: "voice" as const, state: "ready", provider: realtime.id, startedAt: new Date().toISOString(), cameraEnabled: false };
       callSessions.set(call.id, call);
       await repository.createCall(userId, call);
@@ -856,7 +871,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     if (!body.success) return reply.code(400).send(apiError("invalid_video_session", "Video call settings are invalid.", request.id));
     const companion = body.data.companionId ? await repository.getCompanion(userId, body.data.companionId) : await primaryCompanion(userId);
     if (!companion) return reply.code(404).send(apiError("companion_not_found", "Companion not found.", request.id));
-    const voiceSession = await realtime.createSession({ userId, companionId: companion.id, voiceId: companion.voiceId, instructions: `You are ${companion.name}, a warm AI companion in a video-avatar call. Keep spoken replies natural and brief.` });
+    const voiceSession = await realtime.createSession({ userId, companionId: companion.id, voiceId: companion.voiceId, instructions: `You are ${companion.name}, an adult AI companion in a video-avatar call. Speak like a familiar, candid person in one or two short sentences. React to the exact subject; never use canned empathy, therapy language, repeated phrasing, or a forced follow-up question. Do not invent details. If speech is garbled, say what you caught and ask one plain clarification. Never claim to be human or encourage dependency.` });
     const session = { id: randomUUID(), userId, companionId: companion.id, type: "video" as const, state: "connecting", startedAt: new Date().toISOString(), environmentId: body.data.environmentId, cameraEnabled: body.data.cameraEnabled };
     callSessions.set(session.id, session);
     await repository.createCall(userId, { ...session, provider: realtime.id });
