@@ -16,6 +16,7 @@ const femaleIndianEnglishNames = /aditi|kavya|neerja|swara|tara|veena|google.*(?
 const naturalEnglishNames = /andromeda|aria|ava|cora|flo|helena|jenny|juno|karen|luna|moira|nova|samantha|sandy|serena|shelley|shimmer|tara|tessa|thalia|vesta|zira|google.*english.*female/i;
 const enhancedNames = /enhanced|natural|neural|online|premium/i;
 const noveltyOrMaleNames = /albert|aman|bad news|bahh|bells|boing|bubbles|cellos|daniel|eddy|fred|grandpa|jester|junior|organ|ralph|reed|rishi|rocko|superstar|trinoids|whisper|zarvox/i;
+const companionIdentityNames = [/^tara\b/i, /^samantha\b/i, /^karen\b/i, /^tessa\b/i, /^moira\b/i, /^flo\b/i, /^shelley\b/i, /^sandy\b/i, /google.*english.*female/i];
 
 export function detectSpeechLanguage(text: string, requested: SpeechLanguage = "auto"): Exclude<SpeechLanguage, "auto"> {
   if (requested !== "auto") return requested;
@@ -37,24 +38,11 @@ export function cloudSpeakerForVoice(voiceId: string) {
 export function selectPreferredVoice<T extends { name: string; lang: string; default?: boolean; localService?: boolean }>(
   voices: T[],
   text: string,
-  voiceId: string,
+  _voiceId: string,
   language: SpeechLanguage = "auto",
 ) {
   const detected = detectSpeechLanguage(text, language);
   const targetLocale = detected === "hi" ? "hi-IN" : detected === "hinglish" ? "en-IN" : "en-US";
-  const profileNames = voiceId.includes("soft")
-    ? [/samantha/i, /shelley/i, /flo/i, /aurora|cora|serena|ava/i]
-    : voiceId.includes("seductive")
-      ? [/tessa/i, /moira/i, /karen/i, /vesta|helena|serena|samantha/i]
-      : voiceId.includes("sharp")
-        ? [/karen/i, /tessa/i, /tara/i, /theia|thalia|zira|aria|jenny/i]
-        : voiceId.includes("calm")
-          ? [/samantha/i, /moira/i, /tessa/i, /cora|athena|serena|ava/i]
-          : voiceId.includes("confident")
-            ? [/tara/i, /karen/i, /tessa/i, /thalia|aria|ava|jenny|zira/i]
-            : voiceId.includes("warm")
-              ? [/samantha/i, /karen/i, /tessa/i, /helena|cora|serena|ava/i]
-              : [/flo/i, /sandy/i, /shelley/i, /luna|andromeda|aria|ava|samantha|juno/i];
 
   return [...voices].sort((left, right) => {
     const score = (voice: T) => {
@@ -62,10 +50,10 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
       const sameLanguage = voice.lang.toLowerCase().startsWith(`${targetLocale.slice(0, 2).toLowerCase()}-`);
       const regional = detected === "hinglish" ? /en[-_]in/i.test(voice.lang) : detected === "hi" ? /hi[-_]in/i.test(voice.lang) : /^en[-_]/i.test(voice.lang);
       const namedFemale = detected === "hi" ? femaleHindiNames.test(voice.name) : detected === "hinglish" ? femaleIndianEnglishNames.test(voice.name) || naturalEnglishNames.test(voice.name) : naturalEnglishNames.test(voice.name);
-      const profileRank = profileNames.findIndex((pattern) => pattern.test(voice.name));
-      const profileScore = profileRank >= 0 ? 160 - profileRank * 28 : 0;
+      const identityRank = companionIdentityNames.findIndex((pattern) => pattern.test(voice.name));
+      const identityScore = identityRank >= 0 ? 720 - identityRank * 70 : 0;
       const languageVoiceScore = detected === "hi" || detected === "hinglish" ? (namedFemale ? 140 : 0) : (namedFemale ? 70 : 0);
-      return (exactLocale ? (detected === "en" ? 55 : 110) : 0) + (sameLanguage ? 35 : 0) + (regional ? (detected === "en" ? 25 : 50) : 0) + languageVoiceScore + (enhancedNames.test(voice.name) ? 36 : 0) + profileScore + (voice.default ? 2 : 0) + (voice.localService === false ? 6 : 0) - (noveltyOrMaleNames.test(voice.name) ? 260 : 0);
+      return identityScore + (exactLocale ? (detected === "en" ? 55 : 110) : 0) + (sameLanguage ? 35 : 0) + (regional ? (detected === "en" ? 25 : 50) : 0) + languageVoiceScore + (enhancedNames.test(voice.name) ? 36 : 0) + (voice.default ? 2 : 0) + (voice.localService === false ? 6 : 0) - (noveltyOrMaleNames.test(voice.name) ? 260 : 0);
     };
     return score(right) - score(left);
   })[0];
@@ -81,8 +69,6 @@ export interface CompanionSpeechPlayback {
 }
 
 let activePlayback: CompanionSpeechPlayback | null = null;
-let cloudSpeechRetryAfter = 0;
-const cloudSpeechCooldownMs = 5 * 60_000;
 
 export function stopCompanionSpeech() {
   activePlayback?.cancel();
@@ -100,29 +86,29 @@ export function playCompanionSpeech(text: string, options: {
   const voiceId = options.voiceId ?? "mira-playful-01";
   const language = options.language ?? "auto";
   const detected = detectSpeechLanguage(text, language);
-  const controller = new AbortController();
-  let audio: HTMLAudioElement | null = null;
-  let objectUrl = "";
   let canceled = false;
   let finished = false;
-  let fallbackStarted = false;
+  let speechStarted = false;
+  let voiceTimer: number | null = null;
+  let voicesChanged: (() => void) | null = null;
 
   const end = () => {
     if (finished) return;
     finished = true;
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    if (voiceTimer) window.clearTimeout(voiceTimer);
+    if (voicesChanged) window.speechSynthesis?.removeEventListener("voiceschanged", voicesChanged);
     options.onEnd?.();
   };
 
-  const browserFallback = () => {
-    if (fallbackStarted) return;
-    fallbackStarted = true;
-    if (canceled || !("speechSynthesis" in window)) return end();
+  const speakWithCompanionVoice = () => {
+    if (speechStarted || canceled) return;
+    speechStarted = true;
+    if (!("speechSynthesis" in window)) return end();
     const utterance = new SpeechSynthesisUtterance(text);
     const selected = selectPreferredVoice(window.speechSynthesis.getVoices(), text, voiceId, language);
     const profile = voiceProfile(voiceId);
     if (selected) utterance.voice = selected;
-    utterance.lang = detected === "hi" ? "hi-IN" : "en-IN";
+    utterance.lang = selected?.lang ?? (detected === "hi" ? "hi-IN" : "en-IN");
     utterance.rate = profile.rate;
     utterance.pitch = profile.pitch;
     utterance.onstart = () => options.onStart?.();
@@ -135,40 +121,19 @@ export function playCompanionSpeech(text: string, options: {
     cancel() {
       if (canceled) return;
       canceled = true;
-      controller.abort();
-      audio?.pause();
       window.speechSynthesis?.cancel();
       end();
     },
   };
   activePlayback = playback;
 
-  void (async () => {
-    if (detected !== "en") return browserFallback();
-    if (Date.now() < cloudSpeechRetryAfter) return browserFallback();
-    try {
-      const response = await fetch("/api/companion-speech", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text, voiceId }),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        if (response.status === 429 || response.status >= 500) cloudSpeechRetryAfter = Date.now() + cloudSpeechCooldownMs;
-        throw new Error("Cloud speech unavailable");
-      }
-      cloudSpeechRetryAfter = 0;
-      objectUrl = URL.createObjectURL(await response.blob());
-      if (canceled) return end();
-      audio = new Audio(objectUrl);
-      audio.onended = end;
-      audio.onerror = () => { if (!canceled) browserFallback(); };
-      await audio.play();
-      if (!canceled) options.onStart?.();
-    } catch {
-      if (!canceled) browserFallback();
-    }
-  })();
+  if (!("speechSynthesis" in window) || window.speechSynthesis.getVoices().length > 0) {
+    speakWithCompanionVoice();
+  } else {
+    voicesChanged = speakWithCompanionVoice;
+    window.speechSynthesis.addEventListener("voiceschanged", voicesChanged, { once: true });
+    voiceTimer = window.setTimeout(speakWithCompanionVoice, 350);
+  }
 
   return playback;
 }

@@ -27,9 +27,9 @@ import { companionVoiceProfile, companionVoiceProfiles } from "@/lib/voice-profi
 
 const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
 const avatarFrames = {
-  idle: "/assets/mira/video-call-real-idle.jpg",
-  speaking: "/assets/mira/video-call-real-speaking.jpg",
-  blink: "/assets/mira/video-call-real-blink.jpg",
+  base: "/assets/mira/video-call-real-idle.jpg",
+  mouth: "/assets/mira/video-call-mouth-v2.png",
+  blink: "/assets/mira/video-call-blink-v2.png",
 };
 
 interface VideoSpeechRecognition {
@@ -381,14 +381,13 @@ export function VideoCallModal({
   return (
     <motion.div className="live-call live-call--video" role="dialog" aria-modal="true" aria-label={`Video call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div className={speaking ? "video-call__avatar-feed video-call__avatar-feed--speaking" : "video-call__avatar-feed"}>
-        <img className="video-call__avatar-frame video-call__avatar-frame--base" src={avatarFrames.idle} alt={`${companionName}, a photorealistic animated AI companion, on video`} />
-        <img className="video-call__avatar-frame video-call__avatar-frame--breath" src={avatarFrames.idle} alt="" />
-        <img className="video-call__avatar-frame video-call__avatar-frame--hair" src={avatarFrames.idle} alt="" />
-        <img className="video-call__avatar-frame video-call__avatar-frame--blink video-call__avatar-frame--blink-left" src={avatarFrames.blink} alt="" />
-        <img className="video-call__avatar-frame video-call__avatar-frame--blink video-call__avatar-frame--blink-right" src={avatarFrames.blink} alt="" />
-        <img className="video-call__avatar-frame video-call__avatar-frame--mouth" src={avatarFrames.speaking} alt="" />
-        <span className="video-call__presence-light" aria-hidden="true" />
-        <span className="video-call__feed-badge"><i className="status-dot" /> Live animated AI avatar</span>
+        <div className="video-call__avatar-stage">
+          <img className="video-call__avatar-frame" src={avatarFrames.base} alt={`${companionName}, a photorealistic animated AI companion, on video`} />
+          <span className="video-call__hair-light" aria-hidden="true" />
+          <img className="video-call__avatar-feature video-call__avatar-feature--blink" src={avatarFrames.blink} alt="" />
+          <img className="video-call__avatar-feature video-call__avatar-feature--mouth" src={avatarFrames.mouth} alt="" />
+        </div>
+        <span className="video-call__feed-badge"><i className="status-dot" /> Stable photoreal avatar</span>
       </div>
       <div className="live-call__veil live-call__veil--video" />
       <header className="live-call__header"><span><i className="status-dot" /> Live together</span><strong>{companionName}</strong><time>{time}</time></header>

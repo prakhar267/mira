@@ -21,7 +21,7 @@ describe("companion speech", () => {
     expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01")?.name).toBe("Lekha Enhanced");
   });
 
-  it("maps browser voice styles to distinct natural voices available on macOS", () => {
+  it("keeps one natural woman voice across styles and supported languages", () => {
     const voices = [
       { name: "Samantha", lang: "en-US", default: true },
       { name: "Tessa", lang: "en-ZA", default: false },
@@ -32,22 +32,22 @@ describe("companion speech", () => {
       { name: "Lekha", lang: "hi-IN", default: false },
     ];
 
-    expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Flo (English (US))");
-    expect(selectPreferredVoice(voices, "Stay close to me", "mira-seductive-01", "en")?.name).toBe("Tessa");
-    expect(selectPreferredVoice(voices, "Be direct with me", "mira-sharp-01", "en")?.name).toBe("Karen");
+    expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Tara");
+    expect(selectPreferredVoice(voices, "Stay close to me", "mira-seductive-01", "en")?.name).toBe("Tara");
+    expect(selectPreferredVoice(voices, "Be direct with me", "mira-sharp-01", "en")?.name).toBe("Tara");
     expect(selectPreferredVoice(voices, "I need some confidence", "mira-confident-01", "en")?.name).toBe("Tara");
     expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-warm-01", "hinglish")?.name).toBe("Tara");
-    expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01", "hi")?.name).toBe("Lekha");
+    expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01", "hi")?.name).toBe("Tara");
   });
 
-  it("maps companion styles to feminine Aura speakers", () => {
+  it("keeps Luna as the neural voice identity for every delivery style", () => {
     expect(cloudSpeakerForVoice("mira-playful-01")).toBe("luna");
-    expect(cloudSpeakerForVoice("mira-warm-01")).toBe("helena");
-    expect(cloudSpeakerForVoice("mira-soft-01")).toBe("aurora");
-    expect(cloudSpeakerForVoice("mira-seductive-01")).toBe("vesta");
-    expect(cloudSpeakerForVoice("mira-calm-01")).toBe("cora");
-    expect(cloudSpeakerForVoice("mira-confident-01")).toBe("thalia");
-    expect(cloudSpeakerForVoice("mira-sharp-01")).toBe("theia");
+    expect(cloudSpeakerForVoice("mira-warm-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-soft-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-seductive-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-calm-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-confident-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-sharp-01")).toBe("luna");
     expect(cloudSpeakerForVoice("unknown-voice")).toBe("luna");
   });
 });
