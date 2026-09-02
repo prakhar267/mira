@@ -24,6 +24,11 @@ describe("companion speech", () => {
   it("maps companion styles to feminine Aura speakers", () => {
     expect(cloudSpeakerForVoice("mira-playful-01")).toBe("luna");
     expect(cloudSpeakerForVoice("mira-warm-01")).toBe("helena");
+    expect(cloudSpeakerForVoice("mira-soft-01")).toBe("aurora");
+    expect(cloudSpeakerForVoice("mira-seductive-01")).toBe("vesta");
     expect(cloudSpeakerForVoice("mira-calm-01")).toBe("cora");
+    expect(cloudSpeakerForVoice("mira-confident-01")).toBe("thalia");
+    expect(cloudSpeakerForVoice("mira-sharp-01")).toBe("theia");
+    expect(cloudSpeakerForVoice("unknown-voice")).toBe("luna");
   });
 });

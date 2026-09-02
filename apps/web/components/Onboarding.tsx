@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Bot, Check, ShieldCheck, Sparkles } from "lucide-react";
 import type { DemoState } from "@/lib/state";
+import { companionVoiceProfiles } from "@/lib/voice-profiles";
 import { BrandMark } from "./BrandMark";
 
 const intentions = ["Someone to talk to", "Friendship", "Personal growth", "Motivation", "Emotional support", "Relationship advice", "Fun conversations", "Explore AI"];
@@ -181,7 +182,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               </div>
               <label className="field">Companion name<input maxLength={40} value={draft.companionName} onChange={(event) => setDraft({ ...draft, companionName: event.target.value })} /></label>
               <label className="field">Companion pronouns<select value={draft.companionPronouns} onChange={(event) => setDraft({ ...draft, companionPronouns: event.target.value as Draft["companionPronouns"] })}><option>she/her</option><option>he/him</option><option>they/them</option></select></label>
-              <div className="form-grid"><label className="field">Presentation<select value={draft.presentation} onChange={(event) => setDraft({ ...draft, presentation: event.target.value })}><option value="playful and warm">Playful & warm</option><option value="bright and expressive">Bright & expressive</option><option value="calm and thoughtful">Calm & thoughtful</option></select></label><label className="field">Voice<select value={draft.voiceId} onChange={(event) => setDraft({ ...draft, voiceId: event.target.value })}><option value="mira-playful-01">Mira · Playful</option><option value="mira-warm-01">Mira · Warm</option><option value="mira-calm-01">Mira · Calm</option></select></label></div>
+              <div className="form-grid"><label className="field">Presentation<select value={draft.presentation} onChange={(event) => setDraft({ ...draft, presentation: event.target.value })}><option value="playful and warm">Playful & warm</option><option value="bright and expressive">Bright & expressive</option><option value="calm and thoughtful">Calm & thoughtful</option></select></label><label className="field">Voice<select value={draft.voiceId} onChange={(event) => setDraft({ ...draft, voiceId: event.target.value })}>{companionVoiceProfiles.map((voice) => <option key={voice.id} value={voice.id}>{`Mira · ${voice.name}`}</option>)}</select></label></div>
             </>
           )}
 

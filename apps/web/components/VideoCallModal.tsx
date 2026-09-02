@@ -23,12 +23,12 @@ import {
   type CompanionSpeechPlayback,
   type SpeechLanguage,
 } from "@/lib/speech";
+import { companionVoiceProfile, companionVoiceProfiles } from "@/lib/voice-profiles";
 
 const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
 const avatarFrames = {
   idle: "/assets/mira/video-call-real-idle.jpg",
   speaking: "/assets/mira/video-call-real-speaking.jpg",
-  blink: "/assets/mira/video-call-real-blink.jpg",
 };
 
 interface VideoSpeechRecognition {
@@ -59,6 +59,7 @@ export function VideoCallModal({
   voiceId,
   onUserTurn,
   onTranscribedTurn,
+  onVoiceChange,
   onAnalyzeFrame,
   onRealtimeConnect,
   onClose,
@@ -69,6 +70,7 @@ export function VideoCallModal({
   initialEnvironment: string;
   onUserTurn: (content: string) => Promise<string>;
   onTranscribedTurn?: (content: string) => Promise<void> | void;
+  onVoiceChange?: (voiceId: string) => void;
   onAnalyzeFrame: (dataBase64: string, contentType: string) => Promise<string>;
   onRealtimeConnect?: () => Promise<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void }>;
   onClose: (durationSeconds: number) => void;
@@ -87,12 +89,11 @@ export function VideoCallModal({
   const [activityOpen, setActivityOpen] = useState(false);
   const [activity, setActivity] = useState("");
   const [speaking, setSpeaking] = useState(false);
-  const [mouthOpen, setMouthOpen] = useState(false);
-  const [blinking, setBlinking] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [companionLine, setCompanionLine] = useState(greeting);
   const [userLine, setUserLine] = useState("");
   const [language, setLanguage] = useState<SpeechLanguage>("auto");
+  const [activeVoiceId, setActiveVoiceId] = useState(voiceId);
   const [transport, setTransport] = useState<"connecting" | "realtime" | "fallback">(onRealtimeConnect ? "connecting" : "fallback");
   const realtimeRef = useRef<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -107,38 +108,76 @@ export function VideoCallModal({
   const startListeningRef = useRef<() => void>(() => undefined);
   const mutedRef = useRef(false);
   const activeRef = useRef(true);
+  const speakingRef = useRef(false);
+  const thinkingRef = useRef(false);
+  const ignoredRecognitionsRef = useRef(new WeakSet<VideoSpeechRecognition>());
 
   useEffect(() => { onTranscribedTurnRef.current = onTranscribedTurn; }, [onTranscribedTurn]);
+  useEffect(() => { setActiveVoiceId(voiceId); }, [voiceId]);
 
-  const queueAutoListen = useCallback((delay = 320) => {
+  const changeSpeaking = useCallback((next: boolean) => {
+    speakingRef.current = next;
+    setSpeaking(next);
+  }, []);
+
+  const changeThinking = useCallback((next: boolean) => {
+    thinkingRef.current = next;
+    setThinking(next);
+  }, []);
+
+  const stopRecognition = useCallback((ignoreTranscript = true) => {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+    if (ignoreTranscript) ignoredRecognitionsRef.current.add(recognition);
+    recognitionRef.current = null;
+    recognition.abort();
+  }, []);
+
+  const queueAutoListen = useCallback((delay = 650) => {
     if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
     if (transport !== "fallback") return;
     listenTimerRef.current = window.setTimeout(() => {
-      if (activeRef.current && !mutedRef.current && !recognitionRef.current) startListeningRef.current();
+      listenTimerRef.current = null;
+      if (
+        activeRef.current
+        && !mutedRef.current
+        && !recognitionRef.current
+        && !speakingRef.current
+        && !thinkingRef.current
+      ) startListeningRef.current();
     }, delay);
   }, [transport]);
 
-  const speak = useCallback((text: string, force = false) => {
-    if (transport === "realtime") { setSpeaking(false); return; }
+  const speak = useCallback((text: string, force = false, selectedVoiceId = activeVoiceId) => {
+    if (transport === "realtime") { changeSpeaking(false); return; }
     if (!speaker && !force) {
-      setSpeaking(false);
+      changeSpeaking(false);
+      setListening(true);
       queueAutoListen();
       return;
     }
+    if (listenTimerRef.current) {
+      window.clearTimeout(listenTimerRef.current);
+      listenTimerRef.current = null;
+    }
+    stopRecognition();
     speechTurn.current += 1;
     const turn = speechTurn.current;
     playbackRef.current?.cancel();
+    setListening(false);
+    changeSpeaking(true);
     playbackRef.current = playCompanionSpeech(text, {
-      voiceId,
+      voiceId: selectedVoiceId,
       language,
-      onStart: () => { if (speechTurn.current === turn) setSpeaking(true); },
+      onStart: () => { if (speechTurn.current === turn) changeSpeaking(true); },
       onEnd: () => {
         if (speechTurn.current !== turn || !activeRef.current) return;
-        setSpeaking(false);
+        changeSpeaking(false);
+        setListening(true);
         queueAutoListen();
       },
     });
-  }, [language, queueAutoListen, speaker, transport, voiceId]);
+  }, [activeVoiceId, changeSpeaking, language, queueAutoListen, speaker, stopRecognition, transport]);
 
   useEffect(() => {
     if (!onRealtimeConnect) return;
@@ -151,13 +190,15 @@ export function VideoCallModal({
       connection.events.addEventListener("message", (event) => {
         try {
           const payload = JSON.parse(String(event.data)) as { type?: string; delta?: string; transcript?: string };
-          if (payload.type === "response.output_audio_transcript.delta" && payload.delta) { setSpeaking(true); setCompanionLine((line) => { const next = realtimeReplyStarted.current ? `${line}${payload.delta}` : payload.delta!; realtimeReplyStarted.current = true; return next; }); }
-          if (payload.type === "response.output_audio_transcript.done") { realtimeReplyStarted.current = false; setSpeaking(false); }
+          if (payload.type === "response.output_audio_transcript.delta" && payload.delta) { setListening(false); changeThinking(false); changeSpeaking(true); setCompanionLine((line) => { const next = realtimeReplyStarted.current ? `${line}${payload.delta}` : payload.delta!; realtimeReplyStarted.current = true; return next; }); }
+          if (payload.type === "response.output_audio_transcript.done") { realtimeReplyStarted.current = false; changeSpeaking(false); setListening(true); }
           if (payload.type === "conversation.item.input_audio_transcription.completed" && payload.transcript) {
             setUserLine(payload.transcript);
-            setListening(true);
+            setListening(false);
+            changeThinking(true);
             void onTranscribedTurnRef.current?.(payload.transcript);
           }
+          if (payload.type === "input_audio_buffer.speech_started") { changeSpeaking(false); changeThinking(false); setListening(true); }
         } catch { /* Ignore unknown provider events. */ }
       });
     }).catch((cause) => {
@@ -166,7 +207,7 @@ export function VideoCallModal({
       setCameraError(cause instanceof Error ? `${cause.message} Using browser voice fallback.` : "Using browser voice fallback.");
     });
     return () => { active = false; realtimeRef.current?.disconnect(); realtimeRef.current = null; };
-  }, [onRealtimeConnect, userName]);
+  }, [changeSpeaking, changeThinking, onRealtimeConnect, userName]);
 
   useEffect(() => {
     activeRef.current = true;
@@ -174,37 +215,16 @@ export function VideoCallModal({
     return () => {
       activeRef.current = false;
       window.clearInterval(timer);
-      recognitionRef.current?.abort();
+      stopRecognition();
       streamRef.current?.getTracks().forEach((track) => track.stop());
       playbackRef.current?.cancel();
       if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
     };
-  }, []);
+  }, [stopRecognition]);
 
   useEffect(() => {
     Object.values(avatarFrames).forEach((src) => { const image = new Image(); image.src = src; });
   }, []);
-
-  useEffect(() => {
-    if (!speaking) { setMouthOpen(false); return; }
-    const timer = window.setInterval(() => setMouthOpen((open) => !open), 165);
-    return () => window.clearInterval(timer);
-  }, [speaking]);
-
-  useEffect(() => {
-    if (speaking) return;
-    let blinkTimer: number;
-    let releaseTimer: number;
-    const scheduleBlink = () => {
-      blinkTimer = window.setTimeout(() => {
-        setBlinking(true);
-        releaseTimer = window.setTimeout(() => setBlinking(false), 145);
-        scheduleBlink();
-      }, 3_600 + Math.round(Math.random() * 2_400));
-    };
-    scheduleBlink();
-    return () => { window.clearTimeout(blinkTimer); window.clearTimeout(releaseTimer); };
-  }, [speaking]);
 
   useEffect(() => {
     if (greetingSpoken.current) return;
@@ -270,15 +290,15 @@ export function VideoCallModal({
 
   const submitContent = async (content: string) => {
     const clean = content.trim();
-    if (!clean || thinking) return;
+    if (!clean || thinkingRef.current) return;
     setUserLine(clean);
     setListening(false);
     setSpeechError("");
-    setThinking(true);
+    changeThinking(true);
     if (transport === "realtime" && realtimeRef.current?.events.readyState === "open") {
       realtimeRef.current.events.send(JSON.stringify({ type: "conversation.item.create", item: { type: "message", role: "user", content: [{ type: "input_text", text: clean }] } }));
       realtimeRef.current.events.send(JSON.stringify({ type: "response.create" }));
-      setThinking(false);
+      changeThinking(false);
       return;
     }
     try {
@@ -286,19 +306,25 @@ export function VideoCallModal({
       setCompanionLine(reply);
       speak(reply);
     } catch {
-      setCompanionLine("I missed that for a second—say it once more?");
+      const fallback = "I missed that for a second—say it once more?";
+      setCompanionLine(fallback);
+      speak(fallback);
     } finally {
-      setThinking(false);
+      changeThinking(false);
     }
   };
 
   const beginListening = () => {
-    if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
-    if (mutedRef.current || thinking) return;
+    if (listenTimerRef.current) {
+      window.clearTimeout(listenTimerRef.current);
+      listenTimerRef.current = null;
+    }
+    if (mutedRef.current || thinkingRef.current) return;
     if (recognitionRef.current) { setListening(true); return; }
-    if (speaking) {
+    if (speakingRef.current) {
+      speechTurn.current += 1;
       playbackRef.current?.cancel();
-      setSpeaking(false);
+      changeSpeaking(false);
       if (realtimeRef.current?.events.readyState === "open") realtimeRef.current.events.send(JSON.stringify({ type: "response.cancel" }));
     }
     if (transport === "realtime") {
@@ -327,11 +353,12 @@ export function VideoCallModal({
       else if (event.error !== "no-speech" && event.error !== "aborted") setSpeechError("I couldn’t hear that clearly. I’ll keep listening.");
     };
     recognition.onend = () => {
-      recognitionRef.current = null;
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+      if (ignoredRecognitionsRef.current.has(recognition) || !activeRef.current) return;
       if (transcript) void submitContent(transcript);
       else {
         setListening(true);
-        if (restartAllowed) queueAutoListen(450);
+        if (restartAllowed) queueAutoListen(900);
       }
     };
     recognitionRef.current = recognition;
@@ -343,7 +370,7 @@ export function VideoCallModal({
       recognitionRef.current = null;
       setListening(false);
       setSpeechError("The microphone is already busy. I’ll retry in a moment.");
-      queueAutoListen(650);
+      queueAutoListen(900);
     }
   };
   useEffect(() => { startListeningRef.current = beginListening; });
@@ -353,9 +380,8 @@ export function VideoCallModal({
   return (
     <motion.div className="live-call live-call--video" role="dialog" aria-modal="true" aria-label={`Video call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div className={speaking ? "video-call__avatar-feed video-call__avatar-feed--speaking" : "video-call__avatar-feed"}>
-        <img className={!mouthOpen && !blinking ? "video-call__avatar-frame video-call__avatar-frame--active" : "video-call__avatar-frame"} src={avatarFrames.idle} alt={`${companionName}, a photorealistic AI companion, on video`} />
-        <img className={mouthOpen ? "video-call__avatar-frame video-call__avatar-frame--active" : "video-call__avatar-frame"} src={avatarFrames.speaking} alt="" />
-        <img className={blinking && !speaking ? "video-call__avatar-frame video-call__avatar-frame--active" : "video-call__avatar-frame"} src={avatarFrames.blink} alt="" />
+        <img className={!speaking ? "video-call__avatar-frame video-call__avatar-frame--active" : "video-call__avatar-frame"} src={avatarFrames.idle} alt={`${companionName}, a photorealistic AI companion, on video`} />
+        <img className={speaking ? "video-call__avatar-frame video-call__avatar-frame--active" : "video-call__avatar-frame"} src={avatarFrames.speaking} alt="" />
         <span className="video-call__feed-badge"><i className="status-dot" /> Live AI avatar</span>
       </div>
       <div className="live-call__veil live-call__veil--video" />
@@ -370,7 +396,8 @@ export function VideoCallModal({
 
       <div className="video-call__tools">
         <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Photoreal live avatar</span>
-        <label>Language<select aria-label="Video call language" value={language} onChange={(event) => { recognitionRef.current?.abort(); playbackRef.current?.cancel(); setSpeaking(false); setLanguage(event.target.value as SpeechLanguage); queueAutoListen(500); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <label>Language<select aria-label="Video call language" value={language} onChange={(event) => { stopRecognition(); playbackRef.current?.cancel(); changeSpeaking(false); setLanguage(event.target.value as SpeechLanguage); setListening(true); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <label>Voice<select aria-label="Video call voice style" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const profile = companionVoiceProfile(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${profile.name} voice will start on your next call.`); else { setCompanionLine(`${profile.name} voice selected.`); speak(`Okay… this is my ${profile.name.toLowerCase()} voice.`, true, next); } }}>{companionVoiceProfiles.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
         <button type="button" disabled={!cameraOn || visionBusy} onClick={() => void shareCurrentFrame()}><Camera aria-hidden="true" /> {visionBusy ? "Looking…" : "Show frame"}</button>
       </div>
@@ -384,9 +411,9 @@ export function VideoCallModal({
       {captions ? <div className="video-call__captions" aria-live="polite">{userLine ? <p><span>You</span>{userLine}</p> : null}<p><span>{companionName}</span>{thinking ? "…" : companionLine}</p></div> : null}
 
       <div className="live-call__controls">
-        <button type="button" className={muted ? "call-orb call-orb--active" : "call-orb"} onClick={() => { recognitionRef.current?.abort(); setListening(false); setMuted((value) => { const next = !value; mutedRef.current = next; realtimeRef.current?.peer.getSenders().forEach((sender) => { if (sender.track?.kind === "audio") sender.track.enabled = !next; }); if (!next) queueAutoListen(220); return next; }); }} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicrophoneSlash aria-hidden="true" /> : <Microphone aria-hidden="true" />}</button>
+        <button type="button" className={muted ? "call-orb call-orb--active" : "call-orb"} onClick={() => { const next = !muted; mutedRef.current = next; setMuted(next); if (next) { stopRecognition(); setListening(false); } realtimeRef.current?.peer.getSenders().forEach((sender) => { if (sender.track?.kind === "audio") sender.track.enabled = !next; }); if (!next) { setListening(true); queueAutoListen(220); } }} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicrophoneSlash aria-hidden="true" /> : <Microphone aria-hidden="true" />}</button>
         <button type="button" className={cameraOn ? "call-orb call-orb--active" : "call-orb"} onClick={() => void toggleCamera()} aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}>{cameraOn ? <VideoCamera aria-hidden="true" weight="fill" /> : <CameraSlash aria-hidden="true" />}</button>
-        <button type="button" className={speaker ? "call-orb call-orb--active" : "call-orb"} onClick={() => { if (speaker) playbackRef.current?.cancel(); else speak(companionLine, true); setSpeaker((value) => { const next = !value; if (realtimeRef.current) realtimeRef.current.audio.muted = !next; return next; }); }} aria-label={speaker ? "Turn speaker off" : "Turn speaker on"}>{speaker ? <SpeakerHigh aria-hidden="true" /> : <SpeakerSlash aria-hidden="true" />}</button>
+        <button type="button" className={speaker ? "call-orb call-orb--active" : "call-orb"} onClick={() => { const next = !speaker; setSpeaker(next); if (realtimeRef.current) realtimeRef.current.audio.muted = !next; if (!next) { speechTurn.current += 1; playbackRef.current?.cancel(); changeSpeaking(false); setListening(true); queueAutoListen(); } else if (transport !== "realtime") speak(companionLine, true); }} aria-label={speaker ? "Turn speaker off" : "Turn speaker on"}>{speaker ? <SpeakerHigh aria-hidden="true" /> : <SpeakerSlash aria-hidden="true" />}</button>
         <button type="button" className={captions ? "call-orb call-orb--active" : "call-orb"} onClick={() => setCaptions((value) => !value)} aria-label={captions ? "Hide captions" : "Show captions"}><ChatCircleDots aria-hidden="true" /></button>
         <button type="button" className={heartSent ? "call-orb call-orb--heart" : "call-orb"} onClick={() => { setHeartSent(true); window.setTimeout(() => setHeartSent(false), 1_500); }} aria-label="Send heart"><Heart aria-hidden="true" weight={heartSent ? "fill" : "regular"} /></button>
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End video call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>

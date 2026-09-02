@@ -32,9 +32,33 @@ type JsonRecord = Record<string, unknown>;
 function openAIVoice(voiceId?: string) {
   const supported = new Set(["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"]);
   if (voiceId && supported.has(voiceId)) return voiceId;
+  if (voiceId?.includes("soft")) return "marin";
+  if (voiceId?.includes("seductive")) return "coral";
+  if (voiceId?.includes("sharp")) return "sage";
   if (voiceId?.includes("calm")) return "marin";
+  if (voiceId?.includes("confident")) return "sage";
   if (voiceId?.includes("warm")) return "coral";
   return "shimmer";
+}
+
+function openAIVoiceStyle(voiceId?: string) {
+  const shared = "Sound like an adult woman in a relaxed private conversation, never an announcer. Preserve the text's English, Hindi, or Hinglish pronunciation and code-switching exactly.";
+  if (voiceId?.includes("soft")) return `Speak gently and quietly, with rounded words, subtle warmth, and an unhurried pace. ${shared}`;
+  if (voiceId?.includes("seductive")) return `Use a low, intimate, unhurried tone with tasteful warmth. Keep it natural and understated, never exaggerated. ${shared}`;
+  if (voiceId?.includes("sharp")) return `Use a firm, crisp, direct tone with energetic pacing. Sound self-assured rather than hostile. ${shared}`;
+  if (voiceId?.includes("calm")) return `Use a smooth, grounded, reassuring tone with patient pacing. ${shared}`;
+  if (voiceId?.includes("confident")) return `Use a clear, self-assured, energetic tone with decisive pacing. ${shared}`;
+  if (voiceId?.includes("warm")) return `Use a caring, warm, natural tone with subtle expressive pacing. ${shared}`;
+  return `Use a bright, playful, expressive tone with natural conversational timing. ${shared}`;
+}
+
+function openAIVoiceSpeed(voiceId?: string) {
+  if (voiceId?.includes("seductive")) return .86;
+  if (voiceId?.includes("soft")) return .9;
+  if (voiceId?.includes("calm")) return .92;
+  if (voiceId?.includes("sharp")) return 1.05;
+  if (voiceId?.includes("confident")) return 1.02;
+  return .97;
 }
 
 class OpenAIHttpClient {
@@ -225,7 +249,7 @@ export class OpenAISpeechProvider implements SpeechToTextProvider, TextToSpeechP
         input: text,
         voice: openAIVoice(voiceId),
         response_format: "mp3",
-        ...(supportsInstructions ? { instructions: "Speak like a warm young adult woman in a relaxed private conversation. Sound natural and expressive, with subtle pacing and no announcer cadence. Preserve the text's English, Hindi, or Hinglish pronunciation and code-switching exactly." } : {}),
+        ...(supportsInstructions ? { instructions: openAIVoiceStyle(voiceId) } : {}),
       }),
     });
     return { audio: new Uint8Array(await response.arrayBuffer()), contentType: "audio/mpeg", durationMs: Date.now() - started };
@@ -283,10 +307,10 @@ export class OpenAIRealtimeVoiceProvider implements RealtimeVoiceProvider {
         type: "realtime",
         model: this.config.realtimeModel,
         output_modalities: ["audio"],
-        instructions: input.instructions ?? "You are Mira, an adult AI companion. Speak like a familiar, candid person in one or two short sentences. Match the user's English, Hindi, or Hinglish naturally, preserve their code-switching, and never translate or explain the language choice unless asked. React to the exact subject, avoid canned empathy and therapy language, do not force follow-up questions, remember the live conversation, and never repeat recent phrasing, claim to be human, invent details, or encourage dependency.",
+        instructions: `${input.instructions ?? "You are Mira, an adult AI companion. Speak like a familiar, candid person in one or two short sentences. Match the user's English, Hindi, or Hinglish naturally, preserve their code-switching, and never translate or explain the language choice unless asked. React to the exact subject, avoid canned empathy and therapy language, do not force follow-up questions, remember the live conversation, and never repeat recent phrasing, claim to be human, invent details, or encourage dependency."}\n\nVoice delivery: ${openAIVoiceStyle(input.voiceId)}`,
         audio: {
           input: { transcription: { model: this.config.transcriptionModel }, turn_detection: { type: "semantic_vad", eagerness: "auto", create_response: true, interrupt_response: true } },
-          output: { voice: openAIVoice(input.voiceId), speed: 1 },
+          output: { voice: openAIVoice(input.voiceId), speed: openAIVoiceSpeed(input.voiceId) },
         },
       },
     }, { "OpenAI-Safety-Identifier": input.userId });

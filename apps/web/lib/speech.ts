@@ -1,3 +1,5 @@
+import { companionVoiceProfile } from "./voice-profiles";
+
 export type SpeechLanguage = "auto" | "en" | "hi" | "hinglish";
 
 export const speechLanguageOptions: Array<{ value: SpeechLanguage; label: string }> = [
@@ -28,10 +30,7 @@ export function recognitionLocale(language: SpeechLanguage, browserLanguage = "e
 }
 
 export function cloudSpeakerForVoice(voiceId: string) {
-  if (voiceId.includes("calm")) return "cora";
-  if (voiceId.includes("confident")) return "thalia";
-  if (voiceId.includes("warm")) return "helena";
-  return "luna";
+  return companionVoiceProfile(voiceId).speaker;
 }
 
 export function selectPreferredVoice<T extends { name: string; lang: string; default?: boolean; localService?: boolean }>(
@@ -42,13 +41,19 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
 ) {
   const detected = detectSpeechLanguage(text, language);
   const targetLocale = detected === "hi" ? "hi-IN" : detected === "hinglish" ? "en-IN" : "en-US";
-  const profileNames = voiceId.includes("calm")
-    ? /cora|athena|serena|samantha|ava/i
-    : voiceId.includes("confident")
-      ? /thalia|aria|ava|jenny|zira/i
-      : voiceId.includes("warm")
-        ? /helena|cora|samantha|serena|ava/i
-        : /luna|andromeda|aria|ava|samantha|juno/i;
+  const profileNames = voiceId.includes("soft")
+    ? /aurora|cora|serena|samantha|ava/i
+    : voiceId.includes("seductive")
+      ? /vesta|helena|serena|moira|samantha/i
+      : voiceId.includes("sharp")
+        ? /theia|thalia|zira|aria|jenny/i
+        : voiceId.includes("calm")
+          ? /cora|athena|serena|samantha|ava/i
+          : voiceId.includes("confident")
+            ? /thalia|aria|ava|jenny|zira/i
+            : voiceId.includes("warm")
+              ? /helena|cora|samantha|serena|ava/i
+              : /luna|andromeda|aria|ava|samantha|juno/i;
 
   return [...voices].sort((left, right) => {
     const score = (voice: T) => {
@@ -63,10 +68,8 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
 }
 
 function voiceProfile(voiceId: string) {
-  if (voiceId.includes("calm")) return { rate: .9, pitch: .98 };
-  if (voiceId.includes("confident")) return { rate: .98, pitch: 1 };
-  if (voiceId.includes("warm")) return { rate: .94, pitch: 1 };
-  return { rate: .97, pitch: 1.01 };
+  const profile = companionVoiceProfile(voiceId);
+  return { rate: profile.rate, pitch: profile.pitch };
 }
 
 export interface CompanionSpeechPlayback {
@@ -74,6 +77,8 @@ export interface CompanionSpeechPlayback {
 }
 
 let activePlayback: CompanionSpeechPlayback | null = null;
+let cloudSpeechRetryAfter = 0;
+const cloudSpeechCooldownMs = 5 * 60_000;
 
 export function stopCompanionSpeech() {
   activePlayback?.cancel();
@@ -136,6 +141,7 @@ export function playCompanionSpeech(text: string, options: {
 
   void (async () => {
     if (detected !== "en") return browserFallback();
+    if (Date.now() < cloudSpeechRetryAfter) return browserFallback();
     try {
       const response = await fetch("/api/companion-speech", {
         method: "POST",
@@ -143,7 +149,11 @@ export function playCompanionSpeech(text: string, options: {
         body: JSON.stringify({ text, voiceId }),
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error("Cloud speech unavailable");
+      if (!response.ok) {
+        if (response.status === 429 || response.status >= 500) cloudSpeechRetryAfter = Date.now() + cloudSpeechCooldownMs;
+        throw new Error("Cloud speech unavailable");
+      }
+      cloudSpeechRetryAfter = 0;
       objectUrl = URL.createObjectURL(await response.blob());
       if (canceled) return end();
       audio = new Audio(objectUrl);
