@@ -138,7 +138,7 @@ export function VoiceCallModal({
     speechTurn.current += 1;
     const turn = speechTurn.current;
     playbackRef.current?.cancel();
-    changePhase("speaking");
+    changePhase("connecting");
     playbackRef.current = playCompanionSpeech(text, {
       voiceId: selectedVoiceId,
       language,

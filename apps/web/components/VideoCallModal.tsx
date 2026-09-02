@@ -166,7 +166,7 @@ export function VideoCallModal({
     const turn = speechTurn.current;
     playbackRef.current?.cancel();
     setListening(false);
-    changeSpeaking(true);
+    changeSpeaking(false);
     playbackRef.current = playCompanionSpeech(text, {
       voiceId: selectedVoiceId,
       language,
