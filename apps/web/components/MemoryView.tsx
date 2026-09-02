@@ -12,6 +12,7 @@ const categories: Array<{ label: string; value: "all" | MemoryType }> = [
   { label: "Interests", value: "preference" },
   { label: "Important events", value: "episodic" },
   { label: "Goals", value: "goal" },
+  { label: "Mood & context", value: "emotional" },
   { label: "Shared", value: "shared" },
 ];
 
@@ -35,7 +36,7 @@ export function MemoryView({ memories, enabled, companionName, onToggle, onUpdat
   return (
     <section className="workspace memory-view" aria-labelledby="memory-title">
       <header className="workspace-header workspace-header--text">
-        <div><span className="eyebrow">Continuity you control</span><h1 id="memory-title">Memory</h1><p>{enabled ? `${visible.length} active ${visible.length === 1 ? "memory" : "memories"}. Every item stays inspectable.` : "Memory is paused. Conversation can continue without new memories."}</p></div>
+        <div><span className="eyebrow">Continuity you control</span><h1 id="memory-title">Memory</h1><p>{enabled ? `${visible.length} active ${visible.length === 1 ? "memory" : "memories"}. Personal details and meaningful conversation moments are remembered automatically and stay inspectable.` : "Memory is paused. Conversation can continue without new memories."}</p></div>
         <div className="header-actions"><button type="button" className="button button--ghost" onClick={onToggle}>{enabled ? "Pause memory" : "Resume memory"}</button><button type="button" className="button button--primary" onClick={() => setAdding(true)} disabled={!enabled}><Plus aria-hidden="true" /> Add memory</button></div>
       </header>
 

@@ -36,6 +36,33 @@ const personalizeMemory = (content: string, name: string) => {
   return personalized ? `${personalized[0]!.toUpperCase()}${personalized.slice(1)}` : personalized;
 };
 
+function rememberConversationMessage(current: DemoState, content: string, sourceMessageId: string, now: Date) {
+  if (!current.memoryEnabled || assessSafety(content).level !== "safe") return current.memories;
+  let memories = current.memories;
+  for (const candidate of extractMemoryCandidates(content)) {
+    memories = applyContradictions(memories, candidate, now);
+    if (!memories.some((memory) => memory.status === "active" && memory.normalizedContent === candidate.normalizedContent)) {
+      memories = [...memories, {
+        id: crypto.randomUUID(),
+        userId: current.user.id,
+        companionId: current.companion.id,
+        type: candidate.type,
+        content: personalizeMemory(candidate.content, current.user.name),
+        normalizedContent: candidate.normalizedContent,
+        importance: candidate.importance,
+        confidence: candidate.confidence,
+        sourceMessageIds: [sourceMessageId],
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        retrievalCount: 0,
+        status: "active" as const,
+        pinned: false,
+      }];
+    }
+  }
+  return memories;
+}
+
 export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const router = useRouter();
   const liveMode = companionApi.enabled && !forceDemo;
@@ -428,7 +455,6 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     }
 
     const conversation = [...messagesForConversation(state.messages, state.activeConversationId), userMessage];
-    const safety = assessSafety(content);
     const turn = createCompanionTurn(content, conversation, now);
     const reply = await generateDemoReply(conversation, "text", turn);
     const beats = reply.split(/\n\n+/).map((beat) => beat.trim()).filter(Boolean);
@@ -458,33 +484,9 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     }
 
     setState((current) => {
-      let memories = current.memories;
-      if (current.memoryEnabled && safety.level === "safe") {
-        for (const candidate of extractMemoryCandidates(content)) {
-          memories = applyContradictions(memories, candidate, now);
-          if (!memories.some((memory) => memory.status === "active" && memory.normalizedContent === candidate.normalizedContent)) {
-            memories = [...memories, {
-              id: crypto.randomUUID(),
-              userId: current.user.id,
-              companionId: current.companion.id,
-              type: candidate.type,
-              content: personalizeMemory(candidate.content, current.user.name),
-              normalizedContent: candidate.normalizedContent,
-              importance: candidate.importance,
-              confidence: candidate.confidence,
-              sourceMessageIds: [userMessage.id],
-              createdAt: now.toISOString(),
-              updatedAt: now.toISOString(),
-              retrievalCount: 0,
-              status: "active",
-              pinned: false,
-            }];
-          }
-        }
-      }
       return {
         ...current,
-        memories,
+        memories: rememberConversationMessage(current, content, userMessage.id, now),
         relationship: { ...current.relationship, progress: Math.min(100, current.relationship.progress + 1) },
         messages: current.messages,
       };
@@ -768,6 +770,25 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     return "Okay, I can see the frame you chose to share. I won’t guess anything sensitive about you, but I’m here for the story behind what you’re showing me.";
   };
 
+  const rememberTranscribedCallTurn = async (content: string) => {
+    if (!liveMode || !state.memoryEnabled || assessSafety(content).level !== "safe") return;
+    const candidates = extractMemoryCandidates(content);
+    if (!candidates.length) return;
+    const known = new Set(state.memories.filter((memory) => memory.status === "active").map((memory) => memory.content.trim().toLocaleLowerCase()));
+    const created: MemoryRecord[] = [];
+    for (const candidate of candidates) {
+      const personalized = personalizeMemory(candidate.content, state.user.name);
+      const key = personalized.trim().toLocaleLowerCase();
+      if (known.has(key)) continue;
+      const memory = await optional<MemoryRecord | null>(companionApi.createMemory(state.companion.id, candidate.type, personalized), null);
+      if (memory) {
+        known.add(key);
+        created.push(memory);
+      }
+    }
+    if (created.length) setState((current) => ({ ...current, memories: [...current.memories, ...created.filter((memory) => !current.memories.some((knownMemory) => knownMemory.id === memory.id))] }));
+  };
+
   const replyDuringCall = (content: string, delivery: "voice" | "video") => {
     if (liveMode) {
       let reply = "";
@@ -793,7 +814,11 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
         createdAt: new Date(now.getTime() + 1).toISOString(),
         status: "sent",
       };
-      setState((current) => ({ ...current, messages: [...current.messages, userTurn, assistantTurn] }));
+      setState((current) => ({
+        ...current,
+        memories: rememberConversationMessage(current, content, userTurn.id, now),
+        messages: [...current.messages, userTurn, assistantTurn],
+      }));
       return reply;
     });
   };
@@ -844,8 +869,8 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   return (
     <>
       <AppShell active={state.currentView} onNavigate={navigate} onCall={openVoiceCall} companionName={state.companion.name} relationshipStage={state.relationship.stage} relationshipLevel={state.relationship.level} immersive={state.currentView === "home"}>{renderView()}</AppShell>
-      {voiceCallOpen ? <VoiceCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} onUserTurn={(content) => replyDuringCall(content, "voice")} {...(liveMode ? { onRealtimeConnect: connectVoiceRealtime } : {})} onClose={(seconds) => finishCall("voice", seconds)} /> : null}
-      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} onAnalyzeFrame={analyzeSharedCallFrame} {...(liveMode ? { onRealtimeConnect: connectVideoRealtime } : {})} onClose={(seconds) => finishCall("video", seconds)} /> : null}
+      {voiceCallOpen ? <VoiceCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} onUserTurn={(content) => replyDuringCall(content, "voice")} onTranscribedTurn={rememberTranscribedCallTurn} {...(liveMode ? { onRealtimeConnect: connectVoiceRealtime } : {})} onClose={(seconds) => finishCall("voice", seconds)} /> : null}
+      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} onTranscribedTurn={rememberTranscribedCallTurn} onAnalyzeFrame={analyzeSharedCallFrame} {...(liveMode ? { onRealtimeConnect: connectVideoRealtime } : {})} onClose={(seconds) => finishCall("video", seconds)} /> : null}
       {cameraOpen ? <CameraConversationModal companionName={state.companion.name} onSessionStart={liveMode ? companionApi.startCameraSession : async () => ({ mock: true })} onAnalyzeFrame={liveMode ? async (dataBase64: string, contentType: string) => (await companionApi.analyzeImage(dataBase64, contentType, "Discuss the visible object or surroundings naturally and safely.")).description : async () => { await pause(280); return "I can see the frame you chose to share. Tell me what matters about it to you, and I’ll stay with that rather than making assumptions."; }} onClose={() => setCameraOpen(false)} /> : null}
       {plansOpen ? <PlanModal current={state.subscription.planId} onSelect={(planId) => runAction(choosePlan(planId), "The plan could not be changed.")} onClose={() => setPlansOpen(false)} /> : null}
       {processingNoticeOpen ? <Modal title="AI processing is paused" description="Turn processing consent back on before starting chat, voice, video, camera, or image features." onClose={() => setProcessingNoticeOpen(false)}><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setProcessingNoticeOpen(false)}>Keep paused</button><button type="button" className="button button--primary" onClick={() => { setState((current) => ({ ...current, aiProcessingConsent: true })); setProcessingNoticeOpen(false); }}>Enable AI features</button></div></Modal> : null}

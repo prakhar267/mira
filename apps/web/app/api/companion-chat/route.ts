@@ -1,4 +1,4 @@
-import { buildCompanionSystemPrompt, isGenericCompanionReply, sanitizeCompanionReply, type EdgeCompanionRequest } from "@/lib/companion-prompt";
+import { buildCompanionSystemPrompt, buildMemoryRecallReply, isGenericCompanionReply, isMemoryRecallRequest, sanitizeCompanionReply, type EdgeCompanionRequest } from "@/lib/companion-prompt";
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const windowMs = 60_000;
@@ -60,6 +60,8 @@ export async function POST(request: Request) {
   if (rateLimited(request)) return Response.json({ error: "Please give Mira a moment before sending more." }, { status: 429 });
   const input = parseRequest(await request.json().catch(() => null));
   if (!input) return Response.json({ error: "Invalid conversation request." }, { status: 400 });
+  const latestUserMessage = input.messages.at(-1)?.content ?? "";
+  if (isMemoryRecallRequest(latestUserMessage)) return Response.json({ reply: buildMemoryRecallReply(input), model: "memory" });
 
   try {
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");

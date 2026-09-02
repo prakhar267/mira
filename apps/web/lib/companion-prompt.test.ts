@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompanionSystemPrompt, isGenericCompanionReply, sanitizeCompanionReply } from "./companion-prompt";
+import { buildCompanionSystemPrompt, buildMemoryRecallReply, isGenericCompanionReply, isMemoryRecallRequest, sanitizeCompanionReply } from "./companion-prompt";
 
 const request = {
   messages: [{ role: "user" as const, content: "nothing just monotonous" }],
@@ -30,5 +30,12 @@ describe("edge companion prompting", () => {
 
   it("removes model reasoning and speaker labels", () => {
     expect(sanitizeCompanionReply("<think>hidden</think> Mira: That routine would bore me too.")).toBe("That routine would bore me too.");
+  });
+
+  it("answers explicit English, Hindi, and Hinglish recall from saved facts", () => {
+    expect(isMemoryRecallRequest("maine pehle kya bataya tha?")).toBe(true);
+    expect(isMemoryRecallRequest("मैंने पहले क्या बताया था?" )).toBe(true);
+    expect(buildMemoryRecallReply({ ...request, messages: [{ role: "user", content: "maine pehle kya bataya tha?" }], memories: ["Prakhar said: “I work from a small studio in Pune”"] })).toContain("I work from a small studio in Pune");
+    expect(buildMemoryRecallReply({ ...request, messages: [{ role: "user", content: "What do you remember about me?" }], memories: [] })).toContain("don’t have any saved memories");
   });
 });

@@ -25,6 +25,8 @@ export interface EdgeCompanionRequest {
 const genericReplyPattern = /^(?:yeah[,.]?\s*)?(?:i(?:['’]| a)m (?:here|listening)|i hear you|i(?:['’]| a)m with you|that sounds|sounds like|take your time|you don(?:'|’)t have to make this sound polished|we can stay with)/i;
 const stiltedReplyPattern = /\b(?:can feel like|background static|fresh start|brainstorm (?:some|a few)|ready for whatever|hope something unexpected|how is your day treating you)\b/i;
 const danglingReplyPattern = /\b(?:a|an|the|to|and|or|but|because|with|for|of|any|anything|something|particular|your|you|that|which|what|how)$/i;
+const memoryRecallPattern = /\b(?:what do you remember|do you remember|remember about me|what did i (?:say|tell you)|told you earlier|recall|maine (?:pehle )?kya (?:bola|bataya)|yaad hai)\b/i;
+const devanagariMemoryRecallPattern = /(?:तुम्हें याद है|मैंने (?:पहले )?क्या (?:कहा|बताया)|मेरे बारे में क्या याद)/u;
 
 function compact(value: string, limit: number) {
   return value.trim().replace(/\s+/g, " ").slice(0, limit);
@@ -81,6 +83,26 @@ export function buildCompanionSystemPrompt(input: EdgeCompanionRequest) {
     `User-approved memories. Use only when directly relevant and never claim to remember anything else:\n${memories}`,
     `Before answering, silently check: (1) did I address the specific content, (2) would a human friend actually say this aloud, (3) did I avoid canned empathy, (4) did I avoid repeating recent wording? Return only ${companionName}'s reply.`,
   ].join("\n\n");
+}
+
+export function isMemoryRecallRequest(value: string) {
+  return memoryRecallPattern.test(value) || devanagariMemoryRecallPattern.test(value);
+}
+
+export function buildMemoryRecallReply(input: EdgeCompanionRequest) {
+  const memories = (input.memories ?? []).map((memory) => compact(memory, 220)).filter(Boolean).slice(0, 8);
+  const latest = input.messages.at(-1)?.content ?? "";
+  if (!memories.length) {
+    if (/\p{Script=Devanagari}/u.test(latest)) return "अभी मेरे पास तुम्हारे बारे में कोई सेव की हुई याद नहीं है।";
+    if (/\b(?:maine|kya|bataya|bola|yaad|hai)\b/i.test(latest)) return "Abhi mere paas tumhari koi saved memory nahi hai.";
+    return "I don’t have any saved memories about you yet.";
+  }
+  const userName = compact(input.user.name || "", 40);
+  const namePattern = userName ? new RegExp(`^${userName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} said:\\s*`, "i") : null;
+  const recalled = memories.map((memory) => namePattern ? memory.replace(namePattern, "") : memory).join("; ");
+  if (/\p{Script=Devanagari}/u.test(latest)) return `हाँ, मुझे ये बातें याद हैं: ${recalled}`;
+  if (/\b(?:maine|kya|bataya|bola|yaad|hai)\b/i.test(latest)) return `Haan, mujhe yaad hai: ${recalled}`;
+  return `I remember this: ${recalled}`;
 }
 
 export function sanitizeCompanionReply(value: string) {

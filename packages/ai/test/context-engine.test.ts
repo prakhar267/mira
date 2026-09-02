@@ -45,6 +45,23 @@ describe("memory pipeline", () => {
     expect(candidate?.content).toBe("Momo was User's dog, and quiet Sunday mornings remind User of him.");
   });
 
+  it("keeps ordinary personal details as inspectable conversation memories", () => {
+    const english = extractMemoryCandidates("I work from a small studio in Pune")[0];
+    const hinglish = extractMemoryCandidates("mera college friend Rohan kal aa raha hai")[0];
+    const hindi = extractMemoryCandidates("मैं रविवार को अपने परिवार से मिलने जाता हूँ")[0];
+    expect(english).toMatchObject({ type: "episodic", confidence: 0.98 });
+    expect(english?.content).toContain("small studio in Pune");
+    expect(hinglish?.content).toContain("Rohan");
+    expect(hindi?.content).toContain("रविवार");
+    expect(extractMemoryCandidates("I went to school in Mumbai")[0]?.content).toContain("school in Mumbai");
+  });
+
+  it("does not turn questions or trivial acknowledgements into memory", () => {
+    expect(extractMemoryCandidates("What do you remember about me?")).toEqual([]);
+    expect(extractMemoryCandidates("क्या तुम्हें मेरा नाम याद है")).toEqual([]);
+    expect(extractMemoryCandidates("haan")).toEqual([]);
+  });
+
   it("ranks relevant and pinned memories ahead of unrelated items", () => {
     const relevant = memory({ id: "relevant", content: "User's interview is tomorrow.", normalizedContent: "interview:tomorrow", type: "episodic" });
     const pinned = memory({ id: "pinned", content: "User loves hiking.", normalizedContent: "hiking", pinned: true });

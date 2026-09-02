@@ -1416,8 +1416,7 @@ select {
   color: var(--text-primary);
 }
 
-.live-call__backdrop,
-.video-call__avatar {
+.live-call__backdrop {
   position: absolute;
   z-index: -3;
   inset: 0;
@@ -1505,7 +1504,36 @@ select {
 .call-heart svg { width: 42px; height: 42px; }
 
 .live-call--video { justify-content: flex-end; padding-bottom: 74px; }
-.video-call__avatar { object-position: center 35%; }
+.video-call__avatar-feed {
+  position: absolute;
+  z-index: -3;
+  inset: -1.5%;
+  overflow: hidden;
+  background: #211713;
+  transform-origin: 44% 48%;
+  animation: live-camera-drift 9s ease-in-out infinite alternate;
+}
+.video-call__avatar-feed--speaking { animation-duration: 5.8s; }
+.video-call__avatar-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  transition: opacity 90ms linear;
+}
+.video-call__avatar-frame--active { opacity: 1; }
+.video-call__feed-badge { position: absolute; left: 22px; bottom: 20px; display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: rgba(12,9,8,.62); color: rgba(255,255,255,.82); font-size: 8px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; backdrop-filter: blur(10px); }
+@keyframes live-camera-drift {
+  from { transform: scale(1.015) translate3d(0, 0, 0); }
+  to { transform: scale(1.035) translate3d(-.22%, .16%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .video-call__avatar-feed { animation: none; transform: scale(1.02); }
+  .video-call__avatar-frame { transition: none; }
+}
 .video-call__status {
   position: absolute;
   top: 92px;
@@ -1542,7 +1570,9 @@ select {
 .video-call__camera > div button { min-height: 30px; padding: 0 10px; border: 1px solid var(--border-luma); border-radius: 999px; background: rgba(255,255,255,.08); color: var(--text-secondary); font-size: 9px; }
 .video-call__tools { position: absolute; top: 98px; left: 24px; display: grid; gap: 8px; }
 .video-call__tools label,
-.video-call__tools button { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 13px; border: 1px solid var(--border-luma); border-radius: 999px; background: rgba(20,14,29,.66); color: var(--text-primary); backdrop-filter: blur(14px); font-size: 10px; }
+.video-call__tools button,
+.video-call__avatar-label { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 13px; border: 1px solid var(--border-luma); border-radius: 999px; background: rgba(20,14,29,.66); color: var(--text-primary); backdrop-filter: blur(14px); font-size: 10px; }
+.video-call__avatar-label { color: #dff7e6; }
 .video-call__tools button:disabled { cursor: not-allowed; opacity: .48; }
 .video-call__tools select { border: 0; background: transparent; color: inherit; outline: 0; }
 .call-activity-menu { position: absolute; top: 248px; left: 24px; display: grid; width: 220px; padding: 8px; border: 1px solid var(--border-luma); border-radius: 18px; background: rgba(22,15,31,.94); }
@@ -1575,6 +1605,7 @@ select {
   .video-call__camera { top: 80px; right: 14px; width: 105px; height: 150px; border-radius: 18px; }
   .video-call__tools { top: 80px; left: 14px; }
   .video-call__tools label { max-width: 165px; }
+  .video-call__avatar-label { display: none; }
   .video-call__status { top: 136px; }
   .call-activity-menu { top: 230px; left: 14px; }
   .call-activity-card { bottom: 170px; }
@@ -2016,7 +2047,7 @@ select {
 .auth-visual,
 .companion-preview__scene { background-image: url("/assets/mira/loft-morning.png"); }
 .live-call__backdrop { content: url("/assets/mira/loft-morning.png"); filter: blur(20px) brightness(.48) saturate(.9); }
-.video-call__avatar { filter: brightness(.82) saturate(.96); }
+.video-call__avatar-frame { filter: brightness(.88) saturate(.94); }
 .live-call__header strong,
 .call-orb { color: #fffaf4; }
 .call-conversation,

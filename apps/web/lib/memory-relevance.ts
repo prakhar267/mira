@@ -7,7 +7,7 @@ const genericSingleTokens = new Set(["feel", "friend", "heavy", "home", "life", 
 
 function tokens(value: string) {
   return new Set(
-    (value.toLowerCase().match(/[a-z0-9]+/g) ?? [])
+    (value.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
       .map((token) => token.length > 5 ? token.replace(/(?:ing|ed|es|s)$/i, "") : token)
       .filter((token) => token.length >= 4 && !stopWords.has(token)),
   );
@@ -20,16 +20,22 @@ export function relevantMemoryContents(memories: MemoryRecord[], messages: ChatM
     .map((message) => message.content)
     .join(" ");
 
-  if (/\b(?:what do you remember|remember about me|use (?:your|my) memor(?:y|ies)|recall)\b/i.test(recentUserText)) {
-    return memories.slice(0, 8).map((memory) => memory.content);
+  const recentFirst = [...memories].sort((left, right) => {
+    if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+    return (Date.parse(right.updatedAt ?? "") || 0) - (Date.parse(left.updatedAt ?? "") || 0);
+  });
+
+  if (/\b(?:what do you remember|remember about me|what did i (?:say|tell you)|told you earlier|use (?:your|my) memor(?:y|ies)|recall|maine (?:pehle )?kya (?:bola|bataya)|yaad hai)\b/i.test(recentUserText)
+    || /(?:तुम्हें याद है|मैंने (?:पहले )?क्या (?:कहा|बताया)|मेरे बारे में क्या याद)/u.test(recentUserText)) {
+    return recentFirst.slice(0, 10).map((memory) => memory.content);
   }
 
   const recentTokens = tokens(recentUserText);
-  return memories
+  return recentFirst
     .filter((memory) => {
       const overlap = [...tokens(memory.content)].filter((token) => recentTokens.has(token));
       return overlap.length >= 2 || overlap.some((token) => token.length >= 6 && !genericSingleTokens.has(token));
     })
-    .slice(0, 4)
+    .slice(0, 6)
     .map((memory) => memory.content);
 }

@@ -180,6 +180,24 @@ export function extractMemoryCandidates(message: string): MemoryCandidate[] {
     });
   }
 
+  const isQuestion = /[?？]\s*$/.test(compact)
+    || /^(?:what|why|when|where|who|how|can|could|would|should|do|does|did|is|are)\b/iu.test(compact)
+    || /^(?:क्या|कब|कहाँ|क्यों|कैसे)(?:\s|$)/u.test(compact);
+  const isPersonalStatement = /\b(?:i|my\s+[\p{L}]+|main|maine|mera|meri|mere|mujhe)\b/iu.test(compact)
+    || /(?:मैं|मेरा|मेरी|मेरे|मुझे|हमारा|हमारी)/u.test(compact);
+  const isTrivial = /^(?:i(?:'|’)m fine|i am fine|i(?:'|’)m good|i don(?:'|’)t know|idk|not sure|okay|ok|yes|no|haan|han|nahi|नहीं|हाँ|ठीक है)[.!\s]*$/iu.test(compact);
+  if (candidates.length === 0 && !isQuestion && !isTrivial && isPersonalStatement && compact.length >= 10 && compact.length <= 220) {
+    const emotional = /\b(?:angry|anxious|excited|happy|lonely|nervous|sad|tired|upset|worried|mood|dukhi|khush|thaka|thaki)\b/iu.test(compact)
+      || /(?:उदास|खुश|थका|थकी|परेशान|गुस्सा|अकेला|अकेली)/u.test(compact);
+    candidates.push({
+      type: emotional ? "emotional" : "episodic",
+      content: `User said: “${compact}”`,
+      normalizedContent: `conversation:${compact.toLowerCase().replace(/[.!?।]+$/, "")}`,
+      importance: emotional ? 0.58 : 0.5,
+      confidence: 0.98,
+    });
+  }
+
   return candidates;
 }
 

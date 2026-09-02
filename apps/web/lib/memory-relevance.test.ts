@@ -35,4 +35,13 @@ describe("relevantMemoryContents", () => {
   it("returns approved memories when the user explicitly asks for recall", () => {
     expect(relevantMemoryContents(memories, messages("What do you remember about me?"))).toHaveLength(2);
   });
+
+  it("recalls recent conversation memories in Hindi and Hinglish", () => {
+    const conversationMemories = [
+      { ...memories[0]!, id: "older", content: "Prakhar said: old detail", updatedAt: "2026-09-01T10:00:00.000Z" },
+      { ...memories[1]!, id: "newer", content: "Prakhar said: Rohan is visiting tomorrow", updatedAt: "2026-09-02T10:00:00.000Z" },
+    ];
+    expect(relevantMemoryContents(conversationMemories, messages("maine pehle kya bataya tha?"))[0]).toContain("Rohan");
+    expect(relevantMemoryContents(conversationMemories, messages("तुम्हें याद है मैंने क्या बताया?"))).toHaveLength(2);
+  });
 });
