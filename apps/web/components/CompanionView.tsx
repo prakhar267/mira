@@ -102,7 +102,7 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
 
           {tab === "voice" ? <>
             <div className="section-heading"><div><span className="luma-kicker">How she sounds</span><h2>Voice</h2><p>Natural neural voices for English, with हिन्दी and Hinglish support during calls.</p></div></div>
-            <div className="voice-list">{companionVoiceProfiles.map((voice) => <button type="button" key={voice.id} className={companion.voiceId === voice.id ? "voice-option voice-option--selected" : "voice-option"} onClick={() => { onChange({ ...companion, voiceId: voice.id }); previewVoice(voice); }}><span><Play aria-hidden="true" /></span><strong>{voice.name}</strong><small>{voice.detail}</small><Volume2 aria-hidden="true" /></button>)}</div>
+            <div className="voice-list">{companionVoiceProfiles.map((voice) => <button type="button" key={voice.id} className={companion.voiceId === voice.id ? "voice-option voice-option--selected" : "voice-option"} onClick={() => { onChange({ ...companion, voiceId: voice.id }); previewVoice(voice); }}><span><Play aria-hidden="true" /></span><strong>{voice.name} tone</strong><small>{voice.detail}</small><Volume2 aria-hidden="true" /></button>)}</div>
           </> : null}
         </div>
       </div>

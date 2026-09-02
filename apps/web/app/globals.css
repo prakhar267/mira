@@ -1520,9 +1520,9 @@ select {
   width: max(100%, calc(100vh * 1.776833));
   aspect-ratio: 1672 / 941;
   overflow: hidden;
-  transform: translate3d(var(--avatar-translate-x), -50%, 0) scale(1.004);
+  transform: translate3d(var(--avatar-translate-x), -50%, 0) scale(1.002);
   transform-origin: 38% 62%;
-  animation: live-avatar-camera 8s ease-in-out infinite alternate;
+  animation: live-avatar-camera 12s cubic-bezier(.45, 0, .55, 1) infinite alternate;
   backface-visibility: hidden;
   contain: paint;
   will-change: transform;
@@ -1551,8 +1551,9 @@ select {
   height: 12.221%;
   -webkit-mask-image: radial-gradient(ellipse 48% 43% at 50% 52%, #000 44%, rgba(0,0,0,.86) 66%, transparent 100%);
   mask-image: radial-gradient(ellipse 48% 43% at 50% 52%, #000 44%, rgba(0,0,0,.86) 66%, transparent 100%);
-  animation: live-avatar-blink 6.2s steps(1, end) infinite;
+  transition: none;
 }
+.video-call__avatar-feature--blink[data-blinking="true"] { opacity: 1; }
 .video-call__avatar-feature--mouth {
   top: 43.571%;
   left: 32.297%;
@@ -1560,21 +1561,23 @@ select {
   height: 12.752%;
   -webkit-mask-image: radial-gradient(ellipse 43% 36% at 50% 49%, #000 42%, rgba(0,0,0,.86) 68%, transparent 100%);
   mask-image: radial-gradient(ellipse 43% 36% at 50% 49%, #000 42%, rgba(0,0,0,.86) 68%, transparent 100%);
+  overflow: hidden;
+  transform-origin: 50% 51%;
+  transition: opacity 45ms linear, transform 70ms ease-out;
 }
-.video-call__avatar-feed--speaking .video-call__avatar-feature--mouth { animation: live-avatar-mouth .68s steps(1, end) infinite; }
+.video-call__avatar-feature--mouth img { display: block; width: 100%; height: 100%; transform-origin: 50% 51%; transition: transform 70ms ease-out; }
+.video-call__avatar-feed[data-mouth-pose="1"] .video-call__avatar-feature--mouth { opacity: .78; transform: scaleX(.98) scaleY(.72); }
+.video-call__avatar-feed[data-mouth-pose="1"] .video-call__avatar-feature--mouth img { transform: scaleX(1.015) scaleY(1.22); }
+.video-call__avatar-feed[data-mouth-pose="2"] .video-call__avatar-feature--mouth { opacity: .96; transform: scaleX(.96) scaleY(.9); }
+.video-call__avatar-feed[data-mouth-pose="2"] .video-call__avatar-feature--mouth img { transform: scaleX(1.03) scaleY(1.08); }
+.video-call__avatar-feed[data-mouth-pose="3"] .video-call__avatar-feature--mouth { opacity: 1; transform: scaleX(.88) scaleY(1.04); }
+.video-call__avatar-feed[data-mouth-pose="3"] .video-call__avatar-feature--mouth img { transform: scaleX(1.08) scaleY(.98); }
+.video-call__avatar-feed--speaking .video-call__avatar-stage { animation-duration: 6.8s; }
 .video-call__hair-light { position: absolute; z-index: 1; top: 3%; left: 16%; width: 31%; height: 53%; border-radius: 50%; background: radial-gradient(ellipse at 48% 42%, rgba(255,226,196,.08), transparent 68%); filter: blur(8px); mix-blend-mode: screen; pointer-events: none; animation: live-avatar-hair-light 7.5s ease-in-out infinite alternate; }
 .video-call__feed-badge { position: absolute; left: 22px; bottom: 20px; display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: rgba(12,9,8,.62); color: rgba(255,255,255,.82); font-size: 8px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; backdrop-filter: blur(10px); }
-@keyframes live-avatar-mouth {
-  0%, 18%, 49%, 76%, 100% { opacity: 0; }
-  19%, 48%, 77%, 94% { opacity: 1; }
-}
-@keyframes live-avatar-blink {
-  0%, 92%, 95%, 100% { opacity: 0; }
-  92.1%, 94.9% { opacity: 1; }
-}
 @keyframes live-avatar-camera {
-  from { transform: translate3d(var(--avatar-translate-x), -50%, 0) scale(1.004); }
-  to { transform: translate3d(var(--avatar-translate-x), -50.08%, 0) scale(1.008); }
+  from { transform: translate3d(var(--avatar-translate-x), -50%, 0) scale(1.002); }
+  to { transform: translate3d(var(--avatar-translate-x), -50.04%, 0) scale(1.006); }
 }
 @keyframes live-avatar-hair-light {
   from { transform: translate3d(-1.2%, .6%, 0); opacity: .46; }
@@ -1585,7 +1588,7 @@ select {
   .video-call__avatar-feature--blink,
   .video-call__avatar-feature--mouth,
   .video-call__hair-light { animation: none; }
-  .video-call__avatar-feed--speaking .video-call__avatar-feature--mouth { opacity: 1; }
+  .video-call__avatar-feed--speaking .video-call__avatar-feature--mouth { transition: none; }
 }
 .video-call__status {
   position: absolute;

@@ -15,8 +15,22 @@ const femaleHindiNames = /aditi|heera|kavya|lekha|swara|veena|google.*(?:hindi|�
 const femaleIndianEnglishNames = /aditi|kavya|neerja|swara|tara|veena|google.*(?:india|indian)|female/i;
 const naturalEnglishNames = /andromeda|aria|ava|cora|flo|helena|jenny|juno|karen|luna|moira|nova|samantha|sandy|serena|shelley|shimmer|tara|tessa|thalia|vesta|zira|google.*english.*female/i;
 const enhancedNames = /enhanced|natural|neural|online|premium/i;
-const noveltyOrMaleNames = /albert|aman|bad news|bahh|bells|boing|bubbles|cellos|daniel|eddy|fred|grandpa|jester|junior|organ|ralph|reed|rishi|rocko|superstar|trinoids|whisper|zarvox/i;
-const companionIdentityNames = [/^tara\b/i, /^samantha\b/i, /^karen\b/i, /^tessa\b/i, /^moira\b/i, /^flo\b/i, /^shelley\b/i, /^sandy\b/i, /google.*english.*female/i];
+const noveltyOrMaleNames = /albert|\baman\b|bad news|bahh|bells|boing|bubbles|cellos|daniel|eddy|fred|grandpa|jester|junior|organ|ralph|reed|rishi|rocko|superstar|trinoids|whisper|zarvox/i;
+const companionIdentityNames = [/^samantha\b/i, /^karen\b/i, /^tessa\b/i, /^tara\b/i, /^moira\b/i, /^flo\b/i, /^shelley\b/i, /^sandy\b/i, /google.*english.*female/i];
+
+export interface RecognitionResultLike extends ArrayLike<{ transcript?: string; confidence?: number }> {
+  isFinal?: boolean;
+}
+
+export interface RecognitionEventLike {
+  resultIndex?: number;
+  results: ArrayLike<RecognitionResultLike>;
+}
+
+export interface RecognitionTranscript {
+  text: string;
+  hasFinalResult: boolean;
+}
 
 export function detectSpeechLanguage(text: string, requested: SpeechLanguage = "auto"): Exclude<SpeechLanguage, "auto"> {
   if (requested !== "auto") return requested;
@@ -29,6 +43,51 @@ export function recognitionLocale(language: SpeechLanguage, browserLanguage = "e
   if (language === "hi") return "hi-IN";
   if (language === "en" || language === "hinglish") return "en-IN";
   return /^hi(?:-|$)/i.test(browserLanguage) ? "hi-IN" : "en-IN";
+}
+
+function bestRecognitionAlternative(result: RecognitionResultLike) {
+  const alternatives = Array.from({ length: Math.max(1, result.length) }, (_, index) => result[index]).filter((item): item is { transcript?: string; confidence?: number } => Boolean(item?.transcript?.trim()));
+  return alternatives.sort((left, right) => (right.confidence ?? 0) - (left.confidence ?? 0))[0]?.transcript?.trim() ?? "";
+}
+
+export function collectRecognitionTranscript(segments: Map<number, string>, event: RecognitionEventLike): RecognitionTranscript {
+  let hasFinalResult = false;
+  const start = Math.max(0, event.resultIndex ?? 0);
+  for (let index = start; index < event.results.length; index += 1) {
+    const result = event.results[index];
+    if (!result) continue;
+    const text = bestRecognitionAlternative(result).replace(/\s+/g, " ").trim();
+    if (text) segments.set(index, text);
+    else segments.delete(index);
+    if (result.isFinal) hasFinalResult = true;
+  }
+  return {
+    text: [...segments.entries()].sort(([left], [right]) => left - right).map(([, text]) => text).join(" ").replace(/\s+/g, " ").trim(),
+    hasFinalResult,
+  };
+}
+
+export function splitSpeechSegments(text: string, maximumLength = 170) {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const phrases = clean.match(/[^.!?…।]+[.!?…।]?/g)?.map((part) => part.trim()).filter(Boolean) ?? [clean];
+  const segments: string[] = [];
+  for (const phrase of phrases) {
+    if (phrase.length <= maximumLength) {
+      segments.push(phrase);
+      continue;
+    }
+    let current = "";
+    for (const word of phrase.split(" ")) {
+      if (!current || `${current} ${word}`.length <= maximumLength) current = current ? `${current} ${word}` : word;
+      else {
+        segments.push(current);
+        current = word;
+      }
+    }
+    if (current) segments.push(current);
+  }
+  return segments;
 }
 
 export function cloudSpeakerForVoice(voiceId: string) {
@@ -80,6 +139,7 @@ export function playCompanionSpeech(text: string, options: {
   voiceId?: string;
   language?: SpeechLanguage;
   onStart?: () => void;
+  onBoundary?: (boundary: { charIndex: number; charLength: number; elapsedTime: number; name: string }) => void;
   onEnd?: () => void;
 } = {}): CompanionSpeechPlayback {
   stopCompanionSpeech();
@@ -92,29 +152,54 @@ export function playCompanionSpeech(text: string, options: {
   let voiceTimer: number | null = null;
   let voicesChanged: (() => void) | null = null;
 
-  const end = () => {
+  const end = (notify = true) => {
     if (finished) return;
     finished = true;
     if (voiceTimer) window.clearTimeout(voiceTimer);
     if (voicesChanged) window.speechSynthesis?.removeEventListener("voiceschanged", voicesChanged);
-    options.onEnd?.();
+    if (activePlayback === playback) activePlayback = null;
+    if (notify) options.onEnd?.();
   };
 
   const speakWithCompanionVoice = () => {
     if (speechStarted || canceled) return;
     speechStarted = true;
     if (!("speechSynthesis" in window)) return end();
-    const utterance = new SpeechSynthesisUtterance(text);
     const selected = selectPreferredVoice(window.speechSynthesis.getVoices(), text, voiceId, language);
     const profile = voiceProfile(voiceId);
-    if (selected) utterance.voice = selected;
-    utterance.lang = selected?.lang ?? (detected === "hi" ? "hi-IN" : "en-IN");
-    utterance.rate = profile.rate;
-    utterance.pitch = profile.pitch;
-    utterance.onstart = () => options.onStart?.();
-    utterance.onend = end;
-    utterance.onerror = end;
-    window.speechSynthesis.speak(utterance);
+    const segments = splitSpeechSegments(text);
+    let segmentIndex = 0;
+    let characterOffset = 0;
+
+    const speakNext = () => {
+      if (canceled || finished) return;
+      const segment = segments[segmentIndex];
+      if (!segment) return end();
+      const utterance = new SpeechSynthesisUtterance(segment);
+      if (selected) utterance.voice = selected;
+      utterance.lang = selected?.lang ?? (detected === "hi" ? "hi-IN" : "en-IN");
+      utterance.rate = profile.rate;
+      utterance.pitch = profile.pitch;
+      utterance.volume = 1;
+      utterance.onstart = () => {
+        if (segmentIndex === 0) options.onStart?.();
+      };
+      utterance.onboundary = (event) => options.onBoundary?.({
+        charIndex: characterOffset + event.charIndex,
+        charLength: event.charLength,
+        elapsedTime: event.elapsedTime,
+        name: event.name,
+      });
+      utterance.onend = () => {
+        characterOffset += segment.length + 1;
+        segmentIndex += 1;
+        speakNext();
+      };
+      utterance.onerror = () => end();
+      window.speechSynthesis.speak(utterance);
+    };
+
+    speakNext();
   };
 
   const playback: CompanionSpeechPlayback = {
@@ -122,7 +207,7 @@ export function playCompanionSpeech(text: string, options: {
       if (canceled) return;
       canceled = true;
       window.speechSynthesis?.cancel();
-      end();
+      end(false);
     },
   };
   activePlayback = playback;

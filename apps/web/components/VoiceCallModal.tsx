@@ -13,6 +13,7 @@ import {
   Waveform,
 } from "@phosphor-icons/react";
 import {
+  collectRecognitionTranscript,
   playCompanionSpeech,
   recognitionLocale,
   speechLanguageOptions,
@@ -26,11 +27,12 @@ type CallPhase = "connecting" | "listening" | "thinking" | "speaking" | "interru
 interface BrowserSpeechRecognition {
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives: number;
   lang: string;
   start: () => void;
   stop: () => void;
   abort: () => void;
-  onresult: ((event: { results: ArrayLike<{ 0?: { transcript?: string }; isFinal?: boolean }> }) => void) | null;
+  onresult: ((event: { resultIndex?: number; results: ArrayLike<ArrayLike<{ transcript?: string; confidence?: number }> & { isFinal?: boolean }> }) => void) | null;
   onerror: ((event: { error?: string }) => void) | null;
   onend: (() => void) | null;
 }
@@ -86,6 +88,7 @@ export function VoiceCallModal({
   const playbackRef = useRef<CompanionSpeechPlayback | null>(null);
   const onTranscribedTurnRef = useRef(onTranscribedTurn);
   const listenTimerRef = useRef<number | null>(null);
+  const commitTimerRef = useRef<number | null>(null);
   const startListeningRef = useRef<() => void>(() => undefined);
   const mutedRef = useRef(false);
   const activeRef = useRef(true);
@@ -101,6 +104,10 @@ export function VoiceCallModal({
   }, []);
 
   const stopRecognition = useCallback((ignoreTranscript = true) => {
+    if (commitTimerRef.current) {
+      window.clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+    }
     const recognition = recognitionRef.current;
     if (!recognition) return;
     if (ignoreTranscript) ignoredRecognitionsRef.current.add(recognition);
@@ -189,6 +196,7 @@ export function VoiceCallModal({
       stopRecognition();
       playbackRef.current?.cancel();
       if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
+      if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
     };
   }, [stopRecognition]);
 
@@ -247,16 +255,33 @@ export function VoiceCallModal({
     }
 
     const recognition = new Recognition();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
     recognition.lang = recognitionLocale(language, navigator.language);
+    const transcriptSegments = new Map<number, string>();
     let finalTranscript = "";
     let restartAllowed = true;
+    let submitted = false;
+
+    const commitTranscript = () => {
+      if (submitted || !finalTranscript || recognitionRef.current !== recognition) return;
+      submitted = true;
+      if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+      ignoredRecognitionsRef.current.add(recognition);
+      recognitionRef.current = null;
+      recognition.stop();
+      void submitTurn(finalTranscript);
+    };
+
     recognition.onresult = (event) => {
-      const parts = Array.from(event.results).map((result) => result[0]?.transcript ?? "");
-      const transcript = parts.join(" ").trim();
-      setHeard(transcript);
-      finalTranscript = transcript;
+      const transcript = collectRecognitionTranscript(transcriptSegments, event);
+      if (!transcript.text) return;
+      setHeard(transcript.text);
+      finalTranscript = transcript.text;
+      if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = window.setTimeout(commitTranscript, transcript.hasFinalResult ? 1_350 : 2_200);
     };
     recognition.onerror = (event) => {
       changePhase("listening");
@@ -265,9 +290,16 @@ export function VoiceCallModal({
       else if (event.error !== "no-speech" && event.error !== "aborted") setSpeechError("I couldn’t hear that clearly. I’ll keep listening.");
     };
     recognition.onend = () => {
+      if (commitTimerRef.current) {
+        window.clearTimeout(commitTimerRef.current);
+        commitTimerRef.current = null;
+      }
       if (recognitionRef.current === recognition) recognitionRef.current = null;
       if (ignoredRecognitionsRef.current.has(recognition) || !activeRef.current) return;
-      if (finalTranscript) void submitTurn(finalTranscript);
+      if (finalTranscript && !submitted) {
+        submitted = true;
+        void submitTurn(finalTranscript);
+      }
       else {
         changePhase("listening");
         if (restartAllowed) queueAutoListen(900);
@@ -289,6 +321,7 @@ export function VoiceCallModal({
 
   const interrupt = () => {
     if (muted) return;
+    speechTurn.current += 1;
     changePhase("interrupted");
     if (transport === "realtime" && realtimeRef.current?.events.readyState === "open") realtimeRef.current.events.send(JSON.stringify({ type: "response.cancel" }));
     playbackRef.current?.cancel();
@@ -321,7 +354,7 @@ export function VoiceCallModal({
     <motion.div className="live-call live-call--voice" role="dialog" aria-modal="true" aria-label={`Voice call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <img className="live-call__backdrop" src="/assets/mira/loft-morning.png" alt="" />
       <div className="live-call__veil" />
-      <header className="live-call__header"><span><i className="status-dot" /> {transport === "realtime" ? "Mira neural voice connected" : transport === "connecting" ? "Connecting secure voice…" : "Mira voice · on device"}</span><strong>{companionName}</strong><time>{time}</time></header>
+      <header className="live-call__header"><span><i className="status-dot" /> {transport === "realtime" ? "Mira Velvet · neural" : transport === "connecting" ? "Connecting secure voice…" : "Mira Velvet · on device"}</span><strong>{companionName}</strong><time>{time}</time></header>
       <div className="voice-call__portrait">
         <motion.img src={phase === "speaking" ? "/assets/mira/portrait-speaking.png" : "/assets/mira/portrait.png"} alt={`${companionName}, your AI companion`} animate={phase === "speaking" ? { scale: [1, 1.012, 1], y: [0, -1, 0] } : { scale: 1, y: 0 }} transition={{ duration: 3.2, repeat: phase === "speaking" ? Infinity : 0 }} />
         <i className={phase === "speaking" ? "voice-call__ring voice-call__ring--active" : "voice-call__ring"} />
@@ -333,7 +366,7 @@ export function VoiceCallModal({
 
       <div className="call-pickers">
         <label className="call-language-picker"><span>Language</span><select aria-label="Voice call language" value={language} onChange={(event) => { stopRecognition(); playbackRef.current?.cancel(); changePhase("listening"); setLanguage(event.target.value as SpeechLanguage); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        <label className="call-language-picker"><span>Voice</span><select aria-label="Companion voice style" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const profile = companionVoiceProfile(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${profile.name} voice will start on your next call.`); else { setCompanionLine(`${profile.name} voice selected.`); speak(`Okay… this is my ${profile.name.toLowerCase()} voice.`, true, next); } }}>{companionVoiceProfiles.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>
+        <label className="call-language-picker"><span>Tone</span><select aria-label="Mira voice tone" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const profile = companionVoiceProfile(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${profile.name} tone will start on your next call.`); else { setCompanionLine(`${profile.name} tone selected.`); speak(`Okay… this is my ${profile.name.toLowerCase()} tone.`, true, next); } }}>{companionVoiceProfiles.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>
       </div>
 
       <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking"}>
