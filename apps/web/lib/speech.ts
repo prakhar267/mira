@@ -12,9 +12,10 @@ export const speechLanguageOptions: Array<{ value: SpeechLanguage; label: string
 const devanagari = /[\u0900-\u097f]/;
 const hinglishWords = /\b(?:aaj|accha|acha|arey|aur|bahut|bas|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|kya|kyun|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sach|samajh|theek|thik|thoda|tum|tumhara|yaar)\b/i;
 const femaleHindiNames = /aditi|heera|kavya|lekha|swara|veena|google.*(?:hindi|हिन्दी)|female/i;
-const femaleIndianEnglishNames = /aditi|kavya|neerja|swara|veena|google.*(?:india|indian)|female/i;
-const naturalEnglishNames = /andromeda|aria|ava|cora|helena|jenny|juno|karen|luna|moira|nova|samantha|serena|shimmer|tessa|thalia|vesta|zira|google uk english female/i;
+const femaleIndianEnglishNames = /aditi|kavya|neerja|swara|tara|veena|google.*(?:india|indian)|female/i;
+const naturalEnglishNames = /andromeda|aria|ava|cora|flo|helena|jenny|juno|karen|luna|moira|nova|samantha|sandy|serena|shelley|shimmer|tara|tessa|thalia|vesta|zira|google.*english.*female/i;
 const enhancedNames = /enhanced|natural|neural|online|premium/i;
+const noveltyOrMaleNames = /albert|aman|bad news|bahh|bells|boing|bubbles|cellos|daniel|eddy|fred|grandpa|jester|junior|organ|ralph|reed|rishi|rocko|superstar|trinoids|whisper|zarvox/i;
 
 export function detectSpeechLanguage(text: string, requested: SpeechLanguage = "auto"): Exclude<SpeechLanguage, "auto"> {
   if (requested !== "auto") return requested;
@@ -42,18 +43,18 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
   const detected = detectSpeechLanguage(text, language);
   const targetLocale = detected === "hi" ? "hi-IN" : detected === "hinglish" ? "en-IN" : "en-US";
   const profileNames = voiceId.includes("soft")
-    ? /aurora|cora|serena|samantha|ava/i
+    ? [/samantha/i, /shelley/i, /flo/i, /aurora|cora|serena|ava/i]
     : voiceId.includes("seductive")
-      ? /vesta|helena|serena|moira|samantha/i
+      ? [/tessa/i, /moira/i, /karen/i, /vesta|helena|serena|samantha/i]
       : voiceId.includes("sharp")
-        ? /theia|thalia|zira|aria|jenny/i
+        ? [/karen/i, /tessa/i, /tara/i, /theia|thalia|zira|aria|jenny/i]
         : voiceId.includes("calm")
-          ? /cora|athena|serena|samantha|ava/i
+          ? [/samantha/i, /moira/i, /tessa/i, /cora|athena|serena|ava/i]
           : voiceId.includes("confident")
-            ? /thalia|aria|ava|jenny|zira/i
+            ? [/tara/i, /karen/i, /tessa/i, /thalia|aria|ava|jenny|zira/i]
             : voiceId.includes("warm")
-              ? /helena|cora|samantha|serena|ava/i
-              : /luna|andromeda|aria|ava|samantha|juno/i;
+              ? [/samantha/i, /karen/i, /tessa/i, /helena|cora|serena|ava/i]
+              : [/flo/i, /sandy/i, /shelley/i, /luna|andromeda|aria|ava|samantha|juno/i];
 
   return [...voices].sort((left, right) => {
     const score = (voice: T) => {
@@ -61,7 +62,10 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
       const sameLanguage = voice.lang.toLowerCase().startsWith(`${targetLocale.slice(0, 2).toLowerCase()}-`);
       const regional = detected === "hinglish" ? /en[-_]in/i.test(voice.lang) : detected === "hi" ? /hi[-_]in/i.test(voice.lang) : /^en[-_]/i.test(voice.lang);
       const namedFemale = detected === "hi" ? femaleHindiNames.test(voice.name) : detected === "hinglish" ? femaleIndianEnglishNames.test(voice.name) || naturalEnglishNames.test(voice.name) : naturalEnglishNames.test(voice.name);
-      return (exactLocale ? 70 : 0) + (sameLanguage ? 38 : 0) + (regional ? 28 : 0) + (namedFemale ? 65 : 0) + (enhancedNames.test(voice.name) ? 32 : 0) + (profileNames.test(voice.name) ? 15 : 0) + (voice.default ? 2 : 0) + (voice.localService === false ? 4 : 0);
+      const profileRank = profileNames.findIndex((pattern) => pattern.test(voice.name));
+      const profileScore = profileRank >= 0 ? 160 - profileRank * 28 : 0;
+      const languageVoiceScore = detected === "hi" || detected === "hinglish" ? (namedFemale ? 140 : 0) : (namedFemale ? 70 : 0);
+      return (exactLocale ? (detected === "en" ? 55 : 110) : 0) + (sameLanguage ? 35 : 0) + (regional ? (detected === "en" ? 25 : 50) : 0) + languageVoiceScore + (enhancedNames.test(voice.name) ? 36 : 0) + profileScore + (voice.default ? 2 : 0) + (voice.localService === false ? 6 : 0) - (noveltyOrMaleNames.test(voice.name) ? 260 : 0);
     };
     return score(right) - score(left);
   })[0];

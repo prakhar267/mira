@@ -21,6 +21,25 @@ describe("companion speech", () => {
     expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01")?.name).toBe("Lekha Enhanced");
   });
 
+  it("maps browser voice styles to distinct natural voices available on macOS", () => {
+    const voices = [
+      { name: "Samantha", lang: "en-US", default: true },
+      { name: "Tessa", lang: "en-ZA", default: false },
+      { name: "Karen", lang: "en-AU", default: false },
+      { name: "Flo (English (US))", lang: "en-US", default: false },
+      { name: "Tara", lang: "en-IN", default: false },
+      { name: "Aman", lang: "en-IN", default: false },
+      { name: "Lekha", lang: "hi-IN", default: false },
+    ];
+
+    expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Flo (English (US))");
+    expect(selectPreferredVoice(voices, "Stay close to me", "mira-seductive-01", "en")?.name).toBe("Tessa");
+    expect(selectPreferredVoice(voices, "Be direct with me", "mira-sharp-01", "en")?.name).toBe("Karen");
+    expect(selectPreferredVoice(voices, "I need some confidence", "mira-confident-01", "en")?.name).toBe("Tara");
+    expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-warm-01", "hinglish")?.name).toBe("Tara");
+    expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01", "hi")?.name).toBe("Lekha");
+  });
+
   it("maps companion styles to feminine Aura speakers", () => {
     expect(cloudSpeakerForVoice("mira-playful-01")).toBe("luna");
     expect(cloudSpeakerForVoice("mira-warm-01")).toBe("helena");

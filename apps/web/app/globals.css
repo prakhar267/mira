@@ -1520,14 +1520,86 @@ select {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  opacity: 0;
-  transition: opacity 220ms ease;
+  pointer-events: none;
+  user-select: none;
+  will-change: opacity, transform;
 }
-.video-call__avatar-frame--active { opacity: 1; }
+.video-call__avatar-frame--base { z-index: 0; opacity: 1; }
+.video-call__avatar-frame--breath {
+  z-index: 1;
+  opacity: .48;
+  clip-path: ellipse(24% 30% at 39% 76%);
+  -webkit-mask-image: radial-gradient(ellipse 24% 30% at 39% 76%, #000 30%, rgba(0,0,0,.7) 56%, transparent 78%);
+  mask-image: radial-gradient(ellipse 24% 30% at 39% 76%, #000 30%, rgba(0,0,0,.7) 56%, transparent 78%);
+  transform-origin: 39% 82%;
+  animation: live-avatar-breath 6.8s ease-in-out infinite;
+}
+.video-call__avatar-frame--hair {
+  z-index: 2;
+  opacity: .42;
+  clip-path: ellipse(16% 34% at 27% 31%);
+  -webkit-mask-image: radial-gradient(ellipse 16% 34% at 27% 31%, #000 30%, rgba(0,0,0,.64) 57%, transparent 78%);
+  mask-image: radial-gradient(ellipse 16% 34% at 27% 31%, #000 30%, rgba(0,0,0,.64) 57%, transparent 78%);
+  transform-origin: 33% 18%;
+  animation: live-avatar-hair 8.2s ease-in-out infinite alternate;
+}
+.video-call__avatar-frame--blink {
+  z-index: 3;
+  opacity: 0;
+  animation: live-avatar-blink 5.6s linear infinite;
+}
+.video-call__avatar-frame--blink-left {
+  clip-path: ellipse(4.2% 3.8% at 32.5% 34.7%);
+  -webkit-mask-image: radial-gradient(ellipse 4.2% 3.8% at 32.5% 34.7%, #000 42%, rgba(0,0,0,.72) 65%, transparent 86%);
+  mask-image: radial-gradient(ellipse 4.2% 3.8% at 32.5% 34.7%, #000 42%, rgba(0,0,0,.72) 65%, transparent 86%);
+}
+.video-call__avatar-frame--blink-right {
+  clip-path: ellipse(4.2% 3.8% at 40.4% 32.8%);
+  -webkit-mask-image: radial-gradient(ellipse 4.2% 3.8% at 40.4% 32.8%, #000 42%, rgba(0,0,0,.72) 65%, transparent 86%);
+  mask-image: radial-gradient(ellipse 4.2% 3.8% at 40.4% 32.8%, #000 42%, rgba(0,0,0,.72) 65%, transparent 86%);
+}
+.video-call__avatar-frame--mouth {
+  z-index: 4;
+  opacity: 0;
+  clip-path: ellipse(6.2% 5.2% at 38.2% 49.6%);
+  -webkit-mask-image: radial-gradient(ellipse 6.2% 5.2% at 38.2% 49.6%, #000 36%, rgba(0,0,0,.78) 60%, transparent 84%);
+  mask-image: radial-gradient(ellipse 6.2% 5.2% at 38.2% 49.6%, #000 36%, rgba(0,0,0,.78) 60%, transparent 84%);
+}
+.video-call__avatar-feed--speaking .video-call__avatar-frame--mouth { animation: live-avatar-mouth .72s linear infinite; }
+.video-call__presence-light { position: absolute; z-index: 5; top: 5%; left: 13%; width: 29%; height: 54%; border-radius: 50%; background: radial-gradient(ellipse at 48% 44%, rgba(255,225,195,.09), transparent 67%); mix-blend-mode: screen; pointer-events: none; animation: live-avatar-presence 7.4s ease-in-out infinite alternate; }
 .video-call__feed-badge { position: absolute; left: 22px; bottom: 20px; display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: rgba(12,9,8,.62); color: rgba(255,255,255,.82); font-size: 8px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; backdrop-filter: blur(10px); }
+@keyframes live-avatar-mouth {
+  0%, 100% { opacity: .08; }
+  12%, 26% { opacity: .96; }
+  34% { opacity: .28; }
+  45%, 62% { opacity: .9; }
+  71% { opacity: .18; }
+  82%, 93% { opacity: .82; }
+}
+@keyframes live-avatar-blink {
+  0%, 91%, 94%, 97%, 100% { opacity: 0; }
+  92.2%, 95.7% { opacity: .98; }
+}
+@keyframes live-avatar-breath {
+  0%, 100% { transform: translate3d(0, 0, 0) scaleY(1); }
+  50% { transform: translate3d(0, -.18%, 0) scaleY(1.006); }
+}
+@keyframes live-avatar-hair {
+  from { transform: translate3d(-.08%, .04%, 0) rotate(-.04deg); }
+  to { transform: translate3d(.13%, -.08%, 0) rotate(.07deg); }
+}
+@keyframes live-avatar-presence {
+  from { transform: translate3d(-1.5%, .8%, 0); opacity: .48; }
+  to { transform: translate3d(2%, -1.1%, 0); opacity: .78; }
+}
 @media (prefers-reduced-motion: reduce) {
   .video-call__avatar-feed { transform: scale(1.008); }
-  .video-call__avatar-frame { transition: none; }
+  .video-call__avatar-frame--breath,
+  .video-call__avatar-frame--hair,
+  .video-call__avatar-frame--blink,
+  .video-call__avatar-frame--mouth,
+  .video-call__presence-light { animation: none; }
+  .video-call__avatar-feed--speaking .video-call__avatar-frame--mouth { opacity: .82; }
 }
 .video-call__status {
   position: absolute;
@@ -1601,6 +1673,7 @@ select {
   .video-call__camera { top: 80px; right: 14px; width: 105px; height: 150px; border-radius: 18px; }
   .video-call__tools { top: 80px; left: 14px; }
   .video-call__tools label { max-width: 165px; }
+  .video-call__avatar-frame { object-position: 38% center; }
   .video-call__avatar-label { display: none; }
   .video-call__status { top: 136px; }
   .call-activity-menu { top: 280px; left: 14px; }
