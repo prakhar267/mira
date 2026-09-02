@@ -1,5 +1,5 @@
 const CACHE = "companion-shell-v1";
-const SHELL = ["/", "/app", "/demo", "/assets/luma/window-nook.png", "/assets/luma/portrait.png"];
+const SHELL = ["/", "/app", "/demo", "/assets/mira/loft-morning.png", "/assets/mira/portrait.png"];
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL))));
 self.addEventListener("activate", (event) => event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))));
 self.addEventListener("fetch", (event) => {

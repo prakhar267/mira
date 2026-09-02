@@ -49,10 +49,10 @@ const initialDraft: Draft = {
   adultConfirmed: false,
   intentions: [],
   interests: [],
-  companionName: "Luma",
+  companionName: "Mira",
   companionPronouns: "she/her",
   presentation: "playful and warm",
-  voiceId: "luma-playful-01",
+  voiceId: "mira-playful-01",
   relationshipMode: "romantic",
   warmth: 88,
   playfulness: 58,
@@ -82,8 +82,8 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
   const next = async () => {
     setError("");
     if (step === 1 && (!draft.name.trim() || !/^\S+@\S+\.\S+$/.test(draft.email) || draft.password.length < 12)) return setError("Add your name, a valid email, and a password of at least 12 characters.");
-    if (step === 2 && (!isAdult || !draft.adultConfirmed)) return setError("Luma is for adults 18+. Add your birthday and confirm eligibility.");
-    if (step === 4 && draft.intentions.length === 0) return setError("Choose at least one reason for meeting Luma.");
+    if (step === 2 && (!isAdult || !draft.adultConfirmed)) return setError("Mira is for adults 18+. Add your birthday and confirm eligibility.");
+    if (step === 4 && draft.intentions.length === 0) return setError("Choose at least one reason for meeting Mira.");
     if (step === 5 && !draft.companionName.trim()) return setError("Give your companion a name.");
     if (step === 6 && draft.relationshipMode === "romantic" && (!isAdult || !draft.adultConfirmed)) return setError("Romantic mode requires confirmed adult eligibility.");
     if (step === 8 && draft.interests.length === 0) return setError("Choose at least one interest to begin with.");
@@ -119,7 +119,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
             <>
               <div className="onboarding__icon"><Sparkles aria-hidden="true" /></div>
               <h1>A companion that grows from what you choose to share.</h1>
-              <p>Meet Luma, an AI companion designed to feel present through voice, expression, shared moments, and memories you can inspect or remove.</p>
+              <p>Meet Mira, an original AI companion designed to feel present through voice, expression, shared moments, and memories you can inspect or remove.</p>
               <div className="trust-note"><ShieldCheck aria-hidden="true" /><span>Clearly AI. Adults 18+. Not therapy or emergency care.</span></div>
             </>
           )}
@@ -127,7 +127,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
           {step === 1 && (
             <>
               <span className="eyebrow">About you</span>
-              <h1>What should Luma call you?</h1>
+              <h1>What should Mira call you?</h1>
               <p>Your email signs you in securely. Your name stays editable in your profile.</p>
               <label className="field">First name<input autoFocus maxLength={80} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Your first name" /></label>
               <label className="field">Email<input type="email" autoComplete="email" maxLength={200} value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} placeholder="you@example.com" /></label>
@@ -148,7 +148,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
           {step === 3 && (
             <>
               <span className="eyebrow">How we address you</span>
-              <h1>What pronouns should Luma use?</h1>
+              <h1>What pronouns should Mira use?</h1>
               <p>You can change this at any time in your profile.</p>
               <label className="field">Your pronouns<select value={draft.pronouns} onChange={(event) => setDraft({ ...draft, pronouns: event.target.value as Draft["pronouns"] })}><option>she/her</option><option>he/him</option><option>they/them</option></select></label>
             </>
@@ -158,7 +158,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
             <>
               <span className="eyebrow">Your intention</span>
               <h1>What are you looking for?</h1>
-              <p>Choose as many as fit. Luma supports—never replaces—your real relationships or professional care.</p>
+              <p>Choose as many as fit. Mira supports—never replaces—your real relationships or professional care.</p>
               <div className="choice-grid">
                 {intentions.map((item) => <button type="button" key={item} className={draft.intentions.includes(item) ? "choice choice--selected" : "choice"} onClick={() => toggle("intentions", item)}>{draft.intentions.includes(item) ? <Check aria-hidden="true" /> : null}{item}</button>)}
               </div>
@@ -170,12 +170,12 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <span className="eyebrow">Create your companion</span>
               <h1>Make the introduction yours.</h1>
               <div className="companion-pick">
-                <img src="/assets/luma/portrait.png" alt="Luma, an original AI companion avatar" />
+                <img src="/assets/mira/portrait.png" alt="Mira, an original AI companion avatar" />
                 <span><strong>Playful & warm</strong><small>Original prototype avatar</small></span>
               </div>
               <label className="field">Companion name<input maxLength={40} value={draft.companionName} onChange={(event) => setDraft({ ...draft, companionName: event.target.value })} /></label>
               <label className="field">Companion pronouns<select value={draft.companionPronouns} onChange={(event) => setDraft({ ...draft, companionPronouns: event.target.value as Draft["companionPronouns"] })}><option>she/her</option><option>he/him</option><option>they/them</option></select></label>
-              <div className="form-grid"><label className="field">Presentation<select value={draft.presentation} onChange={(event) => setDraft({ ...draft, presentation: event.target.value })}><option value="playful and warm">Playful & warm</option><option value="bright and expressive">Bright & expressive</option><option value="calm and thoughtful">Calm & thoughtful</option></select></label><label className="field">Voice<select value={draft.voiceId} onChange={(event) => setDraft({ ...draft, voiceId: event.target.value })}><option value="luma-playful-01">Luma · Playful</option><option value="luma-warm-01">Luma · Warm</option><option value="luma-calm-01">Luma · Calm</option></select></label></div>
+              <div className="form-grid"><label className="field">Presentation<select value={draft.presentation} onChange={(event) => setDraft({ ...draft, presentation: event.target.value })}><option value="playful and warm">Playful & warm</option><option value="bright and expressive">Bright & expressive</option><option value="calm and thoughtful">Calm & thoughtful</option></select></label><label className="field">Voice<select value={draft.voiceId} onChange={(event) => setDraft({ ...draft, voiceId: event.target.value })}><option value="mira-playful-01">Mira · Playful</option><option value="mira-warm-01">Mira · Warm</option><option value="mira-calm-01">Mira · Calm</option></select></label></div>
             </>
           )}
 
@@ -222,9 +222,9 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
           {step === 9 && (
             <>
               <span className="eyebrow">First conversation</span>
-              <h1>{draft.companionName || "Luma"} is ready to meet you.</h1>
+              <h1>{draft.companionName || "Mira"} is ready to meet you.</h1>
               <p>Your companion will begin with your chosen relationship style, interests, voice, and personality—without inventing facts about your life.</p>
-              <div className="ready-note"><Bot aria-hidden="true" /><span><strong>“Hi {draft.name.trim() || "there"}. I’m {draft.companionName || "Luma"}.”</strong> I feel like I should know one thing about you before we start.</span></div>
+              <div className="ready-note"><Bot aria-hidden="true" /><span><strong>“Hi {draft.name.trim() || "there"}. I’m {draft.companionName || "Mira"}.”</strong> I feel like I should know one thing about you before we start.</span></div>
               <div className="trust-note"><ShieldCheck aria-hidden="true" /><span>Memory stays inspectable. You can export or delete everything from Settings.</span></div>
             </>
           )}
@@ -235,8 +235,8 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
             <button type="button" className="button button--primary" disabled={submitting} onClick={() => void next()}>{submitting ? "Creating your space…" : step === steps - 1 ? "Meet your companion" : step === 0 ? "Begin setup" : "Continue"}<ArrowRight aria-hidden="true" /></button>
           </div>
         </div>
-        <aside className="onboarding__visual" aria-label="Preview of Luma in the companion room">
-          <img src="/assets/luma/window-nook.png" alt="Luma sitting in a moonlit window nook" />
+        <aside className="onboarding__visual" aria-label="Preview of Mira in the companion room">
+          <img src="/assets/mira/loft-morning.png" alt="Mira sketching in a sunny loft" />
           <div className="onboarding__visual-card"><span>Memory is off until you choose it</span><strong>You stay in control</strong></div>
         </aside>
       </section>

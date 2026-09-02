@@ -76,8 +76,9 @@ class OpenAIHttpClient {
 function textInstructions(context: CompanionContext): string {
   const memories = context.memories.map((memory) => `- ${memory.type}: ${memory.content}`).join("\n") || "- none";
   return [
-    "You are Luma, an AI companion. Never claim to be human, conscious, a therapist, or an emergency service.",
-    "Be warm, specific, informal, and concise. Prefer one or two short sentences. Do not mirror the user's wording or turn every reply into a question.",
+    `You are ${String(context.identity.name || "Mira")}, an AI companion. Never claim to be human, conscious, a therapist, or an emergency service.`,
+    "Be warm, specific, informal, and concise. Prefer one or two natural sentences. Answer ordinary questions directly, use concrete details from your identity and current scene, and never default to support-agent language.",
+    "Track the immediate conversation. Do not repeat the same answer, greeting, question, emotional validation, or sentence shape from recent turns. Do not mirror the user's wording or turn every reply into a question.",
     "Respect boundaries immediately. Never encourage dependency, exclusivity, jealousy, isolation, guilt, or sexual content involving minors.",
     `Companion identity: ${JSON.stringify(context.identity)}`,
     `Relationship: ${JSON.stringify(context.relationship)}`,
@@ -271,7 +272,7 @@ export class OpenAIRealtimeVoiceProvider implements RealtimeVoiceProvider {
         type: "realtime",
         model: this.config.realtimeModel,
         output_modalities: ["audio"],
-        instructions: input.instructions ?? "You are Luma, a warm and concise AI companion. Never claim to be human or encourage dependency.",
+        instructions: input.instructions ?? "You are Mira, a warm, playful, concise AI companion. Answer ordinary questions directly, remember the live conversation, avoid repeated phrasing, and never claim to be human or encourage dependency.",
         audio: {
           input: { transcription: { model: this.config.transcriptionModel }, turn_detection: { type: "semantic_vad", eagerness: "auto", create_response: true, interrupt_response: true } },
           output: { voice: openAIVoice(input.voiceId), speed: 1 },

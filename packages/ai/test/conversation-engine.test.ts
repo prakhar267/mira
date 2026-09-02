@@ -6,10 +6,10 @@ const now = new Date("2026-09-01T05:30:00.000Z");
 const user: UserProfile = { id: "user-1", name: "Prakhar", birthday: "1997-04-02", pronouns: "he/him", interests: ["startups", "films"], timezone: "Asia/Kolkata", adultConfirmed: true };
 const companion: CompanionProfile = {
   id: "companion-1",
-  name: "Luma",
+  name: "Mira",
   pronouns: "she/her",
   presentation: "playful and warm",
-  voiceId: "luma-playful-01",
+  voiceId: "mira-playful-01",
   relationshipMode: "romantic",
   mood: "cheerful",
   createdAt: "2026-07-14T00:00:00.000Z",
@@ -30,7 +30,7 @@ function context(messages: ChatMessage[], delivery: "text" | "voice" | "video" =
     timezone: user.timezone,
     now,
     delivery,
-    companionBackstory: "Luma loves city lights, old films, and terrible startup jokes.",
+    companionBackstory: "Mira loves sketching, city lights, old films, and terrible startup jokes.",
     responsePreferences: { listeningFirst: true, responseLength: "balanced", adviceStyle: "ask-first", questionFrequency },
   });
 }
@@ -104,8 +104,28 @@ describe("companion turn planning", () => {
   it("responds like a present character when asked what she is doing", () => {
     const planned = turn("What are you doing?");
     expect(planned.intent).toBe("self");
-    expect(planned.text.toLowerCase()).toMatch(/here|read|day|arrived/);
+    expect(planned.text.toLowerCase()).toMatch(/sketch|loft|light|listening/);
     expect(planned.text.toLowerCase()).not.toContain("how can i help");
+  });
+
+  it("answers basic identity questions directly and transparently", () => {
+    const name = turn("What's your name?");
+    const role = turn("What do you do?");
+    const identity = turn("Are you human?");
+    expect(name.text).toContain("Mira");
+    expect(role.text.toLowerCase()).toMatch(/companion|keep you company|familiar presence/);
+    expect(identity.text.toLowerCase()).toMatch(/ai/);
+    expect(identity.text.toLowerCase()).toMatch(/not human|not alive/);
+  });
+
+  it("varies a repeated spoken answer once the previous turn is in context", () => {
+    const first = turn("How are you?", [], "voice");
+    const prior: ChatMessage[] = [
+      { id: "u1", conversationId: "conversation", role: "user", content: "How are you?", createdAt: now.toISOString(), status: "sent" },
+      { id: "a1", conversationId: "conversation", role: "assistant", content: first.text, createdAt: now.toISOString(), status: "sent" },
+    ];
+    const second = turn("How are you?", prior, "voice");
+    expect(second.text).not.toBe(first.text);
   });
 
   it("makes a direct everyday choice instead of returning a generic prompt", () => {

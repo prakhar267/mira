@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Luma — AI companion",
-    short_name: "Luma",
+    name: "Mira — AI companion",
+    short_name: "Mira",
     description: "An adults-only AI companion with inspectable memory, voice, activities, and user-controlled privacy.",
     start_url: "/app",
     display: "standalone",

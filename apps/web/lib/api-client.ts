@@ -162,7 +162,7 @@ export const companionApi = {
     });
     if (!response.ok || !response.body) {
       const message = await response.json().catch(() => null) as ApiEnvelope<never> | null;
-      throw new Error(message && !message.ok ? message.error.message : "Luma could not respond just now.");
+      throw new Error(message && !message.ok ? message.error.message : "Mira could not respond just now.");
     }
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -180,7 +180,7 @@ export const companionApi = {
         const data = JSON.parse(raw) as { delta?: string; assistantMessageId?: string; message?: string };
         if (event === "token" && data.delta) onDelta(data.delta);
         if (event === "done" && data.assistantMessageId) assistantMessageId = data.assistantMessageId;
-        if (event === "error") throw new Error(data.message ?? "Luma could not respond just now.");
+        if (event === "error") throw new Error(data.message ?? "Mira could not respond just now.");
       }
       if (chunk.done) break;
     }

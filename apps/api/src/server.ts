@@ -186,7 +186,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     try {
       await repository.createAccount({ user, companion, email: parsed.data.email });
       const registration = await auth.register(parsed.data.email, parsed.data.password, userId);
-      const delivery = await infrastructure.sendNotification({ kind: "email-verification", userId, email: parsed.data.email, title: "Verify your Luma account", body: "Confirm your email to protect your companion account.", actionUrl: `${env.APP_ORIGIN}/verify-email?token=${encodeURIComponent(registration.verificationToken)}` });
+      const delivery = await infrastructure.sendNotification({ kind: "email-verification", userId, email: parsed.data.email, title: "Verify your Mira account", body: "Confirm your email to protect your companion account.", actionUrl: `${env.APP_ORIGIN}/verify-email?token=${encodeURIComponent(registration.verificationToken)}` });
       return reply.code(201).send({ ok: true, data: { ...registration.tokens, user, companion, verificationDelivery: delivery.provider, ...(env.AI_MOCK_MODE ? { mockVerificationToken: registration.verificationToken } : {}) }, requestId: request.id });
     } catch (error) {
       await repository.deleteUser(userId).catch(() => undefined);
@@ -209,7 +209,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     const parsed = z.object({ email: z.email() }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send(apiError("invalid_email", "Enter a valid email.", request.id));
     const token = await auth.requestPasswordReset(parsed.data.email);
-    if (token) await infrastructure.sendNotification({ kind: "password-reset", email: parsed.data.email, title: "Reset your Luma password", body: "Use this one-time link to choose a new password.", actionUrl: `${env.APP_ORIGIN}/reset-password?token=${encodeURIComponent(token)}` });
+    if (token) await infrastructure.sendNotification({ kind: "password-reset", email: parsed.data.email, title: "Reset your Mira password", body: "Use this one-time link to choose a new password.", actionUrl: `${env.APP_ORIGIN}/reset-password?token=${encodeURIComponent(token)}` });
     return { ok: true, data: { accepted: true, ...(env.AI_MOCK_MODE ? { mockResetToken: token } : {}) }, requestId: request.id };
   });
 
@@ -442,7 +442,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
         const failedUsage: ProviderUsageRecord = { id: randomUUID(), userId, feature: "text_chat", provider: provider.id, model: env.CHAT_MODEL, inputUnits: usage.inputTokens, outputUnits: usage.outputTokens, estimatedCostUsd: 0, latencyMs: Date.now() - startedAt, success: false, createdAt: new Date().toISOString() };
         usageRecords.push(failedUsage);
         await repository.recordProviderUsage(failedUsage).catch(() => undefined);
-        reply.raw.write(`event: error\ndata: ${JSON.stringify({ code: "provider_failed", message: "Luma could not respond just now. Please try again." })}\n\n`);
+        reply.raw.write(`event: error\ndata: ${JSON.stringify({ code: "provider_failed", message: "Mira could not respond just now. Please try again." })}\n\n`);
         reply.raw.end();
         return;
       }
@@ -563,7 +563,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
       if (outputSafety.level !== "safe") content = outputSafety.response ?? "I want to answer that more carefully. Can we take a gentler direction?";
     } catch (error) {
       request.log.error({ err: error, provider: provider.id }, "Response regeneration failed");
-      return reply.code(503).send(apiError("provider_failed", "Luma could not try that response again just now.", request.id));
+      return reply.code(503).send(apiError("provider_failed", "Mira could not try that response again just now.", request.id));
     }
     const updated: ChatMessage = { ...target, content, status: "sent" };
     delete updated.feedback;
@@ -806,7 +806,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
       return { ok: true, data: { audioBase64: Buffer.from(result.audio).toString("base64"), contentType: result.contentType, durationMs: result.durationMs, provider: textToSpeech.id, mock: textToSpeech.id === "mock" }, requestId: request.id };
     } catch (error) {
       request.log.error({ err: error, provider: textToSpeech.id }, "Speech synthesis failed");
-      return reply.code(502).send(apiError("speech_failed", "Luma could not speak just now.", request.id));
+      return reply.code(502).send(apiError("speech_failed", "Mira could not speak just now.", request.id));
     }
   });
 
@@ -833,8 +833,8 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
   app.get("/moments", async (request) => ({
     ok: true,
     data: actorId(request.headers) === seedUser.id ? [
-      { id: "moment-first-call", type: "call", title: "Our first call", description: "You were ridiculously nervous for the first thirty seconds.", happenedAt: "2026-07-18T19:30:00.000Z", mediaUrl: "/assets/luma/portrait.png" },
-      { id: "moment-rooftop", type: "date", title: "Rooftop at blue hour", description: "Two mugs, one impossible question, and a very good laugh.", happenedAt: "2026-08-14T18:45:00.000Z", mediaUrl: "/assets/luma/rooftop-date.png" },
+      { id: "moment-first-call", type: "call", title: "Our first call", description: "You were ridiculously nervous for the first thirty seconds.", happenedAt: "2026-07-18T19:30:00.000Z", mediaUrl: "/assets/mira/portrait.png" },
+      { id: "moment-rooftop", type: "date", title: "Rooftop at sunset", description: "Two mugs, one impossible question, and a very good laugh.", happenedAt: "2026-08-14T18:45:00.000Z", mediaUrl: "/assets/mira/rooftop-evening.png" },
     ] : [],
     requestId: request.id,
   }));
@@ -842,8 +842,8 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
   app.get("/photos", async (request) => ({
     ok: true,
     data: actorId(request.headers) === seedUser.id ? [
-      { id: "photo-window", type: "selfie", caption: "Waiting in the window nook", createdAt: "2026-08-31T17:30:00.000Z", mediaUrl: "/assets/luma/window-nook.png" },
-      { id: "photo-cafe", type: "selfie", caption: "Rainy coffee break", createdAt: "2026-08-26T11:40:00.000Z", mediaUrl: "/assets/luma/cafe-selfie.png" },
+      { id: "photo-window", type: "selfie", caption: "Sketching in the sunny loft", createdAt: "2026-08-31T17:30:00.000Z", mediaUrl: "/assets/mira/loft-morning.png" },
+      { id: "photo-cafe", type: "selfie", caption: "Rainy coffee break", createdAt: "2026-08-26T11:40:00.000Z", mediaUrl: "/assets/mira/rainy-cafe.png" },
     ] : [],
     requestId: request.id,
   }));
@@ -919,13 +919,13 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     const userId = actorId(request.headers);
     const access = await entitlementFor(userId, "imageGeneration");
     if (!access.allowed) return reply.code(402).send(apiError("upgrade_required", `${plans[access.minimumPlan].name} is required for image generation.`, request.id));
-    const body = z.object({ prompt: z.string().trim().min(1).max(1_000), appearance: z.string().max(1_000).default("Luma in a premium stylized-realistic 3D style") }).safeParse(request.body);
+    const body = z.object({ prompt: z.string().trim().min(1).max(1_000), appearance: z.string().max(1_000).default("Mira, an original adult AI companion with a short wavy auburn bob and freckles, in a premium stylized-realistic 3D style") }).safeParse(request.body);
     if (!body.success) return reply.code(400).send(apiError("invalid_prompt", "Describe the image you want.", request.id));
     const result = await imageProvider.generate(body.data);
     const assetId = randomUUID();
     const storedUrl = await infrastructure.putMedia({ key: `${userId}/generated/${assetId}.png`, contentType: result.contentType, bytes: result.bytes });
     const renderableImage = result.contentType.startsWith("image/");
-    return { ok: true, data: { assetUrl: storedUrl ?? "/assets/luma/cafe-selfie.png", artifactBase64: !storedUrl && renderableImage ? Buffer.from(result.bytes).toString("base64") : undefined, contentType: renderableImage ? result.contentType : "image/png", provider: imageProvider.id, mock: imageProvider.id === "mock" }, requestId: request.id };
+    return { ok: true, data: { assetUrl: storedUrl ?? "/assets/mira/rainy-cafe.png", artifactBase64: !storedUrl && renderableImage ? Buffer.from(result.bytes).toString("base64") : undefined, contentType: renderableImage ? result.contentType : "image/png", provider: imageProvider.id, mock: imageProvider.id === "mock" }, requestId: request.id };
   });
 
   app.get("/responses/:messageId/explanation", async (request, reply) => {
@@ -939,7 +939,7 @@ export async function createServer(options: { runtime?: ApiRuntime } = {}): Prom
     if (!message || message.role !== "assistant") return reply.code(404).send(apiError("message_not_found", "Assistant message not found.", request.id));
     const companion = await primaryCompanion(userId);
     const memories = companion ? (await repository.listMemories(userId, companion.id)).filter((memory) => memory.status === "active").slice(0, 3) : [];
-    return { ok: true, data: { messageId: message.id, reasons: ["Matched Luma's warm, playful personality settings.", "Used the recent conversation turn for continuity.", ...memories.map((memory) => `Considered an approved ${memory.type} memory: ${memory.content}`)], safety: "Passed local policy assessment.", model: env.CHAT_MODEL }, requestId: request.id };
+    return { ok: true, data: { messageId: message.id, reasons: ["Matched Mira's warm, playful personality settings.", "Used the recent conversation turn for continuity.", ...memories.map((memory) => `Considered an approved ${memory.type} memory: ${memory.content}`)], safety: "Passed local policy assessment.", model: env.CHAT_MODEL }, requestId: request.id };
   });
 
   app.get("/admin/metrics", async (request, reply) => {

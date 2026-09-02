@@ -29,7 +29,7 @@ export function FirstMeeting({ userName, companionName, onComplete }: { userName
 
   return (
     <main className="first-meeting">
-      <motion.img src="/assets/luma/window-nook.png" alt={`${companionName} looking toward you from a moonlit window nook`} initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.4 }} />
+      <motion.img src="/assets/mira/loft-morning.png" alt={`${companionName} looking toward you from a sunny loft`} initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.4 }} />
       <div className="first-meeting__veil" />
       <span className="first-meeting__brand">{companionName}<Sparkle aria-hidden="true" weight="fill" /></span>
       <div className="first-meeting__copy">

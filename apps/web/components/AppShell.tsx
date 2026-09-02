@@ -15,8 +15,8 @@ import type { AppView } from "@/lib/state";
 const navigation: Array<{ id: AppView; label: string; icon: Icon }> = [
   { id: "home", label: "Home", icon: House },
   { id: "chat", label: "Chat", icon: ChatCircle },
-  { id: "moments", label: "Moments", icon: Sparkle },
-  { id: "companion", label: "Companion", icon: Heart },
+  { id: "moments", label: "Memories", icon: Sparkle },
+  { id: "companion", label: "Wardrobe", icon: Heart },
   { id: "profile", label: "You", icon: UserCircle },
 ];
 
@@ -42,7 +42,7 @@ export function AppShell({
   return (
     <div className={`app-frame ${immersive ? "app-frame--immersive" : ""}`}>
       <aside className="sidebar" aria-label="Primary navigation">
-        <button className="sidebar__brand" type="button" onClick={() => onNavigate("home")} aria-label="Go to Luma home">
+        <button className="sidebar__brand" type="button" onClick={() => onNavigate("home")} aria-label={`Go to ${companionName} home`}>
           <span>{brand.displayName}</span>
           <Sparkle aria-hidden="true" size={14} weight="fill" />
         </button>

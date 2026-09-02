@@ -28,7 +28,7 @@ import { messagesForConversation, previousUserMessage } from "@/lib/conversation
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 const chooseTypingDelay = (content: string) => Math.min(680, 320 + content.trim().length * 3);
 const optional = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => promise.catch(() => fallback);
-const livePreferencesKey = (userId: string) => `luma-live-preferences-v1:${userId}`;
+const livePreferencesKey = (userId: string) => `mira-live-preferences-v1:${userId}`;
 
 export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const router = useRouter();
@@ -270,12 +270,12 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
         adultConfirmed: true,
         goals: draft.intentions,
         interests: draft.interests,
-        companionName: draft.companionName.trim() || "Luma",
+        companionName: draft.companionName.trim() || "Mira",
         companionPronouns: draft.companionPronouns,
         relationshipMode: draft.relationshipMode,
       });
       await Promise.all([
-        companionApi.updateCompanion(liveAccount.companion.id, { name: draft.companionName.trim() || "Luma", relationshipMode: draft.relationshipMode, voiceId: draft.voiceId }),
+        companionApi.updateCompanion(liveAccount.companion.id, { name: draft.companionName.trim() || "Mira", relationshipMode: draft.relationshipMode, voiceId: draft.voiceId }),
         companionApi.updatePersonality(liveAccount.companion.id, { warmth: draft.warmth / 100, playfulness: draft.playfulness / 100, energy: draft.energy / 100, humor: draft.humor / 100, verbosity: draft.expressiveness / 100 }),
       ]);
       liveConversationId = (await companionApi.createConversation(liveAccount.companion.id)).id;
@@ -290,7 +290,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       companion: {
         ...current.companion,
         ...(liveAccount?.companion ?? {}),
-        name: draft.companionName.trim() || "Luma",
+        name: draft.companionName.trim() || "Mira",
         pronouns: draft.companionPronouns,
         presentation: draft.presentation,
         voiceId: draft.voiceId,
@@ -322,7 +322,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
         id: crypto.randomUUID(),
         conversationId: liveConversationId ?? current.activeConversationId,
         role: "assistant",
-        content: `Hi ${draft.name.trim()}. I’m ${draft.companionName.trim() || "Luma"}. What makes an ordinary day feel good to you?`,
+        content: `Hi ${draft.name.trim()}. I’m ${draft.companionName.trim() || "Mira"}. What makes an ordinary day feel good to you?`,
         createdAt: new Date().toISOString(),
         status: "sent",
       }],
@@ -537,7 +537,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     }
     const now = new Date().toISOString();
     const attachmentId = crypto.randomUUID();
-    const imageUrl = prompt.toLowerCase().includes("rooftop") ? "/assets/luma/rooftop-date.png" : "/assets/luma/cafe-selfie.png";
+    const imageUrl = prompt.toLowerCase().includes("rooftop") ? "/assets/mira/rooftop-evening.png" : "/assets/mira/rainy-cafe.png";
     const assistantMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "assistant", content: `I took this for you—“${prompt}.”`, createdAt: now, status: "sent", attachments: [{ id: attachmentId, type: "generated-image", url: imageUrl, name: prompt }] };
     setState((current) => ({ ...current, mediaLibrary: [{ id: attachmentId, type: "generated-image", name: prompt, url: imageUrl, createdAt: now }, ...current.mediaLibrary], photos: [{ id: attachmentId, imageUrl, caption: prompt, createdAt: now, kind: "selfie" }, ...current.photos], messages: [...current.messages, assistantMessage] }));
   };
@@ -553,8 +553,8 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     const id = crypto.randomUUID();
     setState((current) => ({
       ...current,
-      photos: [{ id, imageUrl: "/assets/luma/cafe-selfie.png", caption: "Rainy coffee break—just for you", createdAt: now, kind: "selfie" }, ...current.photos],
-      mediaLibrary: [{ id, type: "generated-image", name: `${current.companion.name} coffee selfie`, url: "/assets/luma/cafe-selfie.png", createdAt: now }, ...current.mediaLibrary],
+      photos: [{ id, imageUrl: "/assets/mira/rainy-cafe.png", caption: "Rainy coffee break—just for you", createdAt: now, kind: "selfie" }, ...current.photos],
+      mediaLibrary: [{ id, type: "generated-image", name: `${current.companion.name} coffee selfie`, url: "/assets/mira/rainy-cafe.png", createdAt: now }, ...current.mediaLibrary],
     }));
     setMomentsTab("photos");
   };
@@ -736,16 +736,26 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       createdAt: now.toISOString(),
       status: "sent",
     };
-    return Promise.resolve(createCompanionTurn(content, [...messagesForConversation(state.messages, state.activeConversationId), userTurn], now, delivery).text);
+    const turn = createCompanionTurn(content, [...messagesForConversation(state.messages, state.activeConversationId), userTurn], now, delivery);
+    const assistantTurn: ChatMessage = {
+      id: crypto.randomUUID(),
+      conversationId: state.activeConversationId,
+      role: "assistant",
+      content: turn.text,
+      createdAt: new Date(now.getTime() + 1).toISOString(),
+      status: "sent",
+    };
+    setState((current) => ({ ...current, messages: [...current.messages, userTurn, assistantTurn] }));
+    return Promise.resolve(turn.text);
   };
 
   const exportData = async () => {
-    const payload = liveMode ? await companionApi.exportData() : { exportedAt: new Date().toISOString(), source: "luma-local-mock", ...state };
+    const payload = liveMode ? await companionApi.exportData() : { exportedAt: new Date().toISOString(), source: "mira-local-mock", ...state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = liveMode ? "luma-account-export.json" : "luma-demo-export.json";
+    anchor.download = liveMode ? "mira-account-export.json" : "mira-demo-export.json";
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -765,7 +775,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
     router.replace("/login");
   };
 
-  if (!hydrated) return <div className="app-loader"><span /><p>Opening Luma’s room…</p></div>;
+  if (!hydrated) return <div className="app-loader"><span /><p>Opening Mira’s room…</p></div>;
   if (hydrationError) return <div className="app-loader"><p>{hydrationError}</p><button type="button" className="button button--primary" onClick={() => window.location.reload()}>Try again</button></div>;
   if (!state.onboardingComplete) return <Onboarding onComplete={completeOnboarding} />;
   if (!state.firstMeetingComplete) return <FirstMeeting userName={state.user.name} companionName={state.companion.name} onComplete={() => setState((current) => ({ ...current, firstMeetingComplete: true }))} />;

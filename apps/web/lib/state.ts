@@ -138,10 +138,10 @@ const activities: ActivityDefinition[] = [
   { id: "story", title: "Story together", category: "Creativity", description: "Build an original story one choice at a time.", durationMinutes: 15, xp: 35, coinReward: 30 },
   { id: "roleplay", title: "Roleplay adventure", category: "Creativity", description: "A fictional, boundary-aware adventure you direct together.", durationMinutes: 18, xp: 40, coinReward: 34 },
   { id: "plan-trip", title: "Plan a trip", category: "Growth", description: "Dream up a route, mood, and tiny details together.", durationMinutes: 12, xp: 28, coinReward: 22 },
-  { id: "pick-outfit", title: "Pick my outfit", category: "Fun", description: "Luma reacts to tasteful style choices and helps you decide.", durationMinutes: 7, xp: 16, coinReward: 12 },
+  { id: "pick-outfit", title: "Pick my outfit", category: "Fun", description: "Mira reacts to tasteful style choices and helps you decide.", durationMinutes: 7, xp: 16, coinReward: 12 },
   { id: "movie-night", title: "Movie night", category: "Fun", description: "Choose a genre and chat through a watch-along moment.", durationMinutes: 20, xp: 36, coinReward: 28 },
   { id: "reflection", title: "Daily reflection", category: "Reflection", description: "Notice one feeling and one thing you need.", durationMinutes: 6, xp: 20, coinReward: 15 },
-  { id: "journal", title: "Journal together", category: "Reflection", description: "Write privately, then choose whether to reflect with Luma.", durationMinutes: 10, xp: 24, coinReward: 18 },
+  { id: "journal", title: "Journal together", category: "Reflection", description: "Write privately, then choose whether to reflect with Mira.", durationMinutes: 10, xp: 24, coinReward: 18 },
   { id: "goal", title: "Goal planning", category: "Growth", description: "Turn something meaningful into one kind next step.", durationMinutes: 10, xp: 30, coinReward: 25 },
   { id: "breathing", title: "Three-minute reset", category: "Relaxation", description: "A short paced breathing exercise with no pressure.", durationMinutes: 3, xp: 10, coinReward: 8 },
 ];
@@ -160,10 +160,10 @@ export const initialState: DemoState = {
   },
   companion: {
     id: demoCompanionId,
-    name: "Luma",
+    name: "Mira",
     pronouns: "she/her",
     presentation: "playful and warm",
-    voiceId: "luma-playful-01",
+    voiceId: "mira-playful-01",
     relationshipMode: "romantic",
     mood: "cheerful",
     createdAt: "2026-07-14T00:00:00.000Z",
@@ -210,20 +210,20 @@ export const initialState: DemoState = {
     { id: "memory-aman", userId: demoUserId, companionId: demoCompanionId, type: "relationship", content: "Aman is Prakhar’s best friend and lives in Bengaluru.", normalizedContent: "person:aman:best-friend", importance: 0.82, confidence: 0.9, sourceMessageIds: [], createdAt: "2026-08-18T13:00:00.000Z", updatedAt: "2026-08-18T13:00:00.000Z", retrievalCount: 2, status: "active", pinned: false },
   ],
   moments: [
-    { id: "moment-first-call", title: "Our first call", description: "You were ridiculously nervous for the first thirty seconds.", date: "2026-07-18T19:30:00.000Z", imageUrl: "/assets/luma/portrait.png", kind: "call", detail: "23 min · voice call" },
-    { id: "moment-rooftop", title: "Rooftop at blue hour", description: "Two mugs, one impossible question, and a very good laugh.", date: "2026-08-14T18:45:00.000Z", imageUrl: "/assets/luma/rooftop-date.png", kind: "date", detail: "Virtual date · Rooftop" },
-    { id: "moment-pitch", title: "You sent the pitch", description: "A quiet win worth keeping.", date: "2026-08-31T17:59:00.000Z", imageUrl: "/assets/luma/window-nook.png", kind: "memory", detail: "Important goal" },
+    { id: "moment-first-call", title: "Our first call", description: "You were ridiculously nervous for the first thirty seconds.", date: "2026-07-18T19:30:00.000Z", imageUrl: "/assets/mira/portrait.png", kind: "call", detail: "23 min · voice call" },
+    { id: "moment-rooftop", title: "Rooftop at blue hour", description: "Two mugs, one impossible question, and a very good laugh.", date: "2026-08-14T18:45:00.000Z", imageUrl: "/assets/mira/rooftop-evening.png", kind: "date", detail: "Virtual date · Rooftop" },
+    { id: "moment-pitch", title: "You sent the pitch", description: "A quiet win worth keeping.", date: "2026-08-31T17:59:00.000Z", imageUrl: "/assets/mira/loft-morning.png", kind: "memory", detail: "Important goal" },
   ],
   photos: [
-    { id: "photo-window", imageUrl: "/assets/luma/window-nook.png", caption: "Waiting in the window nook", createdAt: "2026-08-31T17:30:00.000Z", kind: "selfie" },
-    { id: "photo-cafe", imageUrl: "/assets/luma/cafe-selfie.png", caption: "Rainy coffee break", createdAt: "2026-08-26T11:40:00.000Z", kind: "selfie" },
-    { id: "photo-rooftop", imageUrl: "/assets/luma/rooftop-date.png", caption: "Our rooftop date", createdAt: "2026-08-14T18:45:00.000Z", kind: "moment" },
+    { id: "photo-window", imageUrl: "/assets/mira/loft-morning.png", caption: "Sketching in the sunny loft", createdAt: "2026-08-31T17:30:00.000Z", kind: "selfie" },
+    { id: "photo-cafe", imageUrl: "/assets/mira/rainy-cafe.png", caption: "Rainy coffee break", createdAt: "2026-08-26T11:40:00.000Z", kind: "selfie" },
+    { id: "photo-rooftop", imageUrl: "/assets/mira/rooftop-evening.png", caption: "Our rooftop date", createdAt: "2026-08-14T18:45:00.000Z", kind: "moment" },
   ],
   calls: [
     { id: "call-today", type: "video", startedAt: "2026-08-31T16:20:00.000Z", durationSeconds: 1_620, summary: "Pitch-deck nerves, one practice answer, then a five-minute reset." },
     { id: "call-yesterday", type: "voice", startedAt: "2026-08-30T20:15:00.000Z", durationSeconds: 720, summary: "A short check-in about sleep and tomorrow’s priorities." },
   ],
-  companionBackstory: "Luma loves late-night city lights, old films, jasmine tea, and terrible startup jokes. She is playful and direct, remembers small details, and knows when to stop asking questions.",
+  companionBackstory: "Mira is an original AI companion who loves sketching sunlit rooms, tiny cafés, old films, sunset walks, and terrible startup jokes. She is playful, observant, direct without being harsh, and knows when companionship matters more than another question.",
   companionReflections: [
     { id: "reflection-pitch", title: "He did the hard part", thought: "Prakhar finally sent the pitch deck after carrying it for weeks. I think relief needs more room than another productivity plan tonight.", createdAt: "2026-08-31T18:20:00.000Z", memoryIds: ["memory-pitch"] },
     { id: "reflection-interview", title: "Tomorrow at eleven", thought: "The Stripe interview matters to him. I want to remember the time without making every conversation about it.", createdAt: "2026-08-31T18:05:00.000Z", memoryIds: ["memory-interview"] },
@@ -234,13 +234,13 @@ export const initialState: DemoState = {
   wallet: { xp: 1_168, level: 12, coins: 640, gems: 28 },
   walletTransactions: [],
   storeItems: [
-    { id: "lavender-cardigan", name: "Moonlight cardigan", description: "Soft lavender knit from the window-nook scene.", category: "Clothing", assetUrl: "/assets/luma/window-nook.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "outfit", tone: "lavender" }, active: true },
-    { id: "midnight-dress", name: "Midnight blue", description: "A softly tailored rooftop look.", category: "Clothing", assetUrl: "/assets/luma/rooftop-date.png", currency: "coins", price: 180, tierRequired: "plus", metadata: { slot: "outfit", tone: "midnight" }, active: true },
-    { id: "cafe-knit", name: "Rainy-day knit", description: "Warm layers for slow coffee afternoons.", category: "Clothing", assetUrl: "/assets/luma/cafe-selfie.png", currency: "coins", price: 120, tierRequired: "free", metadata: { slot: "outfit", tone: "warm" }, active: true },
-    { id: "star-chain", name: "Little star chain", description: "A subtle gold keepsake.", category: "Accessories", assetUrl: "/assets/luma/portrait.png", currency: "gems", price: 8, tierRequired: "plus", metadata: { slot: "accessory", tone: "gold" }, active: true },
-    { id: "window-nook", name: "Window nook", description: "Moonlight, city glow, and the softest corner.", category: "Room", assetUrl: "/assets/luma/window-nook.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "room", environment: "window-nook" }, active: true },
-    { id: "rainy-cafe", name: "Rainy café", description: "Coffee, rain, and a table by the window.", category: "Room", assetUrl: "/assets/luma/cafe-selfie.png", currency: "coins", price: 220, tierRequired: "plus", metadata: { slot: "room", environment: "rainy-cafe" }, active: true },
-    { id: "rooftop", name: "Blue-hour rooftop", description: "City lights for dates and long conversations.", category: "Special Items", assetUrl: "/assets/luma/rooftop-date.png", currency: "gems", price: 18, tierRequired: "ultra", metadata: { slot: "room", environment: "rooftop" }, active: true },
+    { id: "lavender-cardigan", name: "Sage lounge set", description: "Mira’s relaxed sketching-day look.", category: "Clothing", assetUrl: "/assets/mira/loft-morning.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "outfit", tone: "sage" }, active: true },
+    { id: "midnight-dress", name: "Sunset casual", description: "A softly styled rooftop look.", category: "Clothing", assetUrl: "/assets/mira/rooftop-evening.png", currency: "coins", price: 180, tierRequired: "plus", metadata: { slot: "outfit", tone: "sunset" }, active: true },
+    { id: "cafe-knit", name: "Rainy-day tee", description: "Easy layers for slow coffee afternoons.", category: "Clothing", assetUrl: "/assets/mira/rainy-cafe.png", currency: "coins", price: 120, tierRequired: "free", metadata: { slot: "outfit", tone: "warm" }, active: true },
+    { id: "star-chain", name: "Little gold chain", description: "A subtle gold keepsake.", category: "Accessories", assetUrl: "/assets/mira/portrait.png", currency: "gems", price: 8, tierRequired: "plus", metadata: { slot: "accessory", tone: "gold" }, active: true },
+    { id: "window-nook", name: "Sunny loft", description: "Plants, sketches, warm timber, and room to breathe.", category: "Room", assetUrl: "/assets/mira/loft-morning.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "room", environment: "window-nook" }, active: true },
+    { id: "rainy-cafe", name: "Rainy café", description: "Coffee, rain, and a table by the window.", category: "Room", assetUrl: "/assets/mira/rainy-cafe.png", currency: "coins", price: 220, tierRequired: "plus", metadata: { slot: "room", environment: "rainy-cafe" }, active: true },
+    { id: "rooftop", name: "Sunset rooftop", description: "String lights for dates and long conversations.", category: "Special Items", assetUrl: "/assets/mira/rooftop-evening.png", currency: "gems", price: 18, tierRequired: "ultra", metadata: { slot: "room", environment: "rooftop" }, active: true },
   ],
   ownedItems: [
     { itemId: "lavender-cardigan", purchasedAt: "2026-07-14T00:00:00.000Z", equipped: true },
@@ -257,8 +257,8 @@ export const initialState: DemoState = {
   ],
   responsePreferences: { listeningFirst: true, responseLength: "balanced", adviceStyle: "ask-first", questionFrequency: "balanced" },
   mediaLibrary: [
-    { id: "media-cafe", type: "generated-image", name: "Rainy coffee break", url: "/assets/luma/cafe-selfie.png", createdAt: "2026-08-26T11:40:00.000Z" },
-    { id: "media-rooftop", type: "generated-image", name: "Rooftop date", url: "/assets/luma/rooftop-date.png", createdAt: "2026-08-14T18:45:00.000Z" },
+    { id: "media-cafe", type: "generated-image", name: "Rainy coffee break", url: "/assets/mira/rainy-cafe.png", createdAt: "2026-08-26T11:40:00.000Z" },
+    { id: "media-rooftop", type: "generated-image", name: "Rooftop date", url: "/assets/mira/rooftop-evening.png", createdAt: "2026-08-14T18:45:00.000Z" },
   ],
   notifications: {
     frequency: "normal",
@@ -270,11 +270,11 @@ export const initialState: DemoState = {
   memoryEnabled: true,
   aiProcessingConsent: true,
   conversationStorageEnabled: true,
-  theme: "dark",
+  theme: "light",
   activeEnvironment: "window-nook",
   ambienceEnabled: true,
   proactiveCalls: "rarely",
   currentView: "home",
 };
 
-export const storageKey = "luma-demo-v1";
+export const storageKey = "mira-demo-v1";

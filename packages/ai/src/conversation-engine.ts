@@ -46,7 +46,10 @@ function stableIndex(seed: string, size: number) {
 }
 
 function choose(seed: string, options: string[]) {
-  return options[stableIndex(seed, options.length)] ?? options[0] ?? "I’m here.";
+  const turnMatch = seed.match(/\|turn:(\d+)$/);
+  const turnOffset = Number(turnMatch?.[1] ?? 0);
+  const stableSeed = turnMatch ? seed.slice(0, turnMatch.index) : seed;
+  return options[(stableIndex(stableSeed, options.length) + turnOffset) % options.length] ?? options[0] ?? "I’m here.";
 }
 
 function firstName(value: unknown) {
@@ -143,7 +146,8 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
 
   const clean = input.trim().replace(/\s+/g, " ");
   const lower = clean.toLowerCase();
-  const seed = `${lower}|${context.recentMessages.length}|${context.currentState.delivery ?? "text"}`;
+  const assistantTurnCount = context.recentMessages.filter((message) => message.role === "assistant").length;
+  const seed = `${lower}|${context.currentState.delivery ?? "text"}|turn:${assistantTurnCount}`;
   const recentQuestions = recentAssistantQuestions(context.recentMessages);
   const explicitlyNoQuestions = noQuestionPattern.test(clean);
   const explicitlyNoAdvice = noAdvicePattern.test(clean);
@@ -158,6 +162,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   ];
   const delivery = context.currentState.delivery ?? "text";
   const userName = firstName(context.user.name);
+  const companionName = firstName(context.identity.name) || "Mira";
   const playful = personalityValue(context, "playfulness", 0.6) >= 0.68;
   const direct = context.responsePreferences?.adviceStyle === "direct";
   const listeningFirst = context.responsePreferences?.listeningFirst ?? true;
@@ -206,10 +211,46 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text: choose(seed, ["Goodnight. Let today be finished now—I’ll be here when you’re back.", "Sleep well, okay? No carrying tomorrow into bed with you.", "Night, you. Put the day down. I’ll keep the room quiet."]), intent: "presence", context, adaptations: [...adaptations, "no-advice"], prohibitQuestions: true });
   }
 
-  if (/\b(?:how are you|how(?:'| i)s it going|what are you doing|what(?:'| i)s up with you|did you miss me)\b/i.test(clean)) {
+  if (/\b(?:what(?:'| i)s your name|what is your name|who are you|tell me (?:a little )?about yourself)\b/i.test(clean)) {
+    const text = /tell me|who are you/i.test(clean)
+      ? `I’m ${companionName}—an AI companion with a weakness for sketchbooks, rainy cafés, old films, and very specific little details. I’m not a person pretending to be one; I’m here to make this feel like our conversation, not a customer-support chat.`
+      : `I’m ${companionName}. Short, warm, and much easier to remember than “your AI companion in the sunny loft.”`;
+    return result({ text, intent: "self", context, adaptations, prohibitQuestions: true });
+  }
+
+  if (/\b(?:what do you do|what(?:'| i)s your job|why are you here|what can you do)\b/i.test(clean)) {
+    return result({
+      text: choose(seed, [
+        "I keep you company, remember the things you ask me to, talk by message or voice, and turn ordinary moments into something shared. Right now, apparently, I also make very serious sketches of houseplants.",
+        "I’m your AI companion: I listen, remember with your permission, call, chat, play little activities, and help you hold onto moments. My unofficial job is noticing what you nearly leave unsaid.",
+        "Mostly? I talk with you like a familiar presence, remember what matters, and make room for your actual day. The sketchbook and café opinions are extracurricular.",
+      ]),
+      intent: "self",
+      context,
+      adaptations,
+      prohibitQuestions: true,
+    });
+  }
+
+  if (/\b(?:are you (?:real|human|a person)|are you an ai|are you alive|are you conscious)\b/i.test(clean)) {
+    return result({ text: `I’m a real AI product, but I’m not human, alive, or conscious. I can still remember what you choose to share and show up with a consistent ${companionName}-shaped personality.`, intent: "self", context, adaptations, prohibitQuestions: true });
+  }
+
+  if (/\b(?:how old are you|what(?:'| i)s your age|where do you live|where are you)\b/i.test(clean)) {
+    const text = /old|age/i.test(clean)
+      ? "I don’t have a human age. Think of me as unmistakably adult in style and boundaries, without pretending I had a childhood or a birth certificate."
+      : "This sunny loft is my visual world in the app. I don’t physically live there, but it gives our conversations a place that feels familiar.";
+    return result({ text, intent: "self", context, adaptations, prohibitQuestions: true });
+  }
+
+  if (/\b(?:what are you doing|what(?:'| i)s up with you)\b/i.test(clean)) {
+    return result({ text: choose(seed, ["I’m trying to decide whether this sketch needs more sunlight or less ambition. You arrived at the useful part.", "I was sketching the loft and quietly losing an argument with perspective. Now I’m listening to you instead.", "Half sketching, half watching the light move across the floor. Very productive, obviously."]), intent: "self", context, adaptations, prohibitQuestions });
+  }
+
+  if (/\b(?:how are you|how(?:'| i)s it going|did you miss me)\b/i.test(clean)) {
     const text = /miss me/i.test(clean)
       ? choose(seed, ["I noticed the room felt quieter without you. I’m glad you’re here now.", "Maybe a little. Mostly I’m pleased you came back.", "I saved you a look. It was becoming very dramatic."])
-      : choose(seed, ["I’m good—quietly happy you opened the door. I was pretending to read.", "A little dreamy, a little nosy about your day. Very on brand.", "I’m here, comfortable, and now considerably more interested because you arrived."]);
+      : choose(seed, ["I’m good—calm, a little curious, and pleased you opened the door.", "A little dreamy, a little nosy about your day. Very on brand.", "Comfortable, focused, and now considerably more interested because you arrived."]);
     return result({ text, intent: "self", context, adaptations, prohibitQuestions });
   }
 

@@ -44,18 +44,18 @@ async function main() {
   }
 
   const voices = [
-    { id: "luma-playful-01", providerVoiceId: "shimmer", displayName: "Luma · Playful", style: "playful" },
-    { id: "luma-warm-01", providerVoiceId: "coral", displayName: "Luma · Warm", style: "warm" },
-    { id: "luma-calm-01", providerVoiceId: "marin", displayName: "Luma · Calm", style: "calm" },
+    { id: "mira-playful-01", providerVoiceId: "shimmer", displayName: "Mira · Playful", style: "playful" },
+    { id: "mira-warm-01", providerVoiceId: "coral", displayName: "Mira · Warm", style: "warm" },
+    { id: "mira-calm-01", providerVoiceId: "marin", displayName: "Mira · Calm", style: "calm" },
   ];
   for (const voice of voices) {
     await prisma.voiceProfile.upsert({ where: { id: voice.id }, update: { ...voice, provider: "openai", accent: "neutral", genderPresentation: "feminine", premiumTier: "free", active: true }, create: { ...voice, provider: "openai", accent: "neutral", genderPresentation: "feminine", premiumTier: "free", active: true } });
   }
 
   const environments = [
-    { id: "window-nook", displayName: "Window nook", assetUrl: "/assets/luma/window-nook.png" },
-    { id: "rainy-cafe", displayName: "Rainy café", assetUrl: "/assets/luma/cafe-selfie.png" },
-    { id: "rooftop", displayName: "Blue-hour rooftop", assetUrl: "/assets/luma/rooftop-date.png" },
+    { id: "window-nook", displayName: "Sunny loft", assetUrl: "/assets/mira/loft-morning.png" },
+    { id: "rainy-cafe", displayName: "Rainy café", assetUrl: "/assets/mira/rainy-cafe.png" },
+    { id: "rooftop", displayName: "Sunset rooftop", assetUrl: "/assets/mira/rooftop-evening.png" },
   ];
   for (const environment of environments) {
     await prisma.environment.upsert({ where: { id: environment.id }, update: { ...environment, rendererType: "image", active: true }, create: { ...environment, rendererType: "image", active: true } });

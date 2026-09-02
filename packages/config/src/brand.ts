@@ -1,7 +1,7 @@
 export const brand = {
-  internalName: "Luma",
-  displayName: process.env.NEXT_PUBLIC_BRAND_NAME || "Luma",
-  companionName: "Luma",
+  internalName: "Mira",
+  displayName: process.env.NEXT_PUBLIC_BRAND_NAME || "Mira",
+  companionName: "Mira",
   promise: "A companion who feels present, remembers, and grows with you.",
   disclosure: "AI companion · Adults 18+",
   supportEmail: process.env.PUBLIC_SUPPORT_EMAIL || "support@example.invalid",

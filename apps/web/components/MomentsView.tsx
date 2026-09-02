@@ -21,9 +21,9 @@ import type { DemoState, EnvironmentId } from "@/lib/state";
 export type MomentsTab = "moments" | "photos" | "thoughts" | "together" | "calls";
 
 const dates: Array<{ title: string; subtitle: string; environment: EnvironmentId; image: string }> = [
-  { title: "Rooftop date", subtitle: "Blue hour · warm questions", environment: "rooftop", image: "/assets/luma/rooftop-date.png" },
-  { title: "Coffee date", subtitle: "Rain outside · nowhere to rush", environment: "rainy-cafe", image: "/assets/luma/cafe-selfie.png" },
-  { title: "Window-nook night", subtitle: "Soft ambience · deep talk", environment: "window-nook", image: "/assets/luma/window-nook.png" },
+  { title: "Rooftop date", subtitle: "Sunset · warm questions", environment: "rooftop", image: "/assets/mira/rooftop-evening.png" },
+  { title: "Coffee date", subtitle: "Rain outside · nowhere to rush", environment: "rainy-cafe", image: "/assets/mira/rainy-cafe.png" },
+  { title: "Sunny loft", subtitle: "Soft ambience · deep talk", environment: "window-nook", image: "/assets/mira/loft-morning.png" },
 ];
 
 export function MomentsView({
@@ -152,7 +152,7 @@ export function MomentsView({
       {tab === "calls" ? (
         <div className="calls-view">
           <div className="calls-hero">
-            <img src="/assets/luma/portrait.png" alt="" />
+            <img src="/assets/mira/portrait.png" alt="" />
             <div><span className="luma-kicker">Here with you</span><h2>Call {state.companion.name}</h2><p>Voice for a quick check-in. Video when you want the room, expressions, and activities too.</p></div>
             <button type="button" className="luma-button luma-button--accent" onClick={onVideoCall}><VideoCamera aria-hidden="true" weight="fill" /> Start video call</button>
           </div>
@@ -165,7 +165,7 @@ export function MomentsView({
               </article>
             ))}
           </div>
-          <p className="privacy-note"><MagicWand aria-hidden="true" /> Call summaries are optional. Raw audio and video are never stored{liveMode ? " by Luma" : " in this demo"}.</p>
+          <p className="privacy-note"><MagicWand aria-hidden="true" /> Call summaries are optional. Raw audio and video are never stored{liveMode ? ` by ${state.companion.name}` : " in this demo"}.</p>
         </div>
       ) : null}
     </section>

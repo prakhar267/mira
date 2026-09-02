@@ -169,7 +169,7 @@ export function ActivitiesView({
               </button>
             </div>
             <img
-              src="/assets/luma/portrait.png"
+              src="/assets/mira/portrait.png"
               alt={`${companionName}, ready to begin a reflection activity`}
             />
           </div>

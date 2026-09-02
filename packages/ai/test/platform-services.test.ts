@@ -32,7 +32,7 @@ describe("companion platform services", () => {
   it("answers emotional language before matching incidental preference words", async () => {
     const messages: ChatMessage[] = [{ id: "m1", conversationId: "c1", role: "user", content: "I feel nervous about tomorrow. Talk to me like a real person, not a chatbot.", createdAt: "2026-08-31T18:00:00.000Z" }];
     const context: CompanionContext = {
-      identity: { name: "Luma" },
+      identity: { name: "Mira" },
       user: { name: "Prakhar" },
       relationship: { mode: "romantic" },
       memories: [{ id: "memory-interview", type: "episodic", content: "Prakhar has a Stripe interview tomorrow at 11:00." }],

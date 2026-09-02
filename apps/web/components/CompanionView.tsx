@@ -17,10 +17,10 @@ import type { CompanionProfile, OwnedItemRecord, StoreItemRecord, SubscriptionSt
 import { canAccessItem } from "@/lib/product-rules";
 
 const voices = [
-  { id: "luma-warm-01", name: "Warm", detail: "Soft, grounded, close", rate: .92, pitch: 1.02 },
-  { id: "luma-playful-01", name: "Playful", detail: "Bright, teasing, expressive", rate: 1.03, pitch: 1.08 },
-  { id: "luma-calm-01", name: "Calm", detail: "Slow, gentle, steady", rate: .86, pitch: .98 },
-  { id: "luma-confident-01", name: "Confident", detail: "Clear, warm, direct", rate: .98, pitch: 1 },
+  { id: "mira-warm-01", name: "Warm", detail: "Soft, grounded, close", rate: .92, pitch: 1.02 },
+  { id: "mira-playful-01", name: "Playful", detail: "Bright, teasing, expressive", rate: 1.03, pitch: 1.08 },
+  { id: "mira-calm-01", name: "Calm", detail: "Slow, gentle, steady", rate: .86, pitch: .98 },
+  { id: "mira-confident-01", name: "Confident", detail: "Clear, warm, direct", rate: .98, pitch: 1 },
 ];
 
 export function CompanionView({ companion, backstory, storeItems, ownedItems, wallet, subscription, onChange, onBackstoryChange, onPurchase, onEquip, onUpgrade }: {
@@ -39,7 +39,7 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
   const [tab, setTab] = useState<"appearance" | "personality" | "backstory" | "voice">("appearance");
   const [notice, setNotice] = useState("");
   const equipped = ownedItems.find((item) => item.equipped && storeItems.find((candidate) => candidate.id === item.itemId)?.metadata.slot === "outfit");
-  const preview = storeItems.find((item) => item.id === equipped?.itemId)?.assetUrl ?? "/assets/luma/window-nook.png";
+  const preview = storeItems.find((item) => item.id === equipped?.itemId)?.assetUrl ?? "/assets/mira/loft-morning.png";
 
   const previewVoice = (voice: typeof voices[number]) => {
     if (!("speechSynthesis" in window)) return setNotice("Voice preview is unavailable in this browser.");

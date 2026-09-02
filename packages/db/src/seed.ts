@@ -12,10 +12,10 @@ export const seedUser: UserProfile = {
 
 export const seedCompanion: CompanionProfile = {
   id: "00000000-0000-4000-8000-000000000002",
-  name: "Luma",
+  name: "Mira",
   pronouns: "she/her",
   presentation: "warm and grounded",
-  voiceId: "luma-playful-01",
+  voiceId: "mira-playful-01",
   relationshipMode: "romantic",
   mood: "cheerful",
   createdAt: "2026-08-01T00:00:00.000Z",
@@ -78,18 +78,18 @@ export const seedActivities: ActivityDefinition[] = [
   { id: "activity-goal", title: "Goal planning", category: "Growth", description: "Break one meaningful goal into a gentle next step.", durationMinutes: 10, xp: 30, coinReward: 25 },
   { id: "activity-trivia", title: "Trivia", category: "Games", description: "A quick round built around your favorite topics.", durationMinutes: 10, xp: 22, coinReward: 16 },
   { id: "activity-cards", title: "Conversation cards", category: "Relationships", description: "Prompts that can help you understand someone in your life.", durationMinutes: 12, xp: 26, coinReward: 18 },
-  { id: "activity-journal", title: "Journal prompt", category: "Reflection", description: "Write privately, then choose whether Luma may reflect with you.", durationMinutes: 8, xp: 20, coinReward: 14 },
+  { id: "activity-journal", title: "Journal prompt", category: "Reflection", description: "Write privately, then choose whether Mira may reflect with you.", durationMinutes: 8, xp: 20, coinReward: 14 },
   { id: "activity-movie", title: "Movie discussion", category: "Fun", description: "Unpack a film, character, or scene that stayed with you.", durationMinutes: 12, xp: 22, coinReward: 16 },
   { id: "activity-music", title: "Music discussion", category: "Fun", description: "Share a song and the feeling or memory it carries.", durationMinutes: 10, xp: 22, coinReward: 16 },
   { id: "activity-relationship", title: "Relationship reflection", category: "Relationships", description: "Think through a real-world relationship with care and perspective.", durationMinutes: 12, xp: 28, coinReward: 20 },
 ];
 
 export const seedStoreItems: StoreItemRecord[] = [
-  { id: "lavender-cardigan", name: "Moonlight cardigan", description: "Luma's soft lavender starting look.", category: "Clothing", assetUrl: "/assets/luma/window-nook.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "outfit", tone: "lavender" }, active: true },
-  { id: "midnight-blue", name: "Midnight blue", description: "A softly tailored rooftop look.", category: "Clothing", assetUrl: "/assets/luma/rooftop-date.png", currency: "coins", price: 180, tierRequired: "plus", metadata: { slot: "outfit", tone: "midnight" }, active: true },
-  { id: "star-chain", name: "Little star chain", description: "A subtle gold keepsake.", category: "Accessories", assetUrl: "/assets/luma/portrait.png", currency: "gems", price: 8, tierRequired: "plus", metadata: { slot: "jewelry" }, active: true },
-  { id: "window-nook", name: "Window nook", description: "Moonlight, city glow, and the softest corner.", category: "Room", assetUrl: "/assets/luma/window-nook.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "room", ambience: "moonlight", environment: "window-nook" }, active: true },
-  { id: "rainy-cafe", name: "Rainy café", description: "Coffee and nowhere to rush.", category: "Room", assetUrl: "/assets/luma/cafe-selfie.png", currency: "coins", price: 220, tierRequired: "plus", metadata: { slot: "room", ambience: "rain", environment: "rainy-cafe" }, active: true },
+  { id: "lavender-cardigan", name: "Sage lounge set", description: "Mira's relaxed sketching-day look.", category: "Clothing", assetUrl: "/assets/mira/loft-morning.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "outfit", tone: "sage" }, active: true },
+  { id: "midnight-blue", name: "Sunset casual", description: "A softly styled rooftop look.", category: "Clothing", assetUrl: "/assets/mira/rooftop-evening.png", currency: "coins", price: 180, tierRequired: "plus", metadata: { slot: "outfit", tone: "sunset" }, active: true },
+  { id: "star-chain", name: "Little gold chain", description: "A subtle gold keepsake.", category: "Accessories", assetUrl: "/assets/mira/portrait.png", currency: "gems", price: 8, tierRequired: "plus", metadata: { slot: "jewelry" }, active: true },
+  { id: "window-nook", name: "Sunny loft", description: "Plants, sketches, warm timber, and room to breathe.", category: "Room", assetUrl: "/assets/mira/loft-morning.png", currency: "free", price: 0, tierRequired: "free", metadata: { slot: "room", ambience: "daylight", environment: "window-nook" }, active: true },
+  { id: "rainy-cafe", name: "Rainy café", description: "Coffee and nowhere to rush.", category: "Room", assetUrl: "/assets/mira/rainy-cafe.png", currency: "coins", price: 220, tierRequired: "plus", metadata: { slot: "room", ambience: "rain", environment: "rainy-cafe" }, active: true },
 ];
 
 export const inMemorySeed = { user: seedUser, companion: seedCompanion, memories: seedMemories, activities: seedActivities, storeItems: seedStoreItems };

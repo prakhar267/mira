@@ -7,7 +7,6 @@ import {
   Heart,
   Microphone,
   MicrophoneSlash,
-  PaperPlaneTilt,
   PhoneDisconnect,
   SpeakerHigh,
   SpeakerSlash,
@@ -69,14 +68,13 @@ export function VoiceCallModal({
   onRealtimeConnect?: () => Promise<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void }>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const greeting = `Hey ${userName}. There you are. I’m here—take your time.`;
+  const greeting = `Hey ${userName}. Good timing—I was just sketching. What’s going on?`;
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState(true);
   const [captions, setCaptions] = useState(true);
   const [heartSent, setHeartSent] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [phase, setPhase] = useState<CallPhase>("connecting");
-  const [draft, setDraft] = useState("");
   const [heard, setHeard] = useState("");
   const [companionLine, setCompanionLine] = useState(greeting);
   const [speechError, setSpeechError] = useState("");
@@ -85,7 +83,6 @@ export function VoiceCallModal({
   const realtimeRef = useRef<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void } | null>(null);
   const realtimeReplyStarted = useRef(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const greetingSpoken = useRef(false);
   const speechTurn = useRef(0);
 
@@ -150,7 +147,7 @@ export function VoiceCallModal({
 
   useEffect(() => {
     const speakingFrame = new Image();
-    speakingFrame.src = "/assets/luma/portrait-speaking-v2.png";
+    speakingFrame.src = "/assets/mira/portrait-speaking.png";
     if (phase !== "speaking") { setMouthOpen(false); return; }
     const timer = window.setInterval(() => setMouthOpen((value) => !value), 135);
     return () => window.clearInterval(timer);
@@ -168,7 +165,6 @@ export function VoiceCallModal({
     const clean = content.trim();
     if (!clean || phase === "thinking") return;
     recognitionRef.current?.stop();
-    setDraft("");
     setHeard(clean);
     setSpeechError("");
     setPhase("thinking");
@@ -195,8 +191,7 @@ export function VoiceCallModal({
     const Recognition = recognitionConstructor();
     if (!Recognition) {
       setPhase("listening");
-      setSpeechError("Live transcription is not available in this browser. Type below instead.");
-      inputRef.current?.focus();
+      setSpeechError("Voice input is not available in this browser. Use Chrome or Edge and allow microphone access, then try again.");
       return;
     }
 
@@ -204,7 +199,7 @@ export function VoiceCallModal({
     const recognition = new Recognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = "en-IN";
+    recognition.lang = navigator.language || "en-US";
     let finalTranscript = "";
     recognition.onresult = (event) => {
       const parts = Array.from(event.results).map((result) => result[0]?.transcript ?? "");
@@ -214,7 +209,7 @@ export function VoiceCallModal({
     };
     recognition.onerror = (event) => {
       setPhase("listening");
-      setSpeechError(event.error === "not-allowed" ? "Microphone permission was not granted. Type below instead." : "I couldn’t hear that clearly. Try again or type below.");
+      setSpeechError(event.error === "not-allowed" ? "Microphone access is blocked. Allow it in your browser settings, then tap the mic again." : "I couldn’t hear that clearly. Tap the mic and try once more.");
     };
     recognition.onend = () => {
       recognitionRef.current = null;
@@ -225,7 +220,12 @@ export function VoiceCallModal({
     setHeard("");
     setSpeechError("");
     setPhase("listening");
-    recognition.start();
+    try {
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
+      setSpeechError("The microphone is already busy. Wait a second, then tap again.");
+    }
   };
 
   const interrupt = () => {
@@ -260,11 +260,11 @@ export function VoiceCallModal({
 
   return (
     <motion.div className="live-call live-call--voice" role="dialog" aria-modal="true" aria-label={`Voice call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <img className="live-call__backdrop" src="/assets/luma/window-nook.png" alt="" />
+      <img className="live-call__backdrop" src="/assets/mira/loft-morning.png" alt="" />
       <div className="live-call__veil" />
       <header className="live-call__header"><span><i className="status-dot" /> {transport === "realtime" ? "Realtime voice connected" : transport === "connecting" ? "Connecting secure voice…" : "Browser voice fallback"}</span><strong>{companionName}</strong><time>{time}</time></header>
       <div className="voice-call__portrait">
-        <motion.img src={phase === "speaking" && mouthOpen ? "/assets/luma/portrait-speaking-v2.png" : "/assets/luma/portrait.png"} alt={`${companionName}, your AI companion`} animate={phase === "speaking" ? { scale: [1, 1.025, 1], y: [0, -3, 0] } : { scale: 1, y: 0 }} transition={{ duration: 2.4, repeat: phase === "speaking" ? Infinity : 0 }} />
+        <motion.img src={phase === "speaking" && mouthOpen ? "/assets/mira/portrait-speaking.png" : "/assets/mira/portrait.png"} alt={`${companionName}, your AI companion`} animate={phase === "speaking" ? { scale: [1, 1.025, 1], y: [0, -3, 0] } : { scale: 1, y: 0 }} transition={{ duration: 2.4, repeat: phase === "speaking" ? Infinity : 0 }} />
         <i className={phase === "speaking" ? "voice-call__ring voice-call__ring--active" : "voice-call__ring"} />
         <AnimatePresence mode="wait"><motion.span key={phase} initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{phaseCopy[phase]}</motion.span></AnimatePresence>
       </div>
@@ -275,11 +275,6 @@ export function VoiceCallModal({
       <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking"}>
         <Waveform aria-hidden="true" /> {phase === "speaking" ? "Speak now to interrupt" : phase === "thinking" ? "Thinking…" : "Tap and talk"}
       </button>
-
-      <form className="call-reply" onSubmit={(event) => { event.preventDefault(); void submitTurn(draft); }}>
-        <input ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Or type what you want to say…" aria-label={`Type to ${companionName}`} />
-        <button type="submit" disabled={!draft.trim() || phase === "thinking"} aria-label="Send typed call reply"><PaperPlaneTilt aria-hidden="true" weight="fill" /></button>
-      </form>
 
       <div className="live-call__controls">
         <button type="button" className={muted ? "call-orb call-orb--active" : "call-orb"} onClick={() => { recognitionRef.current?.abort(); setMuted((value) => { const next = !value; realtimeRef.current?.peer.getSenders().forEach((sender) => { if (sender.track?.kind === "audio") sender.track.enabled = !next; }); return next; }); }} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicrophoneSlash aria-hidden="true" /> : <Microphone aria-hidden="true" />}</button>

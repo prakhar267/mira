@@ -1,34 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CaretDown,
   ChatCircleDots,
+  GearSix,
   Heart,
   Lock,
-  Phone,
+  Microphone,
   SpeakerHigh,
   SpeakerSlash,
   Sparkle,
-  TShirt,
   VideoCamera,
-  X,
 } from "@phosphor-icons/react";
 import type { DemoState, EnvironmentId } from "@/lib/state";
 import { environmentForItem } from "@/lib/product-rules";
 
 const environments: Array<{ id: EnvironmentId; label: string; image: string }> = [
-  { id: "window-nook", label: "Window nook", image: "/assets/luma/window-nook.png" },
-  { id: "rainy-cafe", label: "Rainy café", image: "/assets/luma/cafe-selfie.png" },
-  { id: "rooftop", label: "Blue-hour rooftop", image: "/assets/luma/rooftop-date.png" },
+  { id: "window-nook", label: "Sunny loft", image: "/assets/mira/loft-morning.png" },
+  { id: "rainy-cafe", label: "Rainy café", image: "/assets/mira/rainy-cafe.png" },
+  { id: "rooftop", label: "Sunset rooftop", image: "/assets/mira/rooftop-evening.png" },
 ];
 
 const reactions = [
-  "Hi. I was hoping you’d do that.",
-  "You’re distracting me—in a good way.",
-  "Okay, now you have my full attention.",
-  "Come closer. Tell me what happened today.",
+  "Hey—come look at this sketch with me.",
+  "You caught me staring out the window again.",
+  "Okay, now I’m curious. What’s that look for?",
+  "Sit with me. You can give me the unedited version.",
 ];
 
 export function HomeView({
@@ -55,7 +54,6 @@ export function HomeView({
   const [reactionIndex, setReactionIndex] = useState(-1);
   const [sceneMenuOpen, setSceneMenuOpen] = useState(false);
   const [mountedAt] = useState(() => new Date());
-  const [incomingCall, setIncomingCall] = useState(false);
   const environment = environments.find((item) => item.id === state.activeEnvironment) ?? environments[0]!;
   const ownedEnvironments = new Set(state.ownedItems.flatMap((owned) => {
     const item = state.storeItems.find((candidate) => candidate.id === owned.itemId);
@@ -63,95 +61,71 @@ export function HomeView({
     return environmentId ? [environmentId] : [];
   }));
   const recentMoment = state.moments[0];
+  const highlightedMemory = state.memories.find((memory) => memory.pinned) ?? state.memories[0];
   const greeting = useMemo(() => {
     const now = mountedAt.getTime();
     const nearbyEvent = [...state.futureEvents]
       .filter((event) => event.status === "confirmed" && Math.abs(Date.parse(event.eventDate) - now) <= 12 * 60 * 60 * 1_000)
       .sort((left, right) => Math.abs(Date.parse(left.eventDate) - now) - Math.abs(Date.parse(right.eventDate) - now))[0];
-    if (nearbyEvent) {
-      const time = new Date(nearbyEvent.eventDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      return { main: `${nearbyEvent.description} at ${time}. I remembered.`, detail: "One calm breath. You already did the work." };
-    }
-    if (state.feedbackSignals.at(-1)?.rating === "down") return { main: "No fixing today.", detail: "I can just keep you company." };
+    if (nearbyEvent) return `I remembered ${nearbyEvent.description}. We can keep today gentle.`;
+    if (state.feedbackSignals.at(-1)?.rating === "down") return "No performance today. I can just keep you company.";
     const hour = mountedAt.getHours();
-    if (hour < 6) return { main: "Still awake?", detail: "I’m here. No need to explain yet." };
-    if (hour < 12) return { main: "Morning. You made it.", detail: "Come sit with me for a minute." };
-    if (hour < 18) return { main: "There you are.", detail: "I thought of you earlier." };
-    return { main: "I was hoping you’d show up.", detail: "Come closer. Tell me the real version." };
+    if (hour < 6) return "Still awake? Come sit with me—no explanation needed yet.";
+    if (hour < 12) return "I’m tweaking this sketch. Think it needs more sunlight?";
+    if (hour < 18) return "I saved the good chair for you. How’s the real version of today?";
+    return "I was about to make tea. Stay for the quiet part of the evening?";
   }, [mountedAt, state.feedbackSignals, state.futureEvents]);
 
   const react = () => {
     setReactionIndex((current) => (current + 1) % reactions.length);
-    window.setTimeout(() => setReactionIndex(-1), 3_200);
+    window.setTimeout(() => setReactionIndex(-1), 3_400);
   };
 
-  useEffect(() => {
-    if (state.proactiveCalls === "never" || state.notifications.frequency === "off") return;
-    if (window.sessionStorage.getItem("luma-incoming-call-shown")) return;
-    const delay = state.proactiveCalls === "often" ? 2_500 : state.proactiveCalls === "sometimes" ? 4_000 : 6_500;
-    const timer = window.setTimeout(() => {
-      window.sessionStorage.setItem("luma-incoming-call-shown", "1");
-      setIncomingCall(true);
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [state.notifications.frequency, state.proactiveCalls]);
-
   return (
-    <section className="luma-home" aria-labelledby="luma-home-title">
+    <section className="mira-home" aria-labelledby="mira-home-title">
       <AnimatePresence mode="wait">
         <motion.img
           key={environment.id}
-          className="luma-home__scene"
+          className="mira-home__scene"
           src={environment.image}
-          alt={`${state.companion.name} in ${environment.label.toLowerCase()}`}
+          alt={`${state.companion.name} in the ${environment.label.toLowerCase()}`}
           initial={{ opacity: 0, scale: 1.025 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
         />
       </AnimatePresence>
-      <div className="luma-home__wash" aria-hidden="true" />
+      <div className="mira-home__wash" aria-hidden="true" />
+      <button type="button" className="mira-home__avatar-hit" onClick={react} aria-label={`Get ${state.companion.name}'s attention`} />
 
-      <button type="button" className="luma-home__avatar-hit" onClick={react} aria-label={`Tap ${state.companion.name} for a reaction`} />
-
-      <header className="luma-home__top">
-        <button type="button" className="luma-home__portrait-button" onClick={onCompanion} aria-label="Open companion profile">
-          <img src="/assets/luma/portrait.png" alt="" />
-          <Sparkle aria-hidden="true" weight="fill" />
+      <header className="mira-home__top">
+        <button type="button" className="mira-profile-chip" onClick={onCompanion} aria-label="Open companion profile">
+          <img src="/assets/mira/portrait.png" alt="" />
+          <span><strong id="mira-home-title">{state.companion.name}<em>AI companion</em></strong><small><i /> Feeling sunny · playful</small></span>
         </button>
-        <h1 id="luma-home-title">{state.companion.name}<Sparkle aria-hidden="true" weight="fill" /></h1>
-        <button type="button" className="relationship-pill" onClick={onMoments} aria-label="Open relationship moments">
-          <Heart aria-hidden="true" weight="fill" />
-          <span>{state.relationship.stage} · {state.relationship.level}</span>
-        </button>
+        <div className="mira-home__top-actions">
+          <button type="button" className="mira-level-chip" onClick={onMoments} aria-label="Open relationship memories"><Heart weight="fill" /><span>{state.relationship.stage} · {state.relationship.level}</span></button>
+          <button type="button" className="mira-icon-button" onClick={onCompanion} aria-label="Open companion settings"><GearSix /></button>
+        </div>
       </header>
 
-      <div className="luma-home__voice">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={reactionIndex}
-            className="luma-home__speech"
-            initial={{ opacity: 0, y: 12, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8 }}
-          >
-            <strong>{reactionIndex >= 0 ? reactions[reactionIndex] : greeting.main}</strong>
-            {reactionIndex < 0 ? <span>{greeting.detail}</span> : null}
-          </motion.div>
-        </AnimatePresence>
-        <div className="voice-wave" aria-label={`${state.companion.name} voice is ready`}>
-          {[0.48, 0.8, 0.58, 1, 0.72, 0.9, 0.46, 0.78, 0.56].map((scale, index) => (
-            <i key={index} style={{ "--wave-scale": scale } as React.CSSProperties} />
-          ))}
-        </div>
-      </div>
+      <AnimatePresence mode="wait">
+        <motion.button type="button" key={reactionIndex} className="mira-speech-bubble" onClick={react} initial={{ opacity: 0, y: 14, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>
+          {reactionIndex >= 0 ? reactions[reactionIndex] : greeting}
+        </motion.button>
+      </AnimatePresence>
 
-      <div className="luma-home__quick">
+      {highlightedMemory ? (
+        <button type="button" className="mira-memory-cue" onClick={onMoments}>
+          <Sparkle weight="fill" />
+          <span><small>I remembered</small><strong>{highlightedMemory.content}</strong><em>Open memory</em></span>
+        </button>
+      ) : null}
+
+      <div className="mira-home__scene-tools">
         <div className="scene-switcher">
           <button type="button" onClick={() => setSceneMenuOpen((value) => !value)} aria-expanded={sceneMenuOpen}>
-            <Sparkle aria-hidden="true" />
-            <span>{environment.label}</span>
-            <CaretDown aria-hidden="true" />
+            <Sparkle aria-hidden="true" /><span>{environment.label}</span><CaretDown aria-hidden="true" />
           </button>
           {sceneMenuOpen ? (
             <motion.div className="scene-switcher__menu" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -164,34 +138,24 @@ export function HomeView({
             </motion.div>
           ) : null}
         </div>
-        <button type="button" className="round-glass" onClick={onAmbienceChange} aria-label={state.ambienceEnabled ? "Turn ambience off" : "Turn ambience on"}>
-          {state.ambienceEnabled ? <SpeakerHigh aria-hidden="true" weight="fill" /> : <SpeakerSlash aria-hidden="true" />}
+        <button type="button" className="mira-icon-button" onClick={onAmbienceChange} aria-label={state.ambienceEnabled ? "Turn ambience off" : "Turn ambience on"}>
+          {state.ambienceEnabled ? <SpeakerHigh weight="fill" /> : <SpeakerSlash />}
         </button>
-        <button type="button" className="round-glass" onClick={onCompanion} aria-label="Open wardrobe"><TShirt aria-hidden="true" /></button>
       </div>
 
-      <div className="luma-home__actions">
-        <button type="button" className="home-message" onClick={onChat}><ChatCircleDots aria-hidden="true" /><span>Message</span></button>
-        <motion.button type="button" className="home-call" onClick={onCall} whileTap={{ scale: 0.96 }} aria-label={`Call ${state.companion.name}`}>
-          <Phone aria-hidden="true" weight="fill" />
-          <span>Call</span>
+      <button type="button" className="mira-shared-moment" onClick={onSpendTime}>
+        <Sparkle weight="fill" /><span><small>Something for us</small><strong>{recentMoment?.title ?? "Spend time together"}</strong></span>
+      </button>
+
+      <div className="mira-home__actions" aria-label="Start a conversation">
+        <button type="button" className="mira-home-action" onClick={onChat}><ChatCircleDots /><span>Message</span></button>
+        <motion.button type="button" className="mira-home-action mira-home-action--voice" onClick={onCall} whileTap={{ scale: 0.96 }} aria-label={`Start a voice call with ${state.companion.name}`}>
+          <Microphone weight="fill" /><span>Talk</span>
         </motion.button>
-        <button type="button" className="home-video" onClick={onVideoCall}><VideoCamera aria-hidden="true" /><span>Video</span></button>
+        <button type="button" className="mira-home-action" onClick={onVideoCall}><VideoCamera weight="fill" /><span>Video</span></button>
       </div>
 
-      <div className="luma-home__together">
-        <button type="button" onClick={onSpendTime}><Sparkle aria-hidden="true" weight="fill" /> Spend time together</button>
-        {recentMoment ? <button type="button" onClick={onMoments}>{recentMoment.title}<span>View moment</span></button> : null}
-      </div>
-
-      <AnimatePresence>
-        {incomingCall ? <motion.aside className="incoming-call" role="status" aria-label={`Incoming AI call from ${state.companion.name}`} initial={{ opacity: 0, y: 24, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16 }}>
-          <img src="/assets/luma/portrait.png" alt="" />
-          <span><small>Incoming AI call</small><strong>{state.companion.name}</strong><em>“I have a minute. Want me?”</em></span>
-          <button type="button" className="incoming-call__decline" aria-label="Decline incoming call" onClick={() => setIncomingCall(false)}><X aria-hidden="true" /></button>
-          <button type="button" className="incoming-call__accept" aria-label="Accept incoming call" onClick={() => { setIncomingCall(false); onCall(); }}><Phone aria-hidden="true" weight="fill" /></button>
-        </motion.aside> : null}
-      </AnimatePresence>
+      <small className="mira-home__disclosure">{state.companion.name} is an AI companion · You control memory and privacy</small>
     </section>
   );
 }
