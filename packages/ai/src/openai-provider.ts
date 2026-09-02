@@ -30,15 +30,8 @@ export interface OpenAIProviderConfig {
 type JsonRecord = Record<string, unknown>;
 
 function openAIVoice(voiceId?: string) {
-  const supported = new Set(["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"]);
-  if (voiceId && supported.has(voiceId)) return voiceId;
-  if (voiceId?.includes("soft")) return "marin";
-  if (voiceId?.includes("seductive")) return "coral";
-  if (voiceId?.includes("sharp")) return "sage";
-  if (voiceId?.includes("calm")) return "marin";
-  if (voiceId?.includes("confident")) return "sage";
-  if (voiceId?.includes("warm")) return "coral";
-  return "shimmer";
+  void voiceId;
+  return "marin";
 }
 
 function openAIVoiceStyle(voiceId?: string) {

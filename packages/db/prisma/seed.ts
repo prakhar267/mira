@@ -44,9 +44,13 @@ async function main() {
   }
 
   const voices = [
-    { id: "mira-playful-01", providerVoiceId: "shimmer", displayName: "Mira · Playful", style: "playful" },
-    { id: "mira-warm-01", providerVoiceId: "coral", displayName: "Mira · Warm", style: "warm" },
-    { id: "mira-calm-01", providerVoiceId: "marin", displayName: "Mira · Calm", style: "calm" },
+    { id: "mira-warm-01", providerVoiceId: "marin", displayName: "Mira · Warm", style: "warm" },
+    { id: "mira-playful-01", providerVoiceId: "marin", displayName: "Mira · Playful", style: "playful" },
+    { id: "mira-soft-01", providerVoiceId: "marin", displayName: "Mira · Soft", style: "soft" },
+    { id: "mira-seductive-01", providerVoiceId: "marin", displayName: "Mira · Seductive", style: "seductive" },
+    { id: "mira-calm-01", providerVoiceId: "marin", displayName: "Mira · Mellow", style: "calm" },
+    { id: "mira-confident-01", providerVoiceId: "marin", displayName: "Mira · Confident", style: "confident" },
+    { id: "mira-sharp-01", providerVoiceId: "marin", displayName: "Mira · Sharp", style: "sharp" },
   ];
   for (const voice of voices) {
     await prisma.voiceProfile.upsert({ where: { id: voice.id }, update: { ...voice, provider: "openai", accent: "neutral", genderPresentation: "feminine", premiumTier: "free", active: true }, create: { ...voice, provider: "openai", accent: "neutral", genderPresentation: "feminine", premiumTier: "free", active: true } });

@@ -321,7 +321,7 @@ export function VoiceCallModal({
     <motion.div className="live-call live-call--voice" role="dialog" aria-modal="true" aria-label={`Voice call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <img className="live-call__backdrop" src="/assets/mira/loft-morning.png" alt="" />
       <div className="live-call__veil" />
-      <header className="live-call__header"><span><i className="status-dot" /> {transport === "realtime" ? "Realtime voice connected" : transport === "connecting" ? "Connecting secure voice…" : "Browser voice fallback"}</span><strong>{companionName}</strong><time>{time}</time></header>
+      <header className="live-call__header"><span><i className="status-dot" /> {transport === "realtime" ? "Mira neural voice connected" : transport === "connecting" ? "Connecting secure voice…" : "Mira voice · on device"}</span><strong>{companionName}</strong><time>{time}</time></header>
       <div className="voice-call__portrait">
         <motion.img src={phase === "speaking" ? "/assets/mira/portrait-speaking.png" : "/assets/mira/portrait.png"} alt={`${companionName}, your AI companion`} animate={phase === "speaking" ? { scale: [1, 1.012, 1], y: [0, -1, 0] } : { scale: 1, y: 0 }} transition={{ duration: 3.2, repeat: phase === "speaking" ? Infinity : 0 }} />
         <i className={phase === "speaking" ? "voice-call__ring voice-call__ring--active" : "voice-call__ring"} />
