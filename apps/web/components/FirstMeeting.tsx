@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, SpeakerHigh, Sparkle } from "@phosphor-icons/react";
+import { playCompanionSpeech, type CompanionSpeechPlayback } from "@/lib/speech";
 
 const lines = [
   (name: string) => `Hi, ${name}. So… I guess this is where we finally meet.`,
@@ -12,19 +13,18 @@ const lines = [
 
 export function FirstMeeting({ userName, companionName, onComplete }: { userName: string; companionName: string; onComplete: () => void }) {
   const [line, setLine] = useState(0);
+  const playbackRef = useRef<CompanionSpeechPlayback | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLine((current) => Math.min(lines.length - 1, current + 1)), 2_900);
     return () => window.clearTimeout(timer);
   }, [line]);
 
+  useEffect(() => () => playbackRef.current?.cancel(), []);
+
   const speak = () => {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(lines[line]!(userName));
-    utterance.rate = .92;
-    utterance.pitch = 1.06;
-    window.speechSynthesis.speak(utterance);
+    playbackRef.current?.cancel();
+    playbackRef.current = playCompanionSpeech(lines[line]!(userName), { voiceId: "mira-playful-01" });
   };
 
   return (

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Camera, ImagePlus, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Send, Sparkles, ThumbsDown, ThumbsUp, Trash2, Video, Volume2 } from "lucide-react";
+import { ArrowLeft, Camera, ImagePlus, Languages, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Send, Sparkles, ThumbsDown, ThumbsUp, Trash2, Video, Volume2 } from "lucide-react";
 import type { ChatMessage } from "@companion/shared";
 import type { DemoState, FeedbackReason } from "@/lib/state";
+import { playCompanionSpeech, recognitionLocale, speechLanguageOptions, type SpeechLanguage } from "@/lib/speech";
 import { Modal } from "./Modal";
 
 interface ChatSpeechRecognition {
@@ -56,6 +57,7 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
   const [online, setOnline] = useState(true);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceError, setVoiceError] = useState("");
+  const [voiceLanguage, setVoiceLanguage] = useState<SpeechLanguage>("auto");
   const textarea = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const messagesViewport = useRef<HTMLDivElement>(null);
@@ -128,7 +130,7 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
     const recognition = new Recognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "en-IN";
+    recognition.lang = recognitionLocale(voiceLanguage, navigator.language);
     let transcript = "";
     recognition.onresult = (event) => {
       transcript = Array.from(event.results).map((result) => result[0]?.transcript ?? "").join(" ").trim();
@@ -175,7 +177,7 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
 
       <div className="chat__composer-wrap">
         {!processingEnabled ? <div className="voice-note-error" role="status">AI processing is paused in Privacy settings. Your existing history remains available.</div> : null}
-        <div className="suggestion-row">{["Just listen", "Help me make a plan", "Remember something"].map((suggestion) => <button type="button" key={suggestion} disabled={!processingEnabled} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
+        <div className="suggestion-row"><label className="voice-language-inline"><Languages aria-hidden="true" /><span>Voice</span><select aria-label="Voice note language" value={voiceLanguage} onChange={(event) => setVoiceLanguage(event.target.value as SpeechLanguage)}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{["Just listen", "Help me make a plan", "Remember something"].map((suggestion) => <button type="button" key={suggestion} disabled={!processingEnabled} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
         <div className="chat__composer">
           <button type="button" className="icon-button" aria-label="Attach image" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><Plus aria-hidden="true" /></button>
           <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setVoiceError(""); void onImageUpload(file).catch((cause) => setVoiceError(cause instanceof Error ? cause.message : "The image could not be shared.")); } event.target.value = ""; }} />
@@ -202,7 +204,7 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
 function MessageBubble({ message, companionName, onFeedback, onRegenerate, onSpeak, onWhy, onReply, onEdit }: { message: ChatMessage; companionName: string; onFeedback: (messageId: string, feedback: "up" | "down", reason?: FeedbackReason) => void; onRegenerate: (messageId: string) => void | Promise<void>; onSpeak?: (content: string) => Promise<void>; onWhy: () => void; onReply: () => void; onEdit: () => void }) {
   const assistant = message.role === "assistant";
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const speak = () => { if (onSpeak) { void onSpeak(message.content); return; } if (!("speechSynthesis" in window)) return; window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(message.content)); };
+  const speak = () => { if (onSpeak) { void onSpeak(message.content); return; } playCompanionSpeech(message.content); };
   const reasons: Array<[FeedbackReason, string]> = [["too-scripted", "Too scripted"], ["too-many-questions", "Too many questions"], ["missed-what-i-said", "Missed what I said"], ["wrong-tone", "Wrong tone"]];
   return <article className={assistant ? "message message--assistant" : "message message--user"}>{assistant ? <img src="/assets/mira/portrait.png" alt="" /> : null}<div>{assistant ? <strong>{companionName}</strong> : null}{message.attachments?.map((attachment) => attachment.type === "audio" ? <div key={attachment.id} className="message-attachment message-attachment--audio"><Mic aria-hidden="true" /> Voice note · {attachment.durationMs ? Math.ceil(attachment.durationMs / 1000) : 2}s<span>{attachment.transcript}</span></div> : <img key={attachment.id} className="message-attachment" src={attachment.url} alt={attachment.name ?? "Shared image"} />)}<p>{message.content || <span className="typing"><i /><i /><i /></span>}</p>{feedbackOpen ? <div className="message-feedback" role="group" aria-label={`What should ${companionName} improve?`}><span>What felt off?</span>{reasons.map(([reason, label]) => <button type="button" key={reason} onClick={() => { onFeedback(message.id, "down", reason); setFeedbackOpen(false); }}>{label}</button>)}</div> : null}<footer><time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time><span className="message-actions">{assistant && message.content ? <><button type="button" className={message.feedback === "up" ? "is-selected" : ""} aria-label="Good response" onClick={() => { setFeedbackOpen(false); onFeedback(message.id, "up"); }}><ThumbsUp aria-hidden="true" /></button><button type="button" className={message.feedback === "down" || feedbackOpen ? "is-selected" : ""} aria-label="Poor response" aria-expanded={feedbackOpen} onClick={() => setFeedbackOpen((value) => !value)}><ThumbsDown aria-hidden="true" /></button><button type="button" aria-label="Hear response" onClick={speak}><Volume2 aria-hidden="true" /></button><button type="button" onClick={onWhy}>Why?</button><button type="button" aria-label="Regenerate response" onClick={() => void onRegenerate(message.id)}><RefreshCw aria-hidden="true" /></button></> : <button type="button" onClick={onEdit}>Edit</button>}<button type="button" onClick={onReply}>Reply</button></span></footer></div></article>;
 }

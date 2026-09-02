@@ -241,6 +241,15 @@ describe("companion turn planning", () => {
     expect(identity.text.toLowerCase()).toMatch(/not human|not alive/);
   });
 
+  it("answers basic questions in Hindi and Hinglish without switching to English", () => {
+    const hindi = turn("तुम्हारा नाम क्या है?");
+    const hinglish = turn("tum kya karti ho?");
+    expect(hindi.intent).toBe("self");
+    expect(hindi.text).toContain("मैं Mira हूँ");
+    expect(hinglish.intent).toBe("self");
+    expect(hinglish.text).toContain("Main tumhari AI companion hoon");
+  });
+
   it("varies a repeated spoken answer once the previous turn is in context", () => {
     const first = turn("How are you?", [], "voice");
     const prior: ChatMessage[] = [

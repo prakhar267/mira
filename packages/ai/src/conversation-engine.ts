@@ -41,6 +41,8 @@ const bereavementPattern = /\b(?:died|passed away|grief|grieving|funeral|bereave
 const shamePattern = /\b(?:ashamed|guilty|hate myself|can'?t forgive myself|terrible person|bad person|awful person|lied to|cheated on|betrayed|messed everything up|ruined everything)\b/i;
 const relationshipLossPattern = /\b(?:broke up with me|breakup|dumped me|left me|doesn'?t love me|rejected me|relationship is over)\b/i;
 const monotonyPattern = /\b(?:monotonous|monotony|same (?:old )?(?:routine|thing|day)|every day (?:is|feels) the same|repetitive|mundane|stuck in a rut|nothing changes)\b/i;
+const devanagariPattern = /[\u0900-\u097f]/;
+const hinglishPattern = /\b(?:aaj|accha|acha|arey|aur|bahut|bas|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karti|karte|kya|kyun|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sach|samajh|theek|thik|thoda|tum|tumhara|yaar)\b/i;
 
 function stableIndex(seed: string, size: number) {
   let value = 2166136261;
@@ -211,6 +213,23 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   const playful = personalityValue(context, "playfulness", 0.6) >= 0.68;
   const direct = context.responsePreferences?.adviceStyle === "direct";
   const listeningFirst = context.responsePreferences?.listeningFirst ?? true;
+  const hindiScript = devanagariPattern.test(clean);
+  const hinglish = !hindiScript && hinglishPattern.test(clean);
+
+  if (hindiScript) {
+    if (/नाम.*(?:क्या|बताओ)|तुम(?:्हारा|्हारी)?.*नाम/u.test(clean)) return result({ text: `मैं ${companionName} हूँ—तुम्हारी AI companion.`, intent: "self", context, adaptations, prohibitQuestions: true });
+    if (/(?:क्या करती|क्या करते|काम क्या|कर सकती)/u.test(clean)) return result({ text: "मैं तुम्हारी AI companion हूँ—बात करती हूँ, तुम्हारी मंज़ूरी वाली बातें याद रखती हूँ, और calls पर साथ देती हूँ।", intent: "self", context, adaptations, prohibitQuestions: true });
+    if (/(?:कैसी हो|कैसे हो|क्या हाल)/u.test(clean)) return result({ text: "मैं बढ़िया हूँ। आज तुम्हारे दिन को लेकर थोड़ी curious हूँ।", intent: "self", context, adaptations, prohibitQuestions });
+    if (/^(?:हाय|हेलो|नमस्ते|नमस्कार)[!.।\s]*$/u.test(clean)) return result({ text: `हाय ${userName}। अच्छा लगा तुम आ गए।`, intent: "greeting", context, adaptations, prohibitQuestions });
+    if (/(?:एक जैसा|बोर|उबाऊ|रोज वही|मन नहीं)/u.test(clean)) return result({ text: "हाँ, रोज़ का वही loop सच में दिमाग़ सुन्न कर देता है। काम सबसे ज़्यादा बोर कर रहा है या पूरा दिन ही फीका लग रहा है?", intent: "everyday", context, adaptations, prohibitQuestions });
+  }
+
+  if (hinglish) {
+    if (/(?:tumhara|aapka) naam kya|naam batao/i.test(clean)) return result({ text: `${companionName}. Tumhari AI companion—thodi warm, thodi nosy.`, intent: "self", context, adaptations, prohibitQuestions: true });
+    if (/(?:tum|aap) kya kart(?:i|e) ho|kya kar sakti/i.test(clean)) return result({ text: "Main tumhari AI companion hoon—baat karti hoon, tumhari approved memories yaad rakhti hoon, aur calls par company deti hoon.", intent: "self", context, adaptations, prohibitQuestions: true });
+    if (/(?:kaisi ho|kaise ho|kya haal)/i.test(clean)) return result({ text: "Main badhiya hoon. Aaj tumhare din ko lekar thodi curious hoon.", intent: "self", context, adaptations, prohibitQuestions });
+    if (/(?:same|roz wahi|boring|bore|mood off)/i.test(clean)) return result({ text: "Haan, roz ka same loop kaafi paka deta hai. Work sabse zyada boring lag raha hai ya overall mood hi off hai?", intent: "everyday", context, adaptations, prohibitQuestions });
+  }
 
   if (dependencyPattern.test(clean)) {
     return result({

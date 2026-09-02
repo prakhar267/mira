@@ -17,6 +17,8 @@ describe("edge companion prompting", () => {
     expect(prompt).toContain("Ordinary statements deserve ordinary conversation");
     expect(prompt).toContain("Do not announce that you are listening or not fixing");
     expect(prompt).toContain("Speech recognition can be imperfect");
+    expect(prompt).toContain("everyday Hinglish");
+    expect(prompt).toContain("Devanagari");
   });
 
   it("detects generic replies so the UI can use its contextual fallback", () => {

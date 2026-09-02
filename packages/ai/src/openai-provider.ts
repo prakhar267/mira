@@ -80,6 +80,7 @@ function textInstructions(context: CompanionContext): string {
     "Talk like a familiar person in a private conversation: warm, specific, informal, candid, and concise. Prefer one or two natural sentences. Answer ordinary questions directly and react to their concrete subject. Ordinary statements deserve ordinary conversation, not counseling.",
     "Never default to canned empathy such as ‘I’m here’, ‘I’m listening’, ‘I hear you’, ‘that sounds hard’, ‘take your time’, or ‘I’m not fixing’. Do not behave like a therapist, coach, support agent, or motivational poster.",
     "Track the immediate conversation. Do not repeat the same answer, greeting, question, validation, or sentence shape from recent turns. Do not mirror the user's wording or append a question merely to keep them talking. Most replies should not be questions.",
+    "Match the language and script of the user's latest message. Support natural English, Hindi in Devanagari, and everyday Hinglish in Latin script. Keep their code-switching instead of translating it, and never announce or explain the language choice.",
     "Have mild harmless opinions and use natural contractions. Do not force jokes, metaphors, memories, romance, scene props, or the user's interests into unrelated replies. Never invent a count, event, reason, feeling, or personal detail.",
     "If a spoken transcript is fragmentary or strange, mention only the useful words you caught and ask one plain clarification instead of inventing emotional meaning.",
     "Respect boundaries immediately. Never encourage dependency, exclusivity, jealousy, isolation, guilt, or sexual content involving minors.",
@@ -215,10 +216,17 @@ export class OpenAISpeechProvider implements SpeechToTextProvider, TextToSpeechP
 
   async synthesize(text: string, voiceId: string) {
     const started = Date.now();
+    const supportsInstructions = this.config.speechModel.includes("gpt-4o");
     const response = await this.client.fetch("/audio/speech", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: this.config.speechModel, input: text, voice: openAIVoice(voiceId), response_format: "mp3" }),
+      body: JSON.stringify({
+        model: this.config.speechModel,
+        input: text,
+        voice: openAIVoice(voiceId),
+        response_format: "mp3",
+        ...(supportsInstructions ? { instructions: "Speak like a warm young adult woman in a relaxed private conversation. Sound natural and expressive, with subtle pacing and no announcer cadence. Preserve the text's English, Hindi, or Hinglish pronunciation and code-switching exactly." } : {}),
+      }),
     });
     return { audio: new Uint8Array(await response.arrayBuffer()), contentType: "audio/mpeg", durationMs: Date.now() - started };
   }
@@ -275,7 +283,7 @@ export class OpenAIRealtimeVoiceProvider implements RealtimeVoiceProvider {
         type: "realtime",
         model: this.config.realtimeModel,
         output_modalities: ["audio"],
-        instructions: input.instructions ?? "You are Mira, an adult AI companion. Speak like a familiar, candid person in one or two short sentences. React to the exact subject, avoid canned empathy and therapy language, do not force follow-up questions, remember the live conversation, and never repeat recent phrasing, claim to be human, invent details, or encourage dependency.",
+        instructions: input.instructions ?? "You are Mira, an adult AI companion. Speak like a familiar, candid person in one or two short sentences. Match the user's English, Hindi, or Hinglish naturally, preserve their code-switching, and never translate or explain the language choice unless asked. React to the exact subject, avoid canned empathy and therapy language, do not force follow-up questions, remember the live conversation, and never repeat recent phrasing, claim to be human, invent details, or encourage dependency.",
         audio: {
           input: { transcription: { model: this.config.transcriptionModel }, turn_detection: { type: "semantic_vad", eagerness: "auto", create_response: true, interrupt_response: true } },
           output: { voice: openAIVoice(input.voiceId), speed: 1 },

@@ -165,6 +165,9 @@ img { display: block; max-width: 100%; }
 .chat__composer-wrap { width: min(800px, calc(100% - 40px)); margin: 0 auto; padding-bottom: 20px; }
 .suggestion-row { display: flex; gap: 8px; margin-bottom: 10px; overflow-x: auto; }
 .suggestion-row button { flex: 0 0 auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; cursor: pointer; color: color-mix(in srgb, var(--ink) 66%, transparent); font-size: 10px; }
+.voice-language-inline { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; color: color-mix(in srgb, var(--ink) 72%, transparent); font-size: 9px; }
+.voice-language-inline svg { width: 13px; color: var(--coral-strong); }
+.voice-language-inline select { max-width: 82px; border: 0; background: transparent; color: inherit; outline: none; font: inherit; }
 .chat__composer { display: flex; align-items: flex-end; gap: 5px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 25px; background: var(--paper-raised); box-shadow: 0 16px 50px rgba(23,24,23,.08); }
 .chat__composer textarea { min-height: 42px; max-height: 130px; flex: 1; padding: 10px 8px; border: 0; background: transparent; color: var(--ink); outline: none; resize: none; font-size: 13px; line-height: 1.55; }
 .send-button { display: grid; width: 42px; height: 42px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--coral); color: white; cursor: pointer; }
@@ -1485,6 +1488,9 @@ select {
 .call-conversation p span { display: block; margin-bottom: 2px; color: var(--accent); font-size: 8px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .call-conversation__user { padding-bottom: 7px; border-bottom: 1px solid var(--border-luma); }
 .call-speech-error { width: min(520px, calc(100% - 32px)); margin: 0; color: var(--accent-soft); font-size: 10px; text-align: center; }
+.call-language-picker { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 12px; border: 1px solid var(--border-luma); border-radius: 999px; background: rgba(20,14,29,.68); color: var(--text-secondary); backdrop-filter: blur(14px); font-size: 9px; }
+.call-language-picker span { color: var(--accent-soft); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.call-language-picker select { border: 0; background: transparent; color: var(--text-primary); outline: none; font: inherit; }
 .call-reply,
 .video-call__reply { display: flex; width: min(520px, calc(100% - 32px)); padding: 5px; border: 1px solid var(--border-luma); border-radius: 999px; background: rgba(20,14,29,.72); backdrop-filter: blur(18px); }
 .call-reply input,

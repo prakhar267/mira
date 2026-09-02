@@ -25,6 +25,7 @@ import { canAccessItem, currencyBalance, environmentForItem } from "@/lib/produc
 import { companionApi } from "@/lib/api-client";
 import { messagesForConversation, previousUserMessage } from "@/lib/conversation-state";
 import { relevantMemoryContents } from "@/lib/memory-relevance";
+import { playCompanionSpeech } from "@/lib/speech";
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 const chooseTypingDelay = (content: string) => Math.min(680, 320 + content.trim().length * 3);
@@ -540,9 +541,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const speakWithProvider = async (content: string) => {
     const speech = await companionApi.synthesize(content, state.companion.voiceId);
     if (speech.mock) {
-      if (!("speechSynthesis" in window)) throw new Error("Speech playback is unavailable in this browser.");
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(content));
+      playCompanionSpeech(content, { voiceId: state.companion.voiceId });
       return;
     }
     const audio = new Audio(`data:${speech.contentType};base64,${speech.audioBase64}`);

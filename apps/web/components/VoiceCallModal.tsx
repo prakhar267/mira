@@ -12,6 +12,13 @@ import {
   SpeakerSlash,
   Waveform,
 } from "@phosphor-icons/react";
+import {
+  playCompanionSpeech,
+  recognitionLocale,
+  speechLanguageOptions,
+  type CompanionSpeechPlayback,
+  type SpeechLanguage,
+} from "@/lib/speech";
 
 type CallPhase = "connecting" | "listening" | "thinking" | "speaking" | "interrupted";
 
@@ -36,21 +43,6 @@ function recognitionConstructor() {
   if (typeof window === "undefined") return undefined;
   const speechWindow = window as SpeechRecognitionWindow;
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-}
-
-function voiceProfile(voiceId: string) {
-  if (voiceId.includes("calm")) return { rate: .88, pitch: .98, names: /serena|samantha|ava|google uk english female/i };
-  if (voiceId.includes("confident")) return { rate: .97, pitch: 1, names: /ava|aria|samantha|zira/i };
-  if (voiceId.includes("warm")) return { rate: .91, pitch: 1.01, names: /samantha|serena|ava|google uk english female/i };
-  return { rate: .98, pitch: 1.04, names: /ava|samantha|aria|serena|zira|google uk english female/i };
-}
-
-function preferredVoice(voiceId: string) {
-  const voices = window.speechSynthesis?.getVoices() ?? [];
-  const profile = voiceProfile(voiceId);
-  return voices.find((voice) => /^en[-_]/i.test(voice.lang) && profile.names.test(voice.name) && /premium|enhanced|natural|neural/i.test(voice.name))
-    ?? voices.find((voice) => /^en[-_]/i.test(voice.lang) && profile.names.test(voice.name))
-    ?? voices.find((voice) => /^en[-_]/i.test(voice.lang));
 }
 
 export function VoiceCallModal({
@@ -80,35 +72,33 @@ export function VoiceCallModal({
   const [speechError, setSpeechError] = useState("");
   const [transport, setTransport] = useState<"connecting" | "realtime" | "fallback">(onRealtimeConnect ? "connecting" : "fallback");
   const [mouthOpen, setMouthOpen] = useState(false);
+  const [language, setLanguage] = useState<SpeechLanguage>("auto");
   const realtimeRef = useRef<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void } | null>(null);
   const realtimeReplyStarted = useRef(false);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const greetingSpoken = useRef(false);
   const speechTurn = useRef(0);
+  const playbackRef = useRef<CompanionSpeechPlayback | null>(null);
 
   const speak = useCallback((text: string, force = false) => {
     if (transport === "realtime") { setPhase("listening"); return; }
-    if ((!speaker && !force) || !("speechSynthesis" in window)) {
+    if (!speaker && !force) {
       setPhase("listening");
       return;
     }
-    window.speechSynthesis.cancel();
+    playbackRef.current?.cancel();
     speechTurn.current += 1;
     const turn = speechTurn.current;
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voice = preferredVoice(voiceId);
-    const profile = voiceProfile(voiceId);
-    if (voice) utterance.voice = voice;
-    utterance.rate = profile.rate;
-    utterance.pitch = profile.pitch;
-    setPhase("speaking");
-    utterance.onend = () => { if (speechTurn.current === turn) setPhase("listening"); };
-    utterance.onerror = () => { if (speechTurn.current === turn) setPhase("listening"); };
-    window.speechSynthesis.speak(utterance);
+    playbackRef.current = playCompanionSpeech(text, {
+      voiceId,
+      language,
+      onStart: () => { if (speechTurn.current === turn) setPhase("speaking"); },
+      onEnd: () => { if (speechTurn.current === turn) setPhase("listening"); },
+    });
     window.setTimeout(() => {
       if (speechTurn.current === turn) setPhase((current) => current === "speaking" ? "listening" : current);
     }, Math.max(2_400, text.length * 46));
-  }, [speaker, transport, voiceId]);
+  }, [language, speaker, transport, voiceId]);
 
   useEffect(() => {
     if (!onRealtimeConnect) return;
@@ -141,7 +131,7 @@ export function VoiceCallModal({
     return () => {
       window.clearInterval(timer);
       recognitionRef.current?.abort();
-      window.speechSynthesis?.cancel();
+      playbackRef.current?.cancel();
     };
   }, []);
 
@@ -190,7 +180,7 @@ export function VoiceCallModal({
   const beginListening = () => {
     if (muted || phase === "thinking") return;
     if (transport === "realtime") { setPhase("listening"); return; }
-    window.speechSynthesis?.cancel();
+    playbackRef.current?.cancel();
     const Recognition = recognitionConstructor();
     if (!Recognition) {
       setPhase("listening");
@@ -202,7 +192,7 @@ export function VoiceCallModal({
     const recognition = new Recognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = navigator.language || "en-US";
+    recognition.lang = recognitionLocale(language, navigator.language);
     let finalTranscript = "";
     recognition.onresult = (event) => {
       const parts = Array.from(event.results).map((result) => result[0]?.transcript ?? "");
@@ -235,13 +225,13 @@ export function VoiceCallModal({
     if (muted) return;
     setPhase("interrupted");
     if (transport === "realtime" && realtimeRef.current?.events.readyState === "open") realtimeRef.current.events.send(JSON.stringify({ type: "response.cancel" }));
-    window.speechSynthesis?.cancel();
+    playbackRef.current?.cancel();
     window.setTimeout(beginListening, 180);
   };
 
   const toggleSpeaker = () => {
     if (speaker) {
-      window.speechSynthesis?.cancel();
+      playbackRef.current?.cancel();
       if (realtimeRef.current) realtimeRef.current.audio.muted = true;
       setSpeaker(false);
       setPhase("listening");
@@ -275,6 +265,8 @@ export function VoiceCallModal({
       {captions ? <div className="call-conversation" aria-live="polite">{heard ? <p className="call-conversation__user"><span>You</span>{heard}</p> : null}<p><span>{companionName}</span>{companionLine}</p></div> : null}
       {speechError ? <p className="call-speech-error" role="status">{speechError}</p> : null}
 
+      <label className="call-language-picker"><span>Language</span><select aria-label="Voice call language" value={language} onChange={(event) => { playbackRef.current?.cancel(); setLanguage(event.target.value as SpeechLanguage); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+
       <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking"}>
         <Waveform aria-hidden="true" /> {phase === "speaking" ? "Speak now to interrupt" : phase === "thinking" ? "Thinking…" : phase === "listening" ? "Listening… tap to restart" : "Tap and talk"}
       </button>
@@ -287,7 +279,7 @@ export function VoiceCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.3, y: -90 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Raw microphone audio is not retained · {transport === "realtime" ? "secure realtime audio connected" : transport === "connecting" ? "connecting…" : "browser voice fallback"}</small>
+      <small className="live-call__disclosure">Raw microphone audio is not retained · {transport === "realtime" ? "secure multilingual audio connected" : transport === "connecting" ? "connecting…" : "natural English voice · हिन्दी and Hinglish supported"}</small>
     </motion.div>
   );
 }

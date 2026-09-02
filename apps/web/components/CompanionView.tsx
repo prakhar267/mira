@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   Check,
@@ -15,12 +15,13 @@ import {
 } from "lucide-react";
 import type { CompanionProfile, OwnedItemRecord, StoreItemRecord, SubscriptionState, WalletState } from "@companion/shared";
 import { canAccessItem } from "@/lib/product-rules";
+import { playCompanionSpeech, type CompanionSpeechPlayback } from "@/lib/speech";
 
 const voices = [
-  { id: "mira-warm-01", name: "Warm", detail: "Soft, grounded, close", rate: .92, pitch: 1.02 },
-  { id: "mira-playful-01", name: "Playful", detail: "Bright, teasing, expressive", rate: 1.03, pitch: 1.08 },
-  { id: "mira-calm-01", name: "Calm", detail: "Slow, gentle, steady", rate: .86, pitch: .98 },
-  { id: "mira-confident-01", name: "Confident", detail: "Clear, warm, direct", rate: .98, pitch: 1 },
+  { id: "mira-warm-01", name: "Warm", detail: "Helena · caring and natural" },
+  { id: "mira-playful-01", name: "Playful", detail: "Luna · friendly and expressive" },
+  { id: "mira-calm-01", name: "Calm", detail: "Cora · smooth and gentle" },
+  { id: "mira-confident-01", name: "Confident", detail: "Thalia · clear and energetic" },
 ];
 
 export function CompanionView({ companion, backstory, storeItems, ownedItems, wallet, subscription, onChange, onBackstoryChange, onPurchase, onEquip, onUpgrade }: {
@@ -38,17 +39,16 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
 }) {
   const [tab, setTab] = useState<"appearance" | "personality" | "backstory" | "voice">("appearance");
   const [notice, setNotice] = useState("");
+  const playbackRef = useRef<CompanionSpeechPlayback | null>(null);
   const equipped = ownedItems.find((item) => item.equipped && storeItems.find((candidate) => candidate.id === item.itemId)?.metadata.slot === "outfit");
   const preview = storeItems.find((item) => item.id === equipped?.itemId)?.assetUrl ?? "/assets/mira/loft-morning.png";
 
+  useEffect(() => () => playbackRef.current?.cancel(), []);
+
   const previewVoice = (voice: typeof voices[number]) => {
-    if (!("speechSynthesis" in window)) return setNotice("Voice preview is unavailable in this browser.");
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance("Hey… nice to meet you. I was hoping you’d show up.");
-    utterance.rate = voice.rate;
-    utterance.pitch = voice.pitch;
-    window.speechSynthesis.speak(utterance);
-    setNotice(`Playing the ${voice.name.toLowerCase()} voice locally.`);
+    playbackRef.current?.cancel();
+    playbackRef.current = playCompanionSpeech("Hey… nice to meet you. I was hoping you’d show up.", { voiceId: voice.id });
+    setNotice(`Playing ${voice.detail}.`);
   };
 
   return (
@@ -107,7 +107,7 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
           </> : null}
 
           {tab === "voice" ? <>
-            <div className="section-heading"><div><span className="luma-kicker">How she sounds</span><h2>Voice</h2><p>Preview locally. Production voices remain behind the server provider contract.</p></div></div>
+            <div className="section-heading"><div><span className="luma-kicker">How she sounds</span><h2>Voice</h2><p>Natural neural voices for English, with हिन्दी and Hinglish support during calls.</p></div></div>
             <div className="voice-list">{voices.map((voice) => <button type="button" key={voice.id} className={companion.voiceId === voice.id ? "voice-option voice-option--selected" : "voice-option"} onClick={() => { onChange({ ...companion, voiceId: voice.id }); previewVoice(voice); }}><span><Play aria-hidden="true" /></span><strong>{voice.name}</strong><small>{voice.detail}</small><Volume2 aria-hidden="true" /></button>)}</div>
           </> : null}
         </div>
