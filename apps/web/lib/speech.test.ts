@@ -21,7 +21,7 @@ describe("companion speech", () => {
     expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01")?.name).toBe("Lekha Enhanced");
   });
 
-  it("keeps one preferred identity while choosing language-compatible pronunciation", () => {
+  it("keeps the preferred Hindi identity voice across every supported language", () => {
     const voices = [
       { name: "Samantha", lang: "en-US", default: true },
       { name: "Tessa", lang: "en-ZA", default: false },
@@ -32,11 +32,11 @@ describe("companion speech", () => {
       { name: "Lekha", lang: "hi-IN", default: false },
     ];
 
-    expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "Stay close to me", "mira-intimate-01", "en")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "Be direct with me", "mira-angry-01", "en")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "I need some confidence", "mira-happy-01", "en")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-natural-01", "hinglish")?.name).toBe("Tara");
+    expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Lekha");
+    expect(selectPreferredVoice(voices, "Stay close to me", "mira-intimate-01", "en")?.name).toBe("Lekha");
+    expect(selectPreferredVoice(voices, "Be direct with me", "mira-angry-01", "en")?.name).toBe("Lekha");
+    expect(selectPreferredVoice(voices, "I need some confidence", "mira-happy-01", "en")?.name).toBe("Lekha");
+    expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-natural-01", "hinglish")?.name).toBe("Lekha");
     expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-natural-01", "hi")?.name).toBe("Lekha");
   });
 
@@ -68,7 +68,7 @@ describe("companion speech", () => {
     expect(segments.join(" ")).toContain("should not be cut off halfway");
   });
 
-  it("switches pronunciation voices inside a mixed Hindi and English reply", () => {
+  it("segments a mixed Hindi and English reply without changing its voice identity", () => {
     expect(splitMultilingualSpeechSegments("Okay yaar, आज थोड़ा rest karte hain. I am here.")).toEqual([
       { text: "Okay yaar,", language: "hinglish" },
       { text: "आज थोड़ा", language: "hi" },

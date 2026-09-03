@@ -19,6 +19,8 @@ describe("edge companion prompting", () => {
     expect(prompt).toContain("Speech recognition can be imperfect");
     expect(prompt).toContain("everyday Hinglish");
     expect(prompt).toContain("Devanagari");
+    expect(prompt).toContain("same conversational cadence in every language");
+    expect(prompt).toContain("more poetic, therapeutic, verbose, formal, or performative than Hindi");
   });
 
   it("detects generic replies so the UI can use its contextual fallback", () => {

@@ -8,7 +8,7 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 export type AvatarMouthPose = 0 | 1 | 2 | 3;
 export type AvatarEmotion = "natural" | "happy" | "playful" | "tender" | "intimate" | "sad" | "angry";
 
-const avatarAsset = "/assets/mira/avatar/mira-ember.glb";
+const avatarAsset = "/assets/mira/avatar/mira-valid-woman.glb";
 
 type MorphMesh = THREE.Mesh & {
   morphTargetDictionary: Record<string, number>;
@@ -140,9 +140,17 @@ export function LiveAvatar3D({
       }
 
       avatar = gltf.scene;
-      avatar.name = "MiraEmberOpenAvatar";
+      avatar.name = "MiraValidOpenAvatar";
       avatar.rotation.y = 0;
       avatar.position.set(0, 0, 0);
+
+      const sourceBounds = new THREE.Box3().setFromObject(avatar);
+      const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+      if (sourceSize.y > 0) avatar.scale.setScalar(1.72 / sourceSize.y);
+      avatar.updateMatrixWorld(true);
+      const fittedBounds = new THREE.Box3().setFromObject(avatar);
+      const fittedCenter = fittedBounds.getCenter(new THREE.Vector3());
+      avatar.position.set(-fittedCenter.x, -fittedBounds.min.y, -fittedCenter.z);
 
       avatar.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
@@ -164,8 +172,8 @@ export function LiveAvatar3D({
       head = avatar.getObjectByName("Head") ?? null;
       neck = avatar.getObjectByName("Neck2") ?? avatar.getObjectByName("Neck") ?? null;
       spine = avatar.getObjectByName("Spine2") ?? null;
-      leftEye = avatar.getObjectByName("LeftEye") ?? null;
-      rightEye = avatar.getObjectByName("RightEye") ?? null;
+      leftEye = avatar.getObjectByName("LeftEye") ?? avatar.getObjectByName("h_L_eye") ?? null;
+      rightEye = avatar.getObjectByName("RightEye") ?? avatar.getObjectByName("h_R_eye") ?? null;
       leftUpperArm = avatar.getObjectByName("LeftArm") ?? null;
       rightUpperArm = avatar.getObjectByName("RightArm") ?? null;
       if (leftUpperArm) leftUpperArm.rotation.set(1.16, -.01, -.2);

@@ -227,7 +227,7 @@ describe("companion turn planning", () => {
   it("responds like a present character when asked what she is doing", () => {
     const planned = turn("What are you doing?");
     expect(planned.intent).toBe("self");
-    expect(planned.text.toLowerCase()).toMatch(/sketch|loft|light|listening/);
+    expect(planned.text.toLowerCase()).toMatch(/quiet|taking it easy|curious/);
     expect(planned.text.toLowerCase()).not.toContain("how can i help");
   });
 
@@ -248,6 +248,16 @@ describe("companion turn planning", () => {
     expect(hindi.text).toContain("मैं Mira हूँ");
     expect(hinglish.intent).toBe("self");
     expect(hinglish.text).toContain("Main tumhari AI companion hoon");
+  });
+
+  it("keeps English and Hinglish as concise and direct as Hindi", () => {
+    const english = turn("What do you do?");
+    const hinglish = turn("tum kya karti ho?");
+    const hindi = turn("तुम क्या करती हो?");
+    expect(english.text.length).toBeLessThan(150);
+    expect(hinglish.text.length).toBeLessThan(150);
+    expect(hindi.text.length).toBeLessThan(150);
+    expect(english.text.toLowerCase()).not.toMatch(/sketch|sunlight|ordinary conversations feel/);
   });
 
   it("varies a repeated spoken answer once the previous turn is in context", () => {

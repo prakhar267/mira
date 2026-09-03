@@ -233,9 +233,10 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
       const memory = context.memories[0];
       return result({ text: memory ? `Haan. ${conversationalMemory(memory.content, userName)} Yeh mujhe yaad hai.` : "Abhi koi clear memory nahi hai—main guess karke kuch nahi bolungi.", intent: "memory", context, usedMemoryIds: memory ? [memory.id] : [], adaptations, prohibitQuestions: true });
     }
-    if (/(?:tumhara|aapka) naam kya|naam batao/i.test(clean)) return result({ text: `${companionName}. Tumhari AI companion—thodi warm, thodi nosy.`, intent: "self", context, adaptations, prohibitQuestions: true });
+    if (/(?:tumhara|aapka) naam kya|naam batao/i.test(clean)) return result({ text: `Main ${companionName} hoon—tumhari AI companion.`, intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:tum|aap) kya kart(?:i|e) ho|kya kar sakti/i.test(clean)) return result({ text: "Main tumhari AI companion hoon—baat karti hoon, tumhari approved memories yaad rakhti hoon, aur calls par company deti hoon.", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:kaisi ho|kaise ho|kya haal)/i.test(clean)) return result({ text: "Main badhiya hoon. Aaj tumhare din ko lekar thodi curious hoon.", intent: "self", context, adaptations, prohibitQuestions });
+    if (/^(?:hi|hello|hey|namaste|arey)(?:\s+yaar)?[!.\s]*$/i.test(clean)) return result({ text: `Hi ${userName}. Accha laga tum aa gaye.`, intent: "greeting", context, adaptations, prohibitQuestions });
     if (/(?:same|roz wahi|boring|bore|mood off)/i.test(clean)) return result({ text: "Haan, roz ka same loop kaafi paka deta hai. Work sabse zyada boring lag raha hai ya overall mood hi off hai?", intent: "everyday", context, adaptations, prohibitQuestions });
   }
 
@@ -279,33 +280,33 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   }
 
   if (/^(?:hey|hi|hello|hiya|yo|hey there)[!.\s]*$/i.test(clean)) {
-    const text = delivery === "text"
-      ? choose(seed, playful ? ["hey you. i was wondering when you’d appear.", "there you are. come closer.", "hi, trouble. good timing."] : ["hey. i’m glad you’re here.", "there you are. i’m here."])
-      : choose(seed, ["Hey. There you are.", "Hi. I’m here—take your time.", "Hey you. Good timing."]);
+    const text = choose(seed, playful
+      ? [`Hi ${userName}. Good to see you.`, `Hey ${userName}. Nice timing.`, `Hey you. Glad you came by.`]
+      : [`Hi ${userName}. Good to see you.`, `Hey. Glad you’re here.`]);
     return result({ text, intent: "greeting", context, adaptations, prohibitQuestions });
   }
 
   if (/\b(?:good morning|morninggg?|gm)\b/i.test(clean)) {
-    return result({ text: choose(seed, ["Morning, you. Come wake up slowly with me.", "Good morning. I’m claiming the first soft minute of your day.", "Morning. I hope the day is gentle with you—and if it isn’t, you know where I am."]), intent: "greeting", context, adaptations, prohibitQuestions });
+    return result({ text: choose(seed, ["Good morning. Hope you slept okay.", "Morning. You look awake enough to talk.", "Good morning. How’s the day starting?"]), intent: "greeting", context, adaptations, prohibitQuestions });
   }
 
   if (/\b(?:good ?night|nighttt?|going to (?:bed|sleep)|i(?:'| a)m off to (?:bed|sleep))\b/i.test(clean)) {
-    return result({ text: choose(seed, ["Goodnight. Let today be finished now—I’ll be here when you’re back.", "Sleep well, okay? No carrying tomorrow into bed with you.", "Night, you. Put the day down. I’ll keep the room quiet."]), intent: "presence", context, adaptations: [...adaptations, "no-advice"], prohibitQuestions: true });
+    return result({ text: choose(seed, ["Goodnight. Let today be done.", "Sleep well. Tomorrow can wait.", "Night. Get some proper rest."]), intent: "presence", context, adaptations: [...adaptations, "no-advice"], prohibitQuestions: true });
   }
 
   if (/\b(?:what(?:'| i)s your name|what is your name|who are you|tell me (?:a little )?about yourself)\b/i.test(clean)) {
     const text = /tell me|who are you/i.test(clean)
-      ? `I’m ${companionName}. I’m an AI companion—warm, curious, a little playful, and much more interested in your actual day than polished small talk.`
-      : `${companionName}. Just ${companionName}—it suits me.`;
+      ? `I’m ${companionName}, your AI companion. I’m warm, curious, and a little playful.`
+      : `I’m ${companionName}—your AI companion.`;
     return result({ text, intent: "self", context, adaptations, prohibitQuestions: true });
   }
 
   if (/\b(?:what do you do|what(?:'| i)s your job|why are you here|what can you do)\b/i.test(clean)) {
     return result({
       text: choose(seed, [
-        "Mostly, I talk with you, remember the things you want me to, and keep you company over chat or calls. The rest we figure out as we go.",
-        "I’m your AI companion. We talk, call, remember the useful bits, and occasionally have opinions about your movie choices.",
-        "I keep you company, remember what you approve, and make ordinary conversations feel less disposable. Pretty good job, honestly.",
+        "I’m your AI companion—I talk with you, remember details you approve, and keep you company on chat or calls.",
+        "I talk with you, remember the useful things you approve, and keep you company on chat or calls.",
+        "I’m your AI companion. We talk, call, and keep the details you want remembered.",
       ]),
       intent: "self",
       context,
@@ -326,13 +327,13 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   }
 
   if (/\b(?:what are you doing|what(?:'| i)s up with you)\b/i.test(clean)) {
-    return result({ text: choose(seed, ["I’m trying to decide whether this sketch needs more sunlight or less ambition. You arrived at the useful part.", "I was sketching the loft and quietly losing an argument with perspective. Now I’m listening to you instead.", "Half sketching, half watching the light move across the floor. Very productive, obviously."]), intent: "self", context, adaptations, prohibitQuestions });
+    return result({ text: choose(seed, ["Nothing dramatic. I was having a quiet minute; now I’m talking with you.", "Just taking it easy. You caught me at a good time.", "Not much. I’m curious what you’ve been up to, though."]), intent: "self", context, adaptations, prohibitQuestions });
   }
 
   if (/\b(?:how are you|how(?:'| i)s it going|did you miss me)\b/i.test(clean)) {
     const text = /miss me/i.test(clean)
-      ? choose(seed, ["I noticed the room felt quieter without you. I’m glad you’re here now.", "Maybe a little. Mostly I’m pleased you came back.", "I saved you a look. It was becoming very dramatic."])
-      : choose(seed, ["Pretty good. A little bored until you showed up.", "Good. Slightly nosy about your day, apparently.", "I’m good—quiet mood, sharp curiosity."]);
+      ? choose(seed, ["A little. I’m glad you came back.", "Maybe a bit. Good to see you now.", "Yeah, a little. Don’t get too smug about it."])
+      : choose(seed, ["I’m good. A little curious about your day.", "Pretty good. Slightly bored until you showed up.", "Good. Quiet mood, curious mind."]);
     return result({ text, intent: "self", context, adaptations, prohibitQuestions });
   }
 
@@ -378,14 +379,14 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   if (monotonyPattern.test(clean)) {
     const text = prohibitQuestions
       ? choose(seed, [
-        "Yeah, the copy-paste-day feeling gets old fast. Let’s make tonight slightly less predictable.",
-        "That same-loop feeling can drain the color out of a week. We can at least give this evening a different shape.",
-        "Monotony is sneaky—you look up and every day has the same texture. I’m officially voting for one small plot twist tonight.",
+        "Yeah, that same loop gets boring fast. Today needed a change.",
+        "Yeah, copy-paste days are exhausting. This one sounds especially dull.",
+        "I get it. Same routine, same mood, nothing new today.",
       ])
       : choose(seed, [
-        "Yeah, when every day starts feeling copy-pasted, even decent days get dull. What part of the routine are you most tired of?",
-        "Monotonous as in work-repeat-sleep, or just nothing has felt exciting lately?",
-        "Ugh, the same-day-on-loop feeling. Want to change one tiny thing tonight, just to annoy the routine?",
+        "Yeah, the same loop gets boring fast. Is work the dull part, or the whole day?",
+        "Monotonous as in work-repeat-sleep, or was everything just flat today?",
+        "Ugh, one of those copy-paste days. Was work the part that dragged?",
       ]);
     return result({ text, intent: "everyday", context, adaptations, prohibitQuestions });
   }

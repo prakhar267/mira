@@ -16,7 +16,7 @@ const femaleIndianEnglishNames = /aditi|kavya|neerja|swara|tara|veena|google.*(?
 const naturalEnglishNames = /andromeda|aria|ava|cora|flo|helena|jenny|juno|karen|luna|moira|nova|samantha|sandy|serena|shelley|shimmer|tara|tessa|thalia|vesta|zira|google.*english.*female/i;
 const enhancedNames = /enhanced|natural|neural|online|premium/i;
 const noveltyOrMaleNames = /albert|\baman\b|bad news|bahh|bells|boing|bubbles|cellos|daniel|eddy|fred|grandpa|jester|junior|organ|ralph|reed|rishi|rocko|superstar|trinoids|whisper|zarvox/i;
-const companionIdentityNames = [/^samantha\b/i, /^karen\b/i, /^tessa\b/i, /^tara\b/i, /^moira\b/i, /^flo\b/i, /^shelley\b/i, /^sandy\b/i, /google.*english.*female/i];
+const companionFallbackNames = [/^tara\b/i, /^samantha\b/i, /^karen\b/i, /^tessa\b/i, /^moira\b/i, /^flo\b/i, /^shelley\b/i, /^sandy\b/i, /google.*english.*female/i];
 
 export interface RecognitionResultLike extends ArrayLike<{ transcript?: string; confidence?: number }> {
   isFinal?: boolean;
@@ -123,23 +123,37 @@ export function cloudSpeakerForVoice(voiceId: string) {
 
 export function selectPreferredVoice<T extends { name: string; lang: string; default?: boolean; localService?: boolean }>(
   voices: T[],
-  text: string,
+  _text: string,
   _voiceId: string,
-  language: SpeechLanguage = "auto",
+  _language?: SpeechLanguage,
 ) {
-  const detected = detectSpeechLanguage(text, language);
-  const targetLocale = detected === "hi" ? "hi-IN" : detected === "hinglish" ? "en-IN" : "en-US";
-
+  void _text;
+  void _voiceId;
+  void _language;
   return [...voices].sort((left, right) => {
     const score = (voice: T) => {
-      const exactLocale = voice.lang.replace("_", "-").toLowerCase() === targetLocale.toLowerCase();
-      const sameLanguage = voice.lang.toLowerCase().startsWith(`${targetLocale.slice(0, 2).toLowerCase()}-`);
-      const regional = detected === "hinglish" ? /en[-_]in/i.test(voice.lang) : detected === "hi" ? /hi[-_]in/i.test(voice.lang) : /^en[-_]/i.test(voice.lang);
-      const namedFemale = detected === "hi" ? femaleHindiNames.test(voice.name) : detected === "hinglish" ? femaleIndianEnglishNames.test(voice.name) || naturalEnglishNames.test(voice.name) : naturalEnglishNames.test(voice.name);
-      const identityRank = companionIdentityNames.findIndex((pattern) => pattern.test(voice.name));
-      const identityScore = identityRank >= 0 ? 90 - identityRank * 8 : 0;
-      const languageVoiceScore = namedFemale ? 150 : 0;
-      return (exactLocale ? 1_000 : 0) + (sameLanguage ? 650 : 0) + (regional ? 180 : 0) + identityScore + languageVoiceScore + (enhancedNames.test(voice.name) ? 55 : 0) + (voice.default ? 2 : 0) + (voice.localService === false ? 6 : 0) - (noveltyOrMaleNames.test(voice.name) ? 520 : 0);
+      const locale = voice.lang.replace("_", "-").toLowerCase();
+      const isHindi = /^hi(?:-|$)/i.test(locale);
+      const isIndianEnglish = /^en-in$/i.test(locale);
+      const isLekha = /^lekha\b/i.test(voice.name);
+      const namedHindiFemale = femaleHindiNames.test(voice.name);
+      const namedIndianFemale = femaleIndianEnglishNames.test(voice.name);
+      const namedEnglishFemale = naturalEnglishNames.test(voice.name);
+      const fallbackRank = companionFallbackNames.findIndex((pattern) => pattern.test(voice.name));
+      const fallbackScore = fallbackRank >= 0 ? 180 - fallbackRank * 12 : 0;
+
+      // Lekha is Mira's on-device identity. Keep it for English, Hindi, and
+      // Hinglish so a language switch never sounds like a different person.
+      return (isLekha ? 8_000 : 0)
+        + (isHindi && namedHindiFemale ? 5_000 : 0)
+        + (isHindi ? 1_600 : 0)
+        + (isIndianEnglish && namedIndianFemale ? 1_250 : 0)
+        + (namedEnglishFemale ? 800 : 0)
+        + fallbackScore
+        + (enhancedNames.test(voice.name) ? 100 : 0)
+        + (voice.default ? 2 : 0)
+        + (voice.localService === false ? 6 : 0)
+        - (noveltyOrMaleNames.test(voice.name) ? 2_400 : 0);
     };
     return score(right) - score(left);
   })[0];
@@ -193,6 +207,7 @@ export function playCompanionSpeech(text: string, options: {
     if (!("speechSynthesis" in window)) return end();
     const profile = voiceProfile(voiceId);
     const segments = splitMultilingualSpeechSegments(text, language);
+    const selectedVoice = selectPreferredVoice(window.speechSynthesis.getVoices(), text, voiceId, language);
     let segmentIndex = 0;
     let characterOffset = 0;
 
@@ -200,10 +215,9 @@ export function playCompanionSpeech(text: string, options: {
       if (canceled || finished) return;
       const segment = segments[segmentIndex];
       if (!segment) return end();
-      const selected = selectPreferredVoice(window.speechSynthesis.getVoices(), segment.text, voiceId, segment.language);
       const utterance = new SpeechSynthesisUtterance(segment.text);
-      if (selected) utterance.voice = selected;
-      utterance.lang = selected?.lang ?? (segment.language === "hi" ? "hi-IN" : "en-IN");
+      if (selectedVoice) utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice?.lang ?? "hi-IN";
       utterance.rate = profile.rate;
       utterance.pitch = profile.pitch;
       utterance.volume = profile.volume;
