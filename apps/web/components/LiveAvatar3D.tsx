@@ -97,6 +97,11 @@ export function LiveAvatar3D({
     let spine: THREE.Object3D | null = null;
     let leftEye: THREE.Object3D | null = null;
     let rightEye: THREE.Object3D | null = null;
+    let headBase: THREE.Euler | null = null;
+    let neckBase: THREE.Euler | null = null;
+    let spineBase: THREE.Euler | null = null;
+    let leftEyeBase: THREE.Euler | null = null;
+    let rightEyeBase: THREE.Euler | null = null;
     let pointerX = 0;
     let pointerY = 0;
 
@@ -172,6 +177,21 @@ export function LiveAvatar3D({
       spine = avatar.getObjectByName("Spine2") ?? null;
       leftEye = avatar.getObjectByName("LeftEye") ?? avatar.getObjectByName("h_L_eye") ?? null;
       rightEye = avatar.getObjectByName("RightEye") ?? avatar.getObjectByName("h_R_eye") ?? null;
+      const poseArm = (name: "LeftArm" | "RightArm", target: THREE.Vector3) => {
+        const arm = avatar?.getObjectByName(name);
+        if (!arm?.parent) return;
+        const parentWorldRotation = arm.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+        const localTarget = target.clone().applyQuaternion(parentWorldRotation).normalize();
+        arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), localTarget);
+      };
+      poseArm("LeftArm", new THREE.Vector3(.08, -1, .02));
+      poseArm("RightArm", new THREE.Vector3(-.08, -1, .02));
+      avatar.updateMatrixWorld(true);
+      headBase = head?.rotation.clone() ?? null;
+      neckBase = neck?.rotation.clone() ?? null;
+      spineBase = spine?.rotation.clone() ?? null;
+      leftEyeBase = leftEye?.rotation.clone() ?? null;
+      rightEyeBase = rightEye?.rotation.clone() ?? null;
       scene.add(avatar);
       setLoadState("ready");
     }).catch((cause) => {
@@ -242,24 +262,24 @@ export function LiveAvatar3D({
       }
 
       const speechEnergy = reducedMotion ? 0 : state.speaking ? 1 : 0.45;
-      if (spine) {
-        spine.rotation.x = Math.sin(elapsed * 1.35) * 0.007 * speechEnergy;
-        spine.rotation.z = Math.sin(elapsed * 0.62) * 0.006;
+      if (spine && spineBase) {
+        spine.rotation.x = spineBase.x + Math.sin(elapsed * 1.35) * 0.007 * speechEnergy;
+        spine.rotation.z = spineBase.z + Math.sin(elapsed * 0.62) * 0.006;
       }
-      if (neck) {
-        neck.rotation.y = THREE.MathUtils.lerp(neck.rotation.y, pointerX * -0.055 + Math.sin(elapsed * 0.35) * 0.018, 0.035);
-        neck.rotation.x = THREE.MathUtils.lerp(neck.rotation.x, pointerY * 0.035 + Math.sin(elapsed * 0.57) * 0.008, 0.035);
+      if (neck && neckBase) {
+        neck.rotation.y = THREE.MathUtils.lerp(neck.rotation.y, neckBase.y + pointerX * -0.055 + Math.sin(elapsed * 0.35) * 0.018, 0.035);
+        neck.rotation.x = THREE.MathUtils.lerp(neck.rotation.x, neckBase.x + pointerY * 0.035 + Math.sin(elapsed * 0.57) * 0.008, 0.035);
       }
-      if (head) {
+      if (head && headBase) {
         const conversationalNod = state.speaking ? Math.sin(elapsed * 2.15) * 0.014 : Math.sin(elapsed * 0.51) * 0.007;
-        head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, conversationalNod, 0.04);
-        head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, Math.sin(elapsed * 0.29) * 0.01, 0.035);
+        head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, headBase.x + conversationalNod, 0.04);
+        head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, headBase.z + Math.sin(elapsed * 0.29) * 0.01, 0.035);
       }
-      if (leftEye && rightEye) {
-        leftEye.rotation.y = THREE.MathUtils.lerp(leftEye.rotation.y, pointerX * -0.06, 0.08);
-        rightEye.rotation.y = THREE.MathUtils.lerp(rightEye.rotation.y, pointerX * -0.06, 0.08);
-        leftEye.rotation.x = THREE.MathUtils.lerp(leftEye.rotation.x, pointerY * 0.04, 0.08);
-        rightEye.rotation.x = THREE.MathUtils.lerp(rightEye.rotation.x, pointerY * 0.04, 0.08);
+      if (leftEye && rightEye && leftEyeBase && rightEyeBase) {
+        leftEye.rotation.y = THREE.MathUtils.lerp(leftEye.rotation.y, leftEyeBase.y + pointerX * -0.06, 0.08);
+        rightEye.rotation.y = THREE.MathUtils.lerp(rightEye.rotation.y, rightEyeBase.y + pointerX * -0.06, 0.08);
+        leftEye.rotation.x = THREE.MathUtils.lerp(leftEye.rotation.x, leftEyeBase.x + pointerY * 0.04, 0.08);
+        rightEye.rotation.x = THREE.MathUtils.lerp(rightEye.rotation.x, rightEyeBase.x + pointerY * 0.04, 0.08);
       }
       if (avatar) avatar.position.y = Math.sin(elapsed * 1.28) * .0028;
 
