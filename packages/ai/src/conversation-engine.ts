@@ -349,12 +349,17 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     if (candidate) {
       const remembered = conversationalMemory(candidate.content, userName)
         .replace(/[.!?]+$/, "");
+      const localizedRemembered = hindiScript
+        ? remembered.replace(/^Your\b/i, "तुम्हारी").replace(/^You\b/i, "तुम")
+        : hinglish
+          ? remembered.replace(/^Your\b/i, "Tumhari").replace(/^You\b/i, "Tum")
+          : remembered;
       return result({
         text: hindiScript
-          ? `मैं याद रखूँगी: ${remembered}। इसे तुम कभी भी देख, सुधार या delete कर सकते हो।`
+          ? `मैं याद रखूँगी: ${localizedRemembered}। इसे तुम कभी भी देख, सुधार या delete कर सकते हो।`
           : hinglish
-            ? `Yaad rahega: ${remembered}. Tum is memory ko kabhi bhi dekh, correct ya delete kar sakte ho.`
-            : `I’ll remember this: ${remembered}. You can inspect, correct, or delete that memory anytime.`,
+            ? `Yaad rahega: ${localizedRemembered}. Tum is memory ko kabhi bhi dekh, correct ya delete kar sakte ho.`
+            : `I’ll remember this: ${localizedRemembered}. You can inspect, correct, or delete that memory anytime.`,
         intent: "memory",
         context,
         adaptations,

@@ -36,6 +36,16 @@ describe("relevantMemoryContents", () => {
     expect(relevantMemoryContents(memories, messages("What do you remember about me?"))).toHaveLength(2);
   });
 
+  it("returns only the requested subject for specific Hinglish recall", () => {
+    const mixedMemories = [
+      ...memories,
+      { ...memories[0]!, id: "priya", content: "User's behen is named Priya" },
+    ];
+    expect(relevantMemoryContents(mixedMemories, messages("meri behen ke baare mein kya yaad hai?"))).toEqual([
+      "User's behen is named Priya",
+    ]);
+  });
+
   it("recalls recent conversation memories in Hindi and Hinglish", () => {
     const conversationMemories = [
       { ...memories[0]!, id: "older", content: "Prakhar said: old detail", updatedAt: "2026-09-01T10:00:00.000Z" },

@@ -26,7 +26,7 @@ const genericReplyPattern = /^(?:yeah[,.]?\s*)?(?:i(?:['’]| a)m (?:here|listen
 const stiltedReplyPattern = /\b(?:can feel like|background static|fresh start|brainstorm (?:some|a few)|ready for whatever|hope something unexpected|how is your day treating you)\b/i;
 const danglingReplyPattern = /\b(?:a|an|the|to|and|or|but|because|with|for|of|any|anything|something|particular|your|you|that|which|what|how)$/i;
 const memoryRecallPattern = /\b(?:what do you remember|do you remember|remember about me|what did i (?:say|tell you)|told you earlier|recall|maine (?:pehle )?kya (?:bola|bataya)|yaad hai)\b/i;
-const devanagariMemoryRecallPattern = /(?:तुम्हें याद है|मैंने (?:पहले )?क्या (?:कहा|बताया)|मेरे बारे में क्या याद)/u;
+const devanagariMemoryRecallPattern = /(?:तुम्हें याद है|मैंने (?:पहले )?क्या (?:कहा|बताया)|मेरे बारे में क्या याद|क्या याद (?:है|हैं))/u;
 
 function compact(value: string, limit: number) {
   return value.trim().replace(/\s+/g, " ").slice(0, limit);
@@ -107,10 +107,15 @@ export function buildMemoryRecallReply(input: EdgeCompanionRequest) {
   const recalled = memories.map((memory) => {
     let result = namePattern ? memory.replace(namePattern, "") : memory;
     const possessive = isDevanagari ? "तुम्हारी" : isHinglish ? "Tumhari" : "Your";
-    const subject = isDevanagari ? "तुम" : isHinglish ? "Tum" : "You";
+    const subject = "You";
     if (possessivePattern) result = result.replace(possessivePattern, possessive);
     if (subjectPattern) result = result.replace(subjectPattern, subject);
-    return result.replace(/^User(?:'s|’s)\b/i, possessive).replace(/^User\b/i, subject);
+    return result
+      .replace(/^User(?:'s|’s)\b/i, possessive)
+      .replace(/^User\b/i, subject)
+      .replace(/^You has\b/i, "You have")
+      .replace(/^You is\b/i, "You are")
+      .replace(/^You (likes|prefers|wants|needs|feels|thinks|knows|remembers|lives|works|hopes|plans|cares)\b/i, (_, verb: string) => `You ${verb.replace(/s$/i, "")}`);
   }).join("; ");
   if (isDevanagari) return `हाँ, मुझे ये बातें याद हैं: ${recalled}`;
   if (isHinglish) return `Haan, mujhe yaad hai: ${recalled}`;
