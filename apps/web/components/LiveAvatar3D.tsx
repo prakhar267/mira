@@ -97,8 +97,6 @@ export function LiveAvatar3D({
     let spine: THREE.Object3D | null = null;
     let leftEye: THREE.Object3D | null = null;
     let rightEye: THREE.Object3D | null = null;
-    let leftUpperArm: THREE.Object3D | null = null;
-    let rightUpperArm: THREE.Object3D | null = null;
     let pointerX = 0;
     let pointerY = 0;
 
@@ -174,10 +172,6 @@ export function LiveAvatar3D({
       spine = avatar.getObjectByName("Spine2") ?? null;
       leftEye = avatar.getObjectByName("LeftEye") ?? avatar.getObjectByName("h_L_eye") ?? null;
       rightEye = avatar.getObjectByName("RightEye") ?? avatar.getObjectByName("h_R_eye") ?? null;
-      leftUpperArm = avatar.getObjectByName("LeftArm") ?? null;
-      rightUpperArm = avatar.getObjectByName("RightArm") ?? null;
-      if (leftUpperArm) leftUpperArm.rotation.set(1.16, -.01, -.2);
-      if (rightUpperArm) rightUpperArm.rotation.set(1.16, .01, .2);
       scene.add(avatar);
       setLoadState("ready");
     }).catch((cause) => {
