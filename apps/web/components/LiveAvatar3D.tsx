@@ -92,8 +92,8 @@ function styleAdultAvatar(root: THREE.Object3D) {
       const name = material.name;
 
       if (/hair/i.test(name)) {
-        material.color?.setRGB(.26, .27, .42);
-        material.shadeColorFactor?.setRGB(.055, .06, .13);
+        material.color?.setRGB(.11, .09, .2);
+        material.shadeColorFactor?.setRGB(.025, .018, .065);
         material.side = THREE.DoubleSide;
       } else if (/eyeiris/i.test(name)) {
         material.color?.setRGB(1, 1, 1);
@@ -231,8 +231,8 @@ export function LiveAvatar3D({
       const rightUpperArm = humanoid.getNormalizedBoneNode("rightUpperArm");
       const leftLowerArm = humanoid.getNormalizedBoneNode("leftLowerArm");
       const rightLowerArm = humanoid.getNormalizedBoneNode("rightLowerArm");
-      if (leftUpperArm) leftUpperArm.rotation.set(.04, -.11, -1.22);
-      if (rightUpperArm) rightUpperArm.rotation.set(.04, .11, 1.22);
+      if (leftUpperArm) leftUpperArm.rotation.set(.04, -.11, 1.18);
+      if (rightUpperArm) rightUpperArm.rotation.set(.04, .11, -1.18);
       if (leftLowerArm) leftLowerArm.rotation.set(0, -.12, -.08);
       if (rightLowerArm) rightLowerArm.rotation.set(0, .12, .08);
 
