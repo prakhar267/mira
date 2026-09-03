@@ -35,23 +35,24 @@ function openAIVoice(voiceId?: string) {
 }
 
 function openAIVoiceStyle(voiceId?: string) {
-  const shared = "Sound like an adult woman in a relaxed private conversation, never an announcer. Preserve the text's English, Hindi, or Hinglish pronunciation and code-switching exactly.";
-  if (voiceId?.includes("soft")) return `Speak gently and quietly, with rounded words, subtle warmth, and an unhurried pace. ${shared}`;
-  if (voiceId?.includes("seductive")) return `Use a low, intimate, unhurried tone with tasteful warmth. Keep it natural and understated, never exaggerated. ${shared}`;
-  if (voiceId?.includes("sharp")) return `Use a firm, crisp, direct tone with energetic pacing. Sound self-assured rather than hostile. ${shared}`;
-  if (voiceId?.includes("calm")) return `Use a smooth, grounded, reassuring tone with patient pacing. ${shared}`;
-  if (voiceId?.includes("confident")) return `Use a clear, self-assured, energetic tone with decisive pacing. ${shared}`;
-  if (voiceId?.includes("warm")) return `Use a caring, warm, natural tone with subtle expressive pacing. ${shared}`;
-  return `Use a bright, playful, expressive tone with natural conversational timing. ${shared}`;
+  const shared = "Keep the same recognizable adult female voice identity in every mood. Sound like a relaxed private conversation, never an announcer. Pronounce English, Hindi, and Hinglish naturally, including mid-sentence code-switching, without translating or explaining the switch.";
+  if (voiceId?.includes("tender") || voiceId?.includes("soft")) return `Speak gently and quietly, with rounded words, caring warmth, and an unhurried pace. ${shared}`;
+  if (voiceId?.includes("intimate") || voiceId?.includes("seductive")) return `Use a low, close, unhurried tone with tasteful warmth. Keep it natural and understated, never exaggerated. ${shared}`;
+  if (voiceId?.includes("angry") || voiceId?.includes("sharp")) return `Use a firm, intense, direct tone with clipped emphasis. Sound emotionally charged but never shout or threaten. ${shared}`;
+  if (voiceId?.includes("sad")) return `Use a quiet, vulnerable, subdued tone with slower breaths and restrained emotion. ${shared}`;
+  if (voiceId?.includes("happy") || voiceId?.includes("confident")) return `Use a bright, smiling, energetic tone with lively conversational timing. ${shared}`;
+  if (voiceId?.includes("playful")) return `Use a playful, teasing, expressive tone with natural conversational timing. ${shared}`;
+  return `Use a warm, relaxed, natural tone with subtle expressive pacing. ${shared}`;
 }
 
 function openAIVoiceSpeed(voiceId?: string) {
-  if (voiceId?.includes("seductive")) return .86;
-  if (voiceId?.includes("soft")) return .9;
-  if (voiceId?.includes("calm")) return .92;
-  if (voiceId?.includes("sharp")) return 1.05;
-  if (voiceId?.includes("confident")) return 1.02;
-  return .97;
+  if (voiceId?.includes("intimate") || voiceId?.includes("seductive")) return .86;
+  if (voiceId?.includes("tender") || voiceId?.includes("soft")) return .9;
+  if (voiceId?.includes("sad")) return .84;
+  if (voiceId?.includes("angry") || voiceId?.includes("sharp")) return 1.06;
+  if (voiceId?.includes("happy") || voiceId?.includes("confident")) return 1.03;
+  if (voiceId?.includes("playful")) return 1;
+  return .96;
 }
 
 class OpenAIHttpClient {

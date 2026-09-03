@@ -15,7 +15,7 @@ export const seedCompanion: CompanionProfile = {
   name: "Mira",
   pronouns: "she/her",
   presentation: "warm and grounded",
-  voiceId: "mira-playful-01",
+  voiceId: "mira-natural-01",
   relationshipMode: "romantic",
   mood: "cheerful",
   createdAt: "2026-08-01T00:00:00.000Z",

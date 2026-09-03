@@ -6,41 +6,43 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
 export type AvatarMouthPose = 0 | 1 | 2 | 3;
+export type AvatarEmotion = "natural" | "happy" | "playful" | "tender" | "intimate" | "sad" | "angry";
 
-const assetRoot = "/assets/mira/rocketbox";
+const avatarAsset = "/assets/mira/avatar/mira-ember.glb";
 
-// Female_Adult_08_facial ships its first 52 morph targets in Apple ARKit order.
-const face = {
-  blinkLeft: 8,
-  blinkRight: 9,
-  jawOpen: 24,
-  mouthClose: 26,
-  mouthFunnel: 31,
-  mouthLowerDownLeft: 33,
-  mouthLowerDownRight: 34,
-  mouthPucker: 37,
-  mouthSmileLeft: 43,
-  mouthSmileRight: 44,
-  mouthStretchLeft: 45,
-  mouthStretchRight: 46,
-} as const;
-
-type MorphMesh = THREE.SkinnedMesh & { morphTargetInfluences: number[] };
+type MorphMesh = THREE.Mesh & {
+  morphTargetDictionary: Record<string, number>;
+  morphTargetInfluences: number[];
+};
 
 function isMorphMesh(object: THREE.Object3D): object is MorphMesh {
-  return object instanceof THREE.SkinnedMesh && Boolean(object.morphTargetInfluences?.length);
+  return object instanceof THREE.Mesh
+    && Boolean(object.morphTargetInfluences?.length)
+    && Boolean(object.morphTargetDictionary);
 }
 
 function targetForPose(pose: AvatarMouthPose) {
-  if (pose === 1) return { jaw: 0.26, funnel: 0.05, pucker: 0.02, stretch: 0.08 };
-  if (pose === 2) return { jaw: 0.54, funnel: 0.04, pucker: 0, stretch: 0.14 };
-  if (pose === 3) return { jaw: 0.32, funnel: 0.34, pucker: 0.3, stretch: 0 };
-  return { jaw: 0, funnel: 0, pucker: 0, stretch: 0 };
+  if (pose === 1) return { jaw: .11, funnel: 0, pucker: 0, stretch: .02, pp: .44, aa: 0, ou: 0, e: 0 };
+  if (pose === 2) return { jaw: .28, funnel: 0, pucker: 0, stretch: .04, pp: 0, aa: .5, ou: 0, e: .08 };
+  if (pose === 3) return { jaw: .17, funnel: .08, pucker: .06, stretch: 0, pp: 0, aa: 0, ou: .5, e: 0 };
+  return { jaw: 0, funnel: 0, pucker: 0, stretch: 0, pp: 0, aa: 0, ou: 0, e: 0 };
 }
 
-function setMorph(mesh: MorphMesh, index: number, target: number, smoothing = 0.24) {
+function setNamedMorph(mesh: MorphMesh, name: string, target: number, smoothing = 0.24) {
+  const index = mesh.morphTargetDictionary[name];
+  if (index === undefined) return;
   const current = mesh.morphTargetInfluences[index] ?? 0;
   mesh.morphTargetInfluences[index] = THREE.MathUtils.lerp(current, target, smoothing);
+}
+
+function emotionTargets(emotion: AvatarEmotion) {
+  if (emotion === "happy") return { smile: .21, frown: 0, innerBrow: .04, browDown: 0, squint: .07, press: 0 };
+  if (emotion === "playful") return { smile: .14, frown: 0, innerBrow: .03, browDown: 0, squint: .1, press: 0 };
+  if (emotion === "tender") return { smile: .07, frown: 0, innerBrow: .1, browDown: 0, squint: .035, press: 0 };
+  if (emotion === "intimate") return { smile: .08, frown: 0, innerBrow: .04, browDown: .025, squint: .12, press: 0 };
+  if (emotion === "sad") return { smile: 0, frown: .23, innerBrow: .29, browDown: 0, squint: .02, press: .05 };
+  if (emotion === "angry") return { smile: 0, frown: .13, innerBrow: 0, browDown: .34, squint: .13, press: .2 };
+  return { smile: .035, frown: 0, innerBrow: .025, browDown: 0, squint: .02, press: 0 };
 }
 
 function disposeObject(root: THREE.Object3D) {
@@ -64,6 +66,7 @@ export function LiveAvatar3D({
   listening,
   blinking,
   mouthPose,
+  emotion = "natural",
 }: {
   companionName: string;
   speaking: boolean;
@@ -71,14 +74,15 @@ export function LiveAvatar3D({
   listening: boolean;
   blinking: boolean;
   mouthPose: AvatarMouthPose;
+  emotion?: AvatarEmotion;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef({ speaking, thinking, listening, blinking, mouthPose });
+  const stateRef = useRef({ speaking, thinking, listening, blinking, mouthPose, emotion });
   const [loadState, setLoadState] = useState<"loading" | "ready" | "fallback">("loading");
 
   useEffect(() => {
-    stateRef.current = { speaking, thinking, listening, blinking, mouthPose };
-  }, [blinking, listening, mouthPose, speaking, thinking]);
+    stateRef.current = { speaking, thinking, listening, blinking, mouthPose, emotion };
+  }, [blinking, emotion, listening, mouthPose, speaking, thinking]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -93,6 +97,8 @@ export function LiveAvatar3D({
     let spine: THREE.Object3D | null = null;
     let leftEye: THREE.Object3D | null = null;
     let rightEye: THREE.Object3D | null = null;
+    let leftUpperArm: THREE.Object3D | null = null;
+    let rightUpperArm: THREE.Object3D | null = null;
     let pointerX = 0;
     let pointerY = 0;
 
@@ -124,72 +130,46 @@ export function LiveAvatar3D({
     fill.position.set(1.2, 1.25, 1.3);
     scene.add(hemisphere, key, rim, fill);
 
-    const textureLoader = new THREE.TextureLoader();
-    const loadTexture = async (name: string, color = false) => {
-      const texture = await textureLoader.loadAsync(`${assetRoot}/${name}`);
-      texture.flipY = false;
-      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-      if (color) texture.colorSpace = THREE.SRGBColorSpace;
-      return texture;
-    };
-
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
 
-    Promise.all([
-      loader.loadAsync(`${assetRoot}/mira-avatar.glb`),
-      loadTexture("body-color.jpg", true),
-      loadTexture("body-normal.jpg"),
-      loadTexture("head-color.jpg", true),
-      loadTexture("head-normal.jpg"),
-      loadTexture("hair-alpha.png", true),
-    ]).then(([gltf, bodyColor, bodyNormal, headColor, headNormal, hairAlpha]) => {
+    loader.loadAsync(avatarAsset).then((gltf) => {
       if (!active) {
         disposeObject(gltf.scene);
-        for (const texture of [bodyColor, bodyNormal, headColor, headNormal, hairAlpha]) texture.dispose();
         return;
       }
 
       avatar = gltf.scene;
-      avatar.name = "MiraOpenSourceAvatar";
+      avatar.name = "MiraEmberOpenAvatar";
       avatar.rotation.y = 0;
       avatar.position.set(0, 0, 0);
 
       avatar.traverse((object) => {
-        if (!isMorphMesh(object)) return;
-        morphMeshes.push(object);
+        if (!(object instanceof THREE.Mesh)) return;
+        if (isMorphMesh(object)) morphMeshes.push(object);
         object.frustumCulled = false;
+        object.castShadow = false;
+        object.receiveShadow = false;
         const materials = Array.isArray(object.material) ? object.material : [object.material];
         for (const material of materials) {
           if (!(material instanceof THREE.MeshStandardMaterial)) continue;
-          material.roughness = 0.76;
-          material.metalness = 0;
-          material.envMapIntensity = 0.35;
-          if (material.name === "f008_body") {
-            material.map = bodyColor;
-            material.normalMap = bodyNormal;
-            material.normalScale.set(0.55, 0.55);
-          } else if (material.name === "f008_head") {
-            material.map = headColor;
-            material.normalMap = headNormal;
-            material.normalScale.set(0.46, 0.46);
-          } else if (material.name === "f008_opacity") {
-            material.map = hairAlpha;
-            material.alphaMap = hairAlpha;
-            material.transparent = true;
-            material.alphaTest = 0.34;
-            material.side = THREE.DoubleSide;
-            material.depthWrite = true;
-          }
+          material.roughness = Math.max(material.roughness, .54);
+          material.metalness = Math.min(material.metalness, .08);
+          material.envMapIntensity = .42;
+          if (/eyelash|hair/i.test(material.name)) material.side = THREE.DoubleSide;
           material.needsUpdate = true;
         }
       });
 
-      head = avatar.getObjectByName("Bip01 Head") ?? null;
-      neck = avatar.getObjectByName("Bip01 Neck") ?? null;
-      spine = avatar.getObjectByName("Bip01 Spine2") ?? null;
-      leftEye = avatar.getObjectByName("Bip01 LEye") ?? null;
-      rightEye = avatar.getObjectByName("Bip01 REye") ?? null;
+      head = avatar.getObjectByName("Head") ?? null;
+      neck = avatar.getObjectByName("Neck2") ?? avatar.getObjectByName("Neck") ?? null;
+      spine = avatar.getObjectByName("Spine2") ?? null;
+      leftEye = avatar.getObjectByName("LeftEye") ?? null;
+      rightEye = avatar.getObjectByName("RightEye") ?? null;
+      leftUpperArm = avatar.getObjectByName("LeftArm") ?? null;
+      rightUpperArm = avatar.getObjectByName("RightArm") ?? null;
+      if (leftUpperArm) leftUpperArm.rotation.set(1.16, -.01, -.2);
+      if (rightUpperArm) rightUpperArm.rotation.set(1.16, .01, .2);
       scene.add(avatar);
       setLoadState("ready");
     }).catch((cause) => {
@@ -228,22 +208,35 @@ export function LiveAvatar3D({
       const elapsed = (performance.now() - startedAt) / 1_000;
       const state = stateRef.current;
       const pose = targetForPose(state.mouthPose);
-      const naturalSmile = 0;
+      const expression = emotionTargets(state.emotion);
       const blink = state.blinking ? 1 : 0;
 
       for (const mesh of morphMeshes) {
-        setMorph(mesh, face.blinkLeft, blink, state.blinking ? 0.72 : 0.33);
-        setMorph(mesh, face.blinkRight, blink, state.blinking ? 0.72 : 0.33);
-        setMorph(mesh, face.jawOpen, pose.jaw, 0.34);
-        setMorph(mesh, face.mouthClose, state.mouthPose === 0 ? 0.04 : 0, 0.3);
-        setMorph(mesh, face.mouthFunnel, pose.funnel, 0.3);
-        setMorph(mesh, face.mouthPucker, pose.pucker, 0.3);
-        setMorph(mesh, face.mouthStretchLeft, pose.stretch, 0.3);
-        setMorph(mesh, face.mouthStretchRight, pose.stretch, 0.3);
-        setMorph(mesh, face.mouthLowerDownLeft, pose.jaw * 0.18, 0.3);
-        setMorph(mesh, face.mouthLowerDownRight, pose.jaw * 0.18, 0.3);
-        setMorph(mesh, face.mouthSmileLeft, naturalSmile, 0.12);
-        setMorph(mesh, face.mouthSmileRight, naturalSmile, 0.12);
+        setNamedMorph(mesh, "eyeBlinkLeft", blink, state.blinking ? .72 : .33);
+        setNamedMorph(mesh, "eyeBlinkRight", blink, state.blinking ? .72 : .33);
+        setNamedMorph(mesh, "jawOpen", pose.jaw, .38);
+        setNamedMorph(mesh, "mouthClose", state.mouthPose === 0 ? .025 : 0, .3);
+        setNamedMorph(mesh, "mouthFunnel", pose.funnel, .34);
+        setNamedMorph(mesh, "mouthPucker", pose.pucker, .34);
+        setNamedMorph(mesh, "mouthStretchLeft", pose.stretch, .34);
+        setNamedMorph(mesh, "mouthStretchRight", pose.stretch, .34);
+        setNamedMorph(mesh, "mouthLowerDownLeft", pose.jaw * .17, .32);
+        setNamedMorph(mesh, "mouthLowerDownRight", pose.jaw * .17, .32);
+        setNamedMorph(mesh, "PP", pose.pp, .42);
+        setNamedMorph(mesh, "aa", pose.aa, .42);
+        setNamedMorph(mesh, "ou", pose.ou, .42);
+        setNamedMorph(mesh, "E", pose.e, .42);
+        setNamedMorph(mesh, "mouthSmileLeft", expression.smile, .1);
+        setNamedMorph(mesh, "mouthSmileRight", expression.smile, .1);
+        setNamedMorph(mesh, "mouthFrownLeft", expression.frown, .1);
+        setNamedMorph(mesh, "mouthFrownRight", expression.frown, .1);
+        setNamedMorph(mesh, "browInnerUp", expression.innerBrow, .1);
+        setNamedMorph(mesh, "browDownLeft", expression.browDown, .1);
+        setNamedMorph(mesh, "browDownRight", expression.browDown, .1);
+        setNamedMorph(mesh, "eyeSquintLeft", expression.squint, .1);
+        setNamedMorph(mesh, "eyeSquintRight", expression.squint, .1);
+        setNamedMorph(mesh, "mouthPressLeft", expression.press, .1);
+        setNamedMorph(mesh, "mouthPressRight", expression.press, .1);
       }
 
       const speechEnergy = reducedMotion ? 0 : state.speaking ? 1 : 0.45;
@@ -266,7 +259,7 @@ export function LiveAvatar3D({
         leftEye.rotation.x = THREE.MathUtils.lerp(leftEye.rotation.x, pointerY * 0.04, 0.08);
         rightEye.rotation.x = THREE.MathUtils.lerp(rightEye.rotation.x, pointerY * 0.04, 0.08);
       }
-      if (avatar) avatar.position.y = Math.sin(elapsed * 1.28) * 0.0025;
+      if (avatar) avatar.position.y = Math.sin(elapsed * 1.28) * .0028;
 
       camera.lookAt(pointerX * -0.018, 1.55 + pointerY * -0.012, 0);
       renderer.render(scene, camera);
@@ -287,7 +280,7 @@ export function LiveAvatar3D({
   return (
     <div className={`live-avatar-3d live-avatar-3d--${loadState}`}>
       <img className="live-avatar-3d__fallback" src="/assets/mira/video-call-real-idle.jpg" alt="" draggable={false} />
-      <canvas ref={canvasRef} className="live-avatar-3d__canvas" role="img" aria-label={`${companionName}, an animated open-source 3D companion`} />
+      <canvas ref={canvasRef} className="live-avatar-3d__canvas" role="img" aria-label={`${companionName}, an expressive animated open-source 3D companion`} />
       {loadState === "loading" ? <span className="live-avatar-3d__loading">Bringing {companionName} into the call…</span> : null}
       {loadState === "fallback" ? <span className="live-avatar-3d__loading">3D is unavailable on this device · using portrait mode</span> : null}
     </div>

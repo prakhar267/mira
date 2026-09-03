@@ -1,22 +1,42 @@
-export interface CompanionVoiceProfile {
+export type CompanionVoiceEmotion = "natural" | "happy" | "playful" | "tender" | "intimate" | "sad" | "angry";
+
+export interface CompanionVoiceMode {
   id: string;
   name: string;
   detail: string;
+  emotion: CompanionVoiceEmotion;
   speaker: "luna";
   rate: number;
   pitch: number;
+  volume: number;
 }
 
-export const companionVoiceProfiles: CompanionVoiceProfile[] = [
-  { id: "mira-warm-01", name: "Warm", detail: "Mira Velvet · caring and natural", speaker: "luna", rate: .96, pitch: .99 },
-  { id: "mira-playful-01", name: "Playful", detail: "Mira Velvet · bright and expressive", speaker: "luna", rate: .99, pitch: 1.015 },
-  { id: "mira-soft-01", name: "Soft", detail: "Mira Velvet · quiet and gentle", speaker: "luna", rate: .92, pitch: 1 },
-  { id: "mira-seductive-01", name: "Seductive", detail: "Mira Velvet · low and intimate", speaker: "luna", rate: .89, pitch: .96 },
-  { id: "mira-calm-01", name: "Mellow", detail: "Mira Velvet · smooth and grounded", speaker: "luna", rate: .94, pitch: .985 },
-  { id: "mira-confident-01", name: "Confident", detail: "Mira Velvet · clear and energetic", speaker: "luna", rate: 1, pitch: .995 },
-  { id: "mira-sharp-01", name: "Sharp", detail: "Mira Velvet · firm and crisp", speaker: "luna", rate: 1.03, pitch: 1 },
+export const companionVoiceIdentity = {
+  name: "Mira Velvet",
+  detail: "One warm adult female voice · English, हिन्दी and Hinglish",
+} as const;
+
+// These are delivery moods for one voice identity, not separate characters or voices.
+export const companionVoiceModes: CompanionVoiceMode[] = [
+  { id: "mira-natural-01", name: "Natural", detail: "Warm, relaxed and conversational", emotion: "natural", speaker: "luna", rate: .96, pitch: .985, volume: 1 },
+  { id: "mira-happy-01", name: "Happy", detail: "Bright, smiling and energetic", emotion: "happy", speaker: "luna", rate: 1.03, pitch: 1.025, volume: 1 },
+  { id: "mira-playful-01", name: "Playful", detail: "Teasing, lively and expressive", emotion: "playful", speaker: "luna", rate: 1, pitch: 1.015, volume: 1 },
+  { id: "mira-tender-01", name: "Tender", detail: "Soft, caring and gentle", emotion: "tender", speaker: "luna", rate: .9, pitch: .995, volume: .9 },
+  { id: "mira-intimate-01", name: "Intimate", detail: "Low, close and unhurried", emotion: "intimate", speaker: "luna", rate: .87, pitch: .955, volume: .92 },
+  { id: "mira-sad-01", name: "Sad", detail: "Quiet, vulnerable and subdued", emotion: "sad", speaker: "luna", rate: .85, pitch: .94, volume: .84 },
+  { id: "mira-angry-01", name: "Angry", detail: "Firm, intense and direct", emotion: "angry", speaker: "luna", rate: 1.07, pitch: .965, volume: 1 },
 ];
 
-export function companionVoiceProfile(voiceId: string) {
-  return companionVoiceProfiles.find((voice) => voice.id === voiceId) ?? companionVoiceProfiles[1]!;
+const legacyModeAliases: Record<string, string> = {
+  "mira-warm-01": "mira-natural-01",
+  "mira-soft-01": "mira-tender-01",
+  "mira-seductive-01": "mira-intimate-01",
+  "mira-calm-01": "mira-natural-01",
+  "mira-confident-01": "mira-happy-01",
+  "mira-sharp-01": "mira-angry-01",
+};
+
+export function companionVoiceMode(modeId: string) {
+  const resolvedId = legacyModeAliases[modeId] ?? modeId;
+  return companionVoiceModes.find((mode) => mode.id === resolvedId) ?? companionVoiceModes[0]!;
 }

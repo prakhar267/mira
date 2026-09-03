@@ -96,10 +96,10 @@ export interface MemoryCandidate {
 export function extractMemoryCandidates(message: string): MemoryCandidate[] {
   const compact = message.trim().replace(/\s+/g, " ");
   const candidates: MemoryCandidate[] = [];
-  const explicit = compact.match(/^(?:please\s+remember|remember|i want you to remember)(?:\s+that)?\s+(.{3,220})/i);
+  const explicit = compact.match(/^(?:(?:please\s+remember|remember|i want you to remember)(?:\s+that)?|(?:please\s+)?yaad\s+rakhna(?:\s+ki)?|(?:कृपया\s+)?याद\s+रखना(?:\s+कि)?)\s+(.{3,220})/iu);
   if (explicit?.[1]) {
     const detail = explicit[1].replace(/\s+/g, " ").trim();
-    const content = detail
+    let content = detail
       .replace(/\bI am\b/gi, "User is")
       .replace(/\bI(?:'|’)m\b/gi, "User is")
       .replace(/\bI have\b/gi, "User has")
@@ -121,9 +121,15 @@ export function extractMemoryCandidates(message: string): MemoryCandidate[] {
       .replace(/\bmy\b/gi, "User's")
       .replace(/\bme\b/gi, "User")
       .replace(/\bI\b/g, "User");
-    const type: MemoryType = /\b(?:friend|partner|wife|husband|mother|father|mom|mum|dad|brother|sister|dog|cat|pet)\b/i.test(detail)
+    if (!/[\u0900-\u097f]/u.test(content)) {
+      content = content
+        .replace(/\b(?:mera|meri|mere)\b/gi, "User's")
+        .replace(/\bmain\b/gi, "User")
+        .replace(/\bmujhe\b/gi, "User");
+    }
+    const type: MemoryType = /\b(?:friend|partner|wife|husband|mother|father|mom|mum|dad|brother|sister|dog|cat|pet|dost|behen|bhai|maa|papa)\b/i.test(detail) || /(?:दोस्त|बहन|भाई|माँ|मां|पिता|पति|पत्नी|कुत्ता|बिल्ली)/u.test(detail)
       ? "relationship"
-      : /\b(?:today|tomorrow|tonight|anniversary|birthday|interview|appointment|exam|meeting|trip|died|passed away)\b/i.test(detail)
+      : /\b(?:today|tomorrow|tonight|anniversary|birthday|interview|appointment|exam|meeting|trip|died|passed away|aaj|kal|parso)\b/i.test(detail) || /(?:आज|कल|जन्मदिन|इंटरव्यू|परीक्षा|मीटिंग|यात्रा)/u.test(detail)
         ? "episodic"
         : "semantic";
     return [{
@@ -147,12 +153,47 @@ export function extractMemoryCandidates(message: string): MemoryCandidate[] {
     });
   }
 
+  const hindiPreference = compact.match(/(?:\b(?:mujhe|muje)\s+(.{2,100}?)\s+(?:bahut\s+)?pasand\s+(?:hai|he)\b|मुझे\s+(.{2,100}?)\s+(?:बहुत\s+)?पसंद\s+है)/iu);
+  const hindiPreferenceValue = hindiPreference?.[1] ?? hindiPreference?.[2];
+  if (hindiPreferenceValue) {
+    const value = hindiPreferenceValue.replace(/[.!?।]+$/, "").trim();
+    candidates.push({
+      type: "preference",
+      content: `User likes ${value}.`,
+      normalizedContent: value.toLowerCase(),
+      importance: 0.68,
+      confidence: 0.86,
+    });
+  }
+
   const person = compact.match(/\bmy\s+(sister|brother|mother|father|friend|partner|wife|husband)\s+(?:is named|is|called)\s+([\p{L}][\p{L}'-]{1,40})/iu);
   if (person?.[1] && person[2]) {
     candidates.push({
       type: "relationship",
       content: `User's ${person[1].toLowerCase()} is named ${person[2]}.`,
       normalizedContent: `${person[1].toLowerCase()}:${person[2].toLowerCase()}`,
+      importance: 0.82,
+      confidence: 0.91,
+    });
+  }
+
+  const hinglishPerson = compact.match(/\bmeri?\s+(behen|bhai|maa|mummy|papa|dost|friend|partner)\s+ka\s+naam\s+([\p{L}][\p{L}'-]{1,40})\s+hai\b/iu);
+  if (hinglishPerson?.[1] && hinglishPerson[2]) {
+    candidates.push({
+      type: "relationship",
+      content: `User's ${hinglishPerson[1].toLowerCase()} is named ${hinglishPerson[2]}.`,
+      normalizedContent: `${hinglishPerson[1].toLowerCase()}:${hinglishPerson[2].toLowerCase()}`,
+      importance: 0.82,
+      confidence: 0.91,
+    });
+  }
+
+  const hindiPerson = compact.match(/मेरी?\s+(बहन|भाई|माँ|मां|मम्मी|पापा|दोस्त|साथी)\s+का\s+नाम\s+([\p{L}\p{M}][\p{L}\p{M}'-]{1,40})\s+है/u);
+  if (hindiPerson?.[1] && hindiPerson[2]) {
+    candidates.push({
+      type: "relationship",
+      content: `User's ${hindiPerson[1]} is named ${hindiPerson[2]}.`,
+      normalizedContent: `${hindiPerson[1]}:${hindiPerson[2]}`.toLowerCase(),
       importance: 0.82,
       confidence: 0.91,
     });

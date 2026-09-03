@@ -44,13 +44,13 @@ async function main() {
   }
 
   const voices = [
-    { id: "mira-warm-01", providerVoiceId: "marin", displayName: "Mira · Warm", style: "warm" },
-    { id: "mira-playful-01", providerVoiceId: "marin", displayName: "Mira · Playful", style: "playful" },
-    { id: "mira-soft-01", providerVoiceId: "marin", displayName: "Mira · Soft", style: "soft" },
-    { id: "mira-seductive-01", providerVoiceId: "marin", displayName: "Mira · Seductive", style: "seductive" },
-    { id: "mira-calm-01", providerVoiceId: "marin", displayName: "Mira · Mellow", style: "calm" },
-    { id: "mira-confident-01", providerVoiceId: "marin", displayName: "Mira · Confident", style: "confident" },
-    { id: "mira-sharp-01", providerVoiceId: "marin", displayName: "Mira · Sharp", style: "sharp" },
+    { id: "mira-natural-01", providerVoiceId: "marin", displayName: "Mira Velvet · Natural", style: "natural" },
+    { id: "mira-happy-01", providerVoiceId: "marin", displayName: "Mira Velvet · Happy", style: "happy" },
+    { id: "mira-playful-01", providerVoiceId: "marin", displayName: "Mira Velvet · Playful", style: "playful" },
+    { id: "mira-tender-01", providerVoiceId: "marin", displayName: "Mira Velvet · Tender", style: "tender" },
+    { id: "mira-intimate-01", providerVoiceId: "marin", displayName: "Mira Velvet · Intimate", style: "intimate" },
+    { id: "mira-sad-01", providerVoiceId: "marin", displayName: "Mira Velvet · Sad", style: "sad" },
+    { id: "mira-angry-01", providerVoiceId: "marin", displayName: "Mira Velvet · Angry", style: "angry" },
   ];
   for (const voice of voices) {
     await prisma.voiceProfile.upsert({ where: { id: voice.id }, update: { ...voice, provider: "openai", accent: "neutral", genderPresentation: "feminine", premiumTier: "free", active: true }, create: { ...voice, provider: "openai", accent: "neutral", genderPresentation: "feminine", premiumTier: "free", active: true } });

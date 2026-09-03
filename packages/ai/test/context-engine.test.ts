@@ -56,6 +56,13 @@ describe("memory pipeline", () => {
     expect(extractMemoryCandidates("I went to school in Mumbai")[0]?.content).toContain("school in Mumbai");
   });
 
+  it("extracts explicit, preference, and relationship memories in Hindi and Hinglish", () => {
+    expect(extractMemoryCandidates("yaad rakhna ki mera birthday 4 May ko hai")[0]).toMatchObject({ type: "episodic", confidence: .99 });
+    expect(extractMemoryCandidates("मुझे पुरानी हिंदी फिल्में बहुत पसंद हैं")[0]).toMatchObject({ type: "preference", normalizedContent: "पुरानी हिंदी फिल्में" });
+    expect(extractMemoryCandidates("meri behen ka naam Priya hai")[0]).toMatchObject({ type: "relationship", normalizedContent: "behen:priya" });
+    expect(extractMemoryCandidates("मेरी बहन का नाम नेहा है")[0]).toMatchObject({ type: "relationship", normalizedContent: "बहन:नेहा" });
+  });
+
   it("does not turn questions or trivial acknowledgements into memory", () => {
     expect(extractMemoryCandidates("What do you remember about me?")).toEqual([]);
     expect(extractMemoryCandidates("क्या तुम्हें मेरा नाम याद है")).toEqual([]);

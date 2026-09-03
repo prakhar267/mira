@@ -26,7 +26,7 @@ describe("OpenAI companion voice", () => {
       visionModel: "test-vision",
       imageModel: "test-image",
     });
-    const styles = ["mira-warm-01", "mira-playful-01", "mira-soft-01", "mira-seductive-01", "mira-calm-01", "mira-confident-01", "mira-sharp-01"];
+    const styles = ["mira-natural-01", "mira-happy-01", "mira-playful-01", "mira-tender-01", "mira-intimate-01", "mira-sad-01", "mira-angry-01"];
 
     for (const voiceId of styles) {
       await provider.createSession({ companionId: "companion-1", userId: "user-1", voiceId });

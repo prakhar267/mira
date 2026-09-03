@@ -163,7 +163,7 @@ export const initialState: DemoState = {
     name: "Mira",
     pronouns: "she/her",
     presentation: "playful and warm",
-    voiceId: "mira-playful-01",
+    voiceId: "mira-natural-01",
     relationshipMode: "romantic",
     mood: "cheerful",
     createdAt: "2026-07-14T00:00:00.000Z",

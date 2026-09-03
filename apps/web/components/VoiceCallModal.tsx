@@ -14,13 +14,14 @@ import {
 } from "@phosphor-icons/react";
 import {
   collectRecognitionTranscript,
+  detectSpeechLanguage,
   playCompanionSpeech,
   recognitionLocale,
   speechLanguageOptions,
   type CompanionSpeechPlayback,
   type SpeechLanguage,
 } from "@/lib/speech";
-import { companionVoiceProfile, companionVoiceProfiles } from "@/lib/voice-profiles";
+import { companionVoiceMode, companionVoiceModes } from "@/lib/voice-profiles";
 
 type CallPhase = "connecting" | "listening" | "thinking" | "speaking" | "interrupted";
 
@@ -94,9 +95,10 @@ export function VoiceCallModal({
   const activeRef = useRef(true);
   const phaseRef = useRef<CallPhase>("connecting");
   const ignoredRecognitionsRef = useRef(new WeakSet<BrowserSpeechRecognition>());
+  const adaptiveLocaleRef = useRef("en-IN");
 
   useEffect(() => { onTranscribedTurnRef.current = onTranscribedTurn; }, [onTranscribedTurn]);
-  useEffect(() => { setActiveVoiceId(voiceId); }, [voiceId]);
+  useEffect(() => { setActiveVoiceId(companionVoiceMode(voiceId).id); }, [voiceId]);
 
   const changePhase = useCallback((next: CallPhase) => {
     phaseRef.current = next;
@@ -258,7 +260,7 @@ export function VoiceCallModal({
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 3;
-    recognition.lang = recognitionLocale(language, navigator.language);
+    recognition.lang = language === "auto" ? adaptiveLocaleRef.current : recognitionLocale(language, navigator.language);
     const transcriptSegments = new Map<number, string>();
     let finalTranscript = "";
     let restartAllowed = true;
@@ -280,6 +282,7 @@ export function VoiceCallModal({
       if (!transcript.text) return;
       setHeard(transcript.text);
       finalTranscript = transcript.text;
+      if (language === "auto") adaptiveLocaleRef.current = recognitionLocale(detectSpeechLanguage(transcript.text), navigator.language);
       if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
       commitTimerRef.current = window.setTimeout(commitTranscript, transcript.hasFinalResult ? 1_350 : 2_200);
     };
@@ -366,7 +369,7 @@ export function VoiceCallModal({
 
       <div className="call-pickers">
         <label className="call-language-picker"><span>Language</span><select aria-label="Voice call language" value={language} onChange={(event) => { stopRecognition(); playbackRef.current?.cancel(); changePhase("listening"); setLanguage(event.target.value as SpeechLanguage); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        <label className="call-language-picker"><span>Tone</span><select aria-label="Mira voice tone" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const profile = companionVoiceProfile(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${profile.name} tone will start on your next call.`); else { setCompanionLine(`${profile.name} tone selected.`); speak(`Okay… this is my ${profile.name.toLowerCase()} tone.`, true, next); } }}>{companionVoiceProfiles.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>
+        <label className="call-language-picker"><span>Mood</span><select aria-label="Mira voice mood" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const mode = companionVoiceMode(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${mode.name} delivery will start on your next call.`); else { setCompanionLine(`${mode.name} mood selected.`); speak(`Okay… I’ll sound ${mode.name.toLowerCase()} now.`, true, next); } }}>{companionVoiceModes.map((mode) => <option key={mode.id} value={mode.id}>{mode.name}</option>)}</select></label>
       </div>
 
       <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking"}>

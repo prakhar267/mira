@@ -19,13 +19,14 @@ import {
 import { LiveAvatar3D, type AvatarMouthPose } from "@/components/LiveAvatar3D";
 import {
   collectRecognitionTranscript,
+  detectSpeechLanguage,
   playCompanionSpeech,
   recognitionLocale,
   speechLanguageOptions,
   type CompanionSpeechPlayback,
   type SpeechLanguage,
 } from "@/lib/speech";
-import { companionVoiceProfile, companionVoiceProfiles } from "@/lib/voice-profiles";
+import { companionVoiceMode, companionVoiceModes } from "@/lib/voice-profiles";
 
 const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
 
@@ -115,9 +116,10 @@ export function VideoCallModal({
   const lastMouthBoundaryRef = useRef(0);
   const mouthSequenceRef = useRef(0);
   const ignoredRecognitionsRef = useRef(new WeakSet<VideoSpeechRecognition>());
+  const adaptiveLocaleRef = useRef("en-IN");
 
   useEffect(() => { onTranscribedTurnRef.current = onTranscribedTurn; }, [onTranscribedTurn]);
-  useEffect(() => { setActiveVoiceId(voiceId); }, [voiceId]);
+  useEffect(() => { setActiveVoiceId(companionVoiceMode(voiceId).id); }, [voiceId]);
 
   const changeSpeaking = useCallback((next: boolean) => {
     speakingRef.current = next;
@@ -389,7 +391,7 @@ export function VideoCallModal({
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 3;
-    recognition.lang = recognitionLocale(language, navigator.language);
+    recognition.lang = language === "auto" ? adaptiveLocaleRef.current : recognitionLocale(language, navigator.language);
     const transcriptSegments = new Map<number, string>();
     let transcript = "";
     let restartAllowed = true;
@@ -411,6 +413,7 @@ export function VideoCallModal({
       if (!next.text) return;
       transcript = next.text;
       setUserLine(next.text);
+      if (language === "auto") adaptiveLocaleRef.current = recognitionLocale(detectSpeechLanguage(next.text), navigator.language);
       if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
       commitTimerRef.current = window.setTimeout(commitTranscript, next.hasFinalResult ? 1_350 : 2_200);
     };
@@ -461,8 +464,9 @@ export function VideoCallModal({
           listening={listening}
           blinking={blinking}
           mouthPose={mouthPose}
+          emotion={companionVoiceMode(activeVoiceId).emotion}
         />
-        <span className="video-call__feed-badge"><i className="status-dot" /> Live 3D face · speech synced</span>
+        <span className="video-call__feed-badge"><i className="status-dot" /> Live expressive 3D face · speech synced</span>
       </div>
       <div className="live-call__veil live-call__veil--video" />
       <header className="live-call__header"><span><i className="status-dot" /> Live together</span><strong>{companionName}</strong><time>{time}</time></header>
@@ -475,9 +479,9 @@ export function VideoCallModal({
       </div>
 
       <div className="video-call__tools">
-        <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Open-source 3D avatar</span>
+        <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> CC BY adult 3D avatar</span>
         <label>Language<select aria-label="Video call language" value={language} onChange={(event) => { stopRecognition(); playbackRef.current?.cancel(); changeSpeaking(false); setLanguage(event.target.value as SpeechLanguage); setListening(true); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        <label>Tone<select aria-label="Video call voice tone" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const profile = companionVoiceProfile(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${profile.name} tone will start on your next call.`); else { setCompanionLine(`${profile.name} tone selected.`); speak(`Okay… this is my ${profile.name.toLowerCase()} tone.`, true, next); } }}>{companionVoiceProfiles.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>
+        <label>Mood<select aria-label="Video call voice mood" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const mode = companionVoiceMode(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${mode.name} delivery will start on your next call.`); else { setCompanionLine(`${mode.name} mood selected.`); speak(`Okay… I’ll sound ${mode.name.toLowerCase()} now.`, true, next); } }}>{companionVoiceModes.map((mode) => <option key={mode.id} value={mode.id}>{mode.name}</option>)}</select></label>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
         <button type="button" disabled={!cameraOn || visionBusy} onClick={() => void shareCurrentFrame()}><Camera aria-hidden="true" /> {visionBusy ? "Looking…" : "Show frame"}</button>
       </div>

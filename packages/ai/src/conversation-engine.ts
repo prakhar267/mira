@@ -217,6 +217,10 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   const hinglish = !hindiScript && hinglishPattern.test(clean);
 
   if (hindiScript) {
+    if (/(?:क्या.*याद|याद.*क्या|मेरे बारे में.*जान)/u.test(clean)) {
+      const memory = context.memories[0];
+      return result({ text: memory ? `हाँ। ${conversationalMemory(memory.content, userName)} मैंने इसे याद रखा है।` : "अभी कोई साफ़ memory नहीं है—मैं कुछ बनाकर नहीं बोलूँगी।", intent: "memory", context, usedMemoryIds: memory ? [memory.id] : [], adaptations, prohibitQuestions: true });
+    }
     if (/नाम.*(?:क्या|बताओ)|तुम(?:्हारा|्हारी)?.*नाम/u.test(clean)) return result({ text: `मैं ${companionName} हूँ—तुम्हारी AI companion.`, intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:क्या करती|क्या करते|काम क्या|कर सकती)/u.test(clean)) return result({ text: "मैं तुम्हारी AI companion हूँ—बात करती हूँ, तुम्हारी मंज़ूरी वाली बातें याद रखती हूँ, और calls पर साथ देती हूँ।", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:कैसी हो|कैसे हो|क्या हाल)/u.test(clean)) return result({ text: "मैं बढ़िया हूँ। आज तुम्हारे दिन को लेकर थोड़ी curious हूँ।", intent: "self", context, adaptations, prohibitQuestions });
@@ -225,6 +229,10 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   }
 
   if (hinglish) {
+    if (/(?:kya yaad|yaad hai kya|mere baare mein? kya|what do you remember)/i.test(clean)) {
+      const memory = context.memories[0];
+      return result({ text: memory ? `Haan. ${conversationalMemory(memory.content, userName)} Yeh mujhe yaad hai.` : "Abhi koi clear memory nahi hai—main guess karke kuch nahi bolungi.", intent: "memory", context, usedMemoryIds: memory ? [memory.id] : [], adaptations, prohibitQuestions: true });
+    }
     if (/(?:tumhara|aapka) naam kya|naam batao/i.test(clean)) return result({ text: `${companionName}. Tumhari AI companion—thodi warm, thodi nosy.`, intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:tum|aap) kya kart(?:i|e) ho|kya kar sakti/i.test(clean)) return result({ text: "Main tumhari AI companion hoon—baat karti hoon, tumhari approved memories yaad rakhti hoon, aur calls par company deti hoon.", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:kaisi ho|kaise ho|kya haal)/i.test(clean)) return result({ text: "Main badhiya hoon. Aaj tumhare din ko lekar thodi curious hoon.", intent: "self", context, adaptations, prohibitQuestions });
@@ -336,13 +344,17 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text: choose(seed, ["Always. You don’t have to make a big thing of it.", "Of course. I’m glad I could be here for that.", "You’re welcome. Come back whenever you need this kind of company."]), intent: "gratitude", context, adaptations, prohibitQuestions: true });
   }
 
-  if (/^(?:please\s+remember|remember|i want you to remember)\b/i.test(clean)) {
+  if (/^(?:(?:please\s+remember|remember|i want you to remember)\b|(?:please\s+)?yaad\s+rakhna\b|(?:कृपया\s+)?याद\s+रखना\b)/iu.test(clean)) {
     const candidate = extractMemoryCandidates(clean)[0];
     if (candidate) {
       const remembered = conversationalMemory(candidate.content, userName)
         .replace(/[.!?]+$/, "");
       return result({
-        text: `I’ll remember this: ${remembered}. You can inspect, correct, or delete that memory anytime.`,
+        text: hindiScript
+          ? `मैं याद रखूँगी: ${remembered}। इसे तुम कभी भी देख, सुधार या delete कर सकते हो।`
+          : hinglish
+            ? `Yaad rahega: ${remembered}. Tum is memory ko kabhi bhi dekh, correct ya delete kar sakte ho.`
+            : `I’ll remember this: ${remembered}. You can inspect, correct, or delete that memory anytime.`,
         intent: "memory",
         context,
         adaptations,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, recognitionLocale, selectPreferredVoice, splitSpeechSegments } from "./speech";
+import { cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, recognitionLocale, selectPreferredVoice, splitMultilingualSpeechSegments, splitSpeechSegments } from "./speech";
 
 describe("companion speech", () => {
   it("detects English, Hindi, and Roman-script Hinglish", () => {
@@ -21,7 +21,7 @@ describe("companion speech", () => {
     expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01")?.name).toBe("Lekha Enhanced");
   });
 
-  it("keeps one natural woman voice across styles and supported languages", () => {
+  it("keeps one preferred identity while choosing language-compatible pronunciation", () => {
     const voices = [
       { name: "Samantha", lang: "en-US", default: true },
       { name: "Tessa", lang: "en-ZA", default: false },
@@ -33,11 +33,11 @@ describe("companion speech", () => {
     ];
 
     expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "Stay close to me", "mira-seductive-01", "en")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "Be direct with me", "mira-sharp-01", "en")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "I need some confidence", "mira-confident-01", "en")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-warm-01", "hinglish")?.name).toBe("Samantha");
-    expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01", "hi")?.name).toBe("Samantha");
+    expect(selectPreferredVoice(voices, "Stay close to me", "mira-intimate-01", "en")?.name).toBe("Samantha");
+    expect(selectPreferredVoice(voices, "Be direct with me", "mira-angry-01", "en")?.name).toBe("Samantha");
+    expect(selectPreferredVoice(voices, "I need some confidence", "mira-happy-01", "en")?.name).toBe("Samantha");
+    expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-natural-01", "hinglish")?.name).toBe("Tara");
+    expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-natural-01", "hi")?.name).toBe("Lekha");
   });
 
   it("accumulates final and interim recognition segments without repeating earlier words", () => {
@@ -68,14 +68,23 @@ describe("companion speech", () => {
     expect(segments.join(" ")).toContain("should not be cut off halfway");
   });
 
+  it("switches pronunciation voices inside a mixed Hindi and English reply", () => {
+    expect(splitMultilingualSpeechSegments("Okay yaar, आज थोड़ा rest karte hain. I am here.")).toEqual([
+      { text: "Okay yaar,", language: "hinglish" },
+      { text: "आज थोड़ा", language: "hi" },
+      { text: "rest karte hain.", language: "en" },
+      { text: "I am here.", language: "en" },
+    ]);
+  });
+
   it("keeps Luna as the neural voice identity for every delivery style", () => {
     expect(cloudSpeakerForVoice("mira-playful-01")).toBe("luna");
-    expect(cloudSpeakerForVoice("mira-warm-01")).toBe("luna");
-    expect(cloudSpeakerForVoice("mira-soft-01")).toBe("luna");
-    expect(cloudSpeakerForVoice("mira-seductive-01")).toBe("luna");
-    expect(cloudSpeakerForVoice("mira-calm-01")).toBe("luna");
-    expect(cloudSpeakerForVoice("mira-confident-01")).toBe("luna");
-    expect(cloudSpeakerForVoice("mira-sharp-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-natural-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-happy-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-tender-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-intimate-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-sad-01")).toBe("luna");
+    expect(cloudSpeakerForVoice("mira-angry-01")).toBe("luna");
     expect(cloudSpeakerForVoice("unknown-voice")).toBe("luna");
   });
 });

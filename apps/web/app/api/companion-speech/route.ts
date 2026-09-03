@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   if (rateLimited(request)) return Response.json({ error: "Please wait a moment before playing more speech." }, { status: 429 });
   const body = await request.json().catch(() => null) as { text?: unknown; voiceId?: unknown } | null;
   const text = typeof body?.text === "string" ? body.text.trim().slice(0, 900) : "";
-  const voiceId = typeof body?.voiceId === "string" ? body.voiceId.slice(0, 80) : "mira-playful-01";
+  const voiceId = typeof body?.voiceId === "string" ? body.voiceId.slice(0, 80) : "mira-natural-01";
   if (!text) return Response.json({ error: "Speech text is required." }, { status: 400 });
 
   try {

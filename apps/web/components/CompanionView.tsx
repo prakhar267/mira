@@ -16,7 +16,7 @@ import {
 import type { CompanionProfile, OwnedItemRecord, StoreItemRecord, SubscriptionState, WalletState } from "@companion/shared";
 import { canAccessItem } from "@/lib/product-rules";
 import { playCompanionSpeech, type CompanionSpeechPlayback } from "@/lib/speech";
-import { companionVoiceProfiles } from "@/lib/voice-profiles";
+import { companionVoiceIdentity, companionVoiceMode, companionVoiceModes } from "@/lib/voice-profiles";
 
 export function CompanionView({ companion, backstory, storeItems, ownedItems, wallet, subscription, onChange, onBackstoryChange, onPurchase, onEquip, onUpgrade }: {
   companion: CompanionProfile;
@@ -39,10 +39,10 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
 
   useEffect(() => () => playbackRef.current?.cancel(), []);
 
-  const previewVoice = (voice: typeof companionVoiceProfiles[number]) => {
+  const previewMood = (mode: typeof companionVoiceModes[number]) => {
     playbackRef.current?.cancel();
-    playbackRef.current = playCompanionSpeech("Hey… nice to meet you. I was hoping you’d show up.", { voiceId: voice.id });
-    setNotice(`Playing ${voice.detail}.`);
+    playbackRef.current = playCompanionSpeech("Hey… nice to meet you. I was hoping you’d show up.", { voiceId: mode.id });
+    setNotice(`${companionVoiceIdentity.name} · ${mode.name} mood.`);
   };
 
   return (
@@ -101,8 +101,8 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
           </> : null}
 
           {tab === "voice" ? <>
-            <div className="section-heading"><div><span className="luma-kicker">How she sounds</span><h2>Voice</h2><p>Natural neural voices for English, with हिन्दी and Hinglish support during calls.</p></div></div>
-            <div className="voice-list">{companionVoiceProfiles.map((voice) => <button type="button" key={voice.id} className={companion.voiceId === voice.id ? "voice-option voice-option--selected" : "voice-option"} onClick={() => { onChange({ ...companion, voiceId: voice.id }); previewVoice(voice); }}><span><Play aria-hidden="true" /></span><strong>{voice.name} tone</strong><small>{voice.detail}</small><Volume2 aria-hidden="true" /></button>)}</div>
+            <div className="section-heading"><div><span className="luma-kicker">One recognizable voice</span><h2>{companionVoiceIdentity.name}</h2><p>{companionVoiceIdentity.detail}. Change her emotional delivery without swapping her identity.</p></div></div>
+            <div className="voice-list">{companionVoiceModes.map((mode) => <button type="button" key={mode.id} className={companionVoiceMode(companion.voiceId).id === mode.id ? "voice-option voice-option--selected" : "voice-option"} onClick={() => { onChange({ ...companion, voiceId: mode.id }); previewMood(mode); }}><span><Play aria-hidden="true" /></span><strong>{mode.name} mood</strong><small>{mode.detail}</small><Volume2 aria-hidden="true" /></button>)}</div>
           </> : null}
         </div>
       </div>

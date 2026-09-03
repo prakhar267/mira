@@ -24,7 +24,7 @@ export function FirstMeeting({ userName, companionName, onComplete }: { userName
 
   const speak = () => {
     playbackRef.current?.cancel();
-    playbackRef.current = playCompanionSpeech(lines[line]!(userName), { voiceId: "mira-playful-01" });
+    playbackRef.current = playCompanionSpeech(lines[line]!(userName), { voiceId: "mira-natural-01" });
   };
 
   return (

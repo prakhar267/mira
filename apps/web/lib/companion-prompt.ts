@@ -92,16 +92,28 @@ export function isMemoryRecallRequest(value: string) {
 export function buildMemoryRecallReply(input: EdgeCompanionRequest) {
   const memories = (input.memories ?? []).map((memory) => compact(memory, 220)).filter(Boolean).slice(0, 8);
   const latest = input.messages.at(-1)?.content ?? "";
+  const isDevanagari = /\p{Script=Devanagari}/u.test(latest);
+  const isHinglish = /\b(?:maine|kya|bataya|bola|yaad|hai)\b/i.test(latest);
   if (!memories.length) {
-    if (/\p{Script=Devanagari}/u.test(latest)) return "अभी मेरे पास तुम्हारे बारे में कोई सेव की हुई याद नहीं है।";
-    if (/\b(?:maine|kya|bataya|bola|yaad|hai)\b/i.test(latest)) return "Abhi mere paas tumhari koi saved memory nahi hai.";
+    if (isDevanagari) return "अभी मेरे पास तुम्हारे बारे में कोई सेव की हुई याद नहीं है।";
+    if (isHinglish) return "Abhi mere paas tumhari koi saved memory nahi hai.";
     return "I don’t have any saved memories about you yet.";
   }
   const userName = compact(input.user.name || "", 40);
-  const namePattern = userName ? new RegExp(`^${userName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} said:\\s*`, "i") : null;
-  const recalled = memories.map((memory) => namePattern ? memory.replace(namePattern, "") : memory).join("; ");
-  if (/\p{Script=Devanagari}/u.test(latest)) return `हाँ, मुझे ये बातें याद हैं: ${recalled}`;
-  if (/\b(?:maine|kya|bataya|bola|yaad|hai)\b/i.test(latest)) return `Haan, mujhe yaad hai: ${recalled}`;
+  const escapedName = userName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const namePattern = userName ? new RegExp(`^${escapedName} said:\\s*`, "i") : null;
+  const possessivePattern = userName ? new RegExp(`^${escapedName}(?:'s|’s)\\b`, "i") : null;
+  const subjectPattern = userName ? new RegExp(`^${escapedName}\\b`, "i") : null;
+  const recalled = memories.map((memory) => {
+    let result = namePattern ? memory.replace(namePattern, "") : memory;
+    const possessive = isDevanagari ? "तुम्हारी" : isHinglish ? "Tumhari" : "Your";
+    const subject = isDevanagari ? "तुम" : isHinglish ? "Tum" : "You";
+    if (possessivePattern) result = result.replace(possessivePattern, possessive);
+    if (subjectPattern) result = result.replace(subjectPattern, subject);
+    return result.replace(/^User(?:'s|’s)\b/i, possessive).replace(/^User\b/i, subject);
+  }).join("; ");
+  if (isDevanagari) return `हाँ, मुझे ये बातें याद हैं: ${recalled}`;
+  if (isHinglish) return `Haan, mujhe yaad hai: ${recalled}`;
   return `I remember this: ${recalled}`;
 }
 

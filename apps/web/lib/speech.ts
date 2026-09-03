@@ -1,4 +1,4 @@
-import { companionVoiceProfile } from "./voice-profiles";
+import { companionVoiceMode } from "./voice-profiles";
 
 export type SpeechLanguage = "auto" | "en" | "hi" | "hinglish";
 
@@ -90,8 +90,35 @@ export function splitSpeechSegments(text: string, maximumLength = 170) {
   return segments;
 }
 
+export interface MultilingualSpeechSegment {
+  text: string;
+  language: Exclude<SpeechLanguage, "auto">;
+}
+
+export function splitMultilingualSpeechSegments(
+  text: string,
+  language: SpeechLanguage = "auto",
+  maximumLength = 170,
+): MultilingualSpeechSegment[] {
+  if (language !== "auto") {
+    return splitSpeechSegments(text, maximumLength).map((segment) => ({ text: segment, language }));
+  }
+
+  const runs = text
+    .replace(/\s+/g, " ")
+    .trim()
+    .match(/[\u0900-\u097f][\u0900-\u097f\s।!?…,'’-]*|[^\u0900-\u097f]+/g)
+    ?.map((part) => part.trim())
+    .filter(Boolean) ?? [];
+
+  return runs.flatMap((run) => {
+    const detected = devanagari.test(run) ? "hi" : detectSpeechLanguage(run);
+    return splitSpeechSegments(run, maximumLength).map((segment) => ({ text: segment, language: detected }));
+  });
+}
+
 export function cloudSpeakerForVoice(voiceId: string) {
-  return companionVoiceProfile(voiceId).speaker;
+  return companionVoiceMode(voiceId).speaker;
 }
 
 export function selectPreferredVoice<T extends { name: string; lang: string; default?: boolean; localService?: boolean }>(
@@ -110,17 +137,17 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
       const regional = detected === "hinglish" ? /en[-_]in/i.test(voice.lang) : detected === "hi" ? /hi[-_]in/i.test(voice.lang) : /^en[-_]/i.test(voice.lang);
       const namedFemale = detected === "hi" ? femaleHindiNames.test(voice.name) : detected === "hinglish" ? femaleIndianEnglishNames.test(voice.name) || naturalEnglishNames.test(voice.name) : naturalEnglishNames.test(voice.name);
       const identityRank = companionIdentityNames.findIndex((pattern) => pattern.test(voice.name));
-      const identityScore = identityRank >= 0 ? 720 - identityRank * 70 : 0;
-      const languageVoiceScore = detected === "hi" || detected === "hinglish" ? (namedFemale ? 140 : 0) : (namedFemale ? 70 : 0);
-      return identityScore + (exactLocale ? (detected === "en" ? 55 : 110) : 0) + (sameLanguage ? 35 : 0) + (regional ? (detected === "en" ? 25 : 50) : 0) + languageVoiceScore + (enhancedNames.test(voice.name) ? 36 : 0) + (voice.default ? 2 : 0) + (voice.localService === false ? 6 : 0) - (noveltyOrMaleNames.test(voice.name) ? 260 : 0);
+      const identityScore = identityRank >= 0 ? 90 - identityRank * 8 : 0;
+      const languageVoiceScore = namedFemale ? 150 : 0;
+      return (exactLocale ? 1_000 : 0) + (sameLanguage ? 650 : 0) + (regional ? 180 : 0) + identityScore + languageVoiceScore + (enhancedNames.test(voice.name) ? 55 : 0) + (voice.default ? 2 : 0) + (voice.localService === false ? 6 : 0) - (noveltyOrMaleNames.test(voice.name) ? 520 : 0);
     };
     return score(right) - score(left);
   })[0];
 }
 
 function voiceProfile(voiceId: string) {
-  const profile = companionVoiceProfile(voiceId);
-  return { rate: profile.rate, pitch: profile.pitch };
+  const mode = companionVoiceMode(voiceId);
+  return { rate: mode.rate, pitch: mode.pitch, volume: mode.volume };
 }
 
 export interface CompanionSpeechPlayback {
@@ -143,9 +170,8 @@ export function playCompanionSpeech(text: string, options: {
   onEnd?: () => void;
 } = {}): CompanionSpeechPlayback {
   stopCompanionSpeech();
-  const voiceId = options.voiceId ?? "mira-playful-01";
+  const voiceId = options.voiceId ?? "mira-natural-01";
   const language = options.language ?? "auto";
-  const detected = detectSpeechLanguage(text, language);
   let canceled = false;
   let finished = false;
   let speechStarted = false;
@@ -165,9 +191,8 @@ export function playCompanionSpeech(text: string, options: {
     if (speechStarted || canceled) return;
     speechStarted = true;
     if (!("speechSynthesis" in window)) return end();
-    const selected = selectPreferredVoice(window.speechSynthesis.getVoices(), text, voiceId, language);
     const profile = voiceProfile(voiceId);
-    const segments = splitSpeechSegments(text);
+    const segments = splitMultilingualSpeechSegments(text, language);
     let segmentIndex = 0;
     let characterOffset = 0;
 
@@ -175,12 +200,13 @@ export function playCompanionSpeech(text: string, options: {
       if (canceled || finished) return;
       const segment = segments[segmentIndex];
       if (!segment) return end();
-      const utterance = new SpeechSynthesisUtterance(segment);
+      const selected = selectPreferredVoice(window.speechSynthesis.getVoices(), segment.text, voiceId, segment.language);
+      const utterance = new SpeechSynthesisUtterance(segment.text);
       if (selected) utterance.voice = selected;
-      utterance.lang = selected?.lang ?? (detected === "hi" ? "hi-IN" : "en-IN");
+      utterance.lang = selected?.lang ?? (segment.language === "hi" ? "hi-IN" : "en-IN");
       utterance.rate = profile.rate;
       utterance.pitch = profile.pitch;
-      utterance.volume = 1;
+      utterance.volume = profile.volume;
       utterance.onstart = () => {
         if (segmentIndex === 0) options.onStart?.();
       };
@@ -191,7 +217,7 @@ export function playCompanionSpeech(text: string, options: {
         name: event.name,
       });
       utterance.onend = () => {
-        characterOffset += segment.length + 1;
+        characterOffset += segment.text.length + 1;
         segmentIndex += 1;
         speakNext();
       };

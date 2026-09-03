@@ -1,23 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { companionVoiceProfile, companionVoiceProfiles } from "./voice-profiles";
+import { companionVoiceIdentity, companionVoiceMode, companionVoiceModes } from "./voice-profiles";
 
-describe("companion voice profiles", () => {
-  it("keeps one voice identity while offering distinct delivery styles", () => {
-    expect(companionVoiceProfiles.map((profile) => profile.name)).toEqual([
-      "Warm",
+describe("companion voice modes", () => {
+  it("keeps one named voice identity while offering emotional delivery modes", () => {
+    expect(companionVoiceIdentity.name).toBe("Mira Velvet");
+    expect(companionVoiceModes.map((mode) => mode.name)).toEqual([
+      "Natural",
+      "Happy",
       "Playful",
-      "Soft",
-      "Seductive",
-      "Mellow",
-      "Confident",
-      "Sharp",
+      "Tender",
+      "Intimate",
+      "Sad",
+      "Angry",
     ]);
-    expect(new Set(companionVoiceProfiles.map((profile) => profile.id)).size).toBe(companionVoiceProfiles.length);
-    expect(new Set(companionVoiceProfiles.map((profile) => profile.speaker))).toEqual(new Set(["luna"]));
-    expect(new Set(companionVoiceProfiles.map((profile) => `${profile.rate}:${profile.pitch}`)).size).toBe(companionVoiceProfiles.length);
+    expect(new Set(companionVoiceModes.map((mode) => mode.id)).size).toBe(companionVoiceModes.length);
+    expect(new Set(companionVoiceModes.map((mode) => mode.speaker))).toEqual(new Set(["luna"]));
+    expect(new Set(companionVoiceModes.map((mode) => `${mode.rate}:${mode.pitch}:${mode.volume}`)).size).toBe(companionVoiceModes.length);
   });
 
-  it("uses the playful profile when an older or unknown voice id is loaded", () => {
-    expect(companionVoiceProfile("unknown").id).toBe("mira-playful-01");
+  it("maps old settings and unknown ids onto the single current identity", () => {
+    expect(companionVoiceMode("mira-seductive-01").id).toBe("mira-intimate-01");
+    expect(companionVoiceMode("unknown").id).toBe("mira-natural-01");
   });
 });
