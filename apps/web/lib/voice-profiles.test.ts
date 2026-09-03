@@ -3,7 +3,7 @@ import { companionVoiceIdentity, companionVoiceMode, companionVoiceModes } from 
 
 describe("companion voice modes", () => {
   it("keeps one named voice identity while offering emotional delivery modes", () => {
-    expect(companionVoiceIdentity.name).toBe("Mira Velvet");
+    expect(companionVoiceIdentity.name).toBe("Mira Aster");
     expect(companionVoiceModes.map((mode) => mode.name)).toEqual([
       "Natural",
       "Happy",
@@ -16,6 +16,8 @@ describe("companion voice modes", () => {
     expect(new Set(companionVoiceModes.map((mode) => mode.id)).size).toBe(companionVoiceModes.length);
     expect(new Set(companionVoiceModes.map((mode) => mode.speaker))).toEqual(new Set(["luna"]));
     expect(new Set(companionVoiceModes.map((mode) => `${mode.rate}:${mode.pitch}:${mode.volume}`)).size).toBe(companionVoiceModes.length);
+    expect(companionVoiceModes.every((mode) => mode.pitch >= 1.02)).toBe(true);
+    expect(companionVoiceModes.every((mode) => mode.rate <= .99)).toBe(true);
   });
 
   it("maps old settings and unknown ids onto the single current identity", () => {

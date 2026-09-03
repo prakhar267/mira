@@ -1541,9 +1541,9 @@ select {
 }
 .live-avatar-3d__fallback {
   object-fit: cover;
-  object-position: 42% center;
-  filter: blur(3px) brightness(.58) saturate(.8);
-  transform: scale(1.018);
+  object-position: 50% 42%;
+  filter: blur(2px) brightness(.62) saturate(.76) hue-rotate(18deg);
+  transform: scale(1.025);
   transition: opacity .45s ease;
 }
 .live-avatar-3d__canvas {

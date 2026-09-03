@@ -1,11 +1,20 @@
-# Mira Google VALID avatar
+# Mira original anime avatar
 
-`mira-valid-woman.glb` is a web-optimized derivative of the Google VALID
-`Asian_F_1_Busi` adult avatar, distributed in GLB/VRM form by
-[TLTMedia/valid-vrm-avatars](https://github.com/TLTMedia/valid-vrm-avatars).
+`mira-anime-original.vrm` is a color-styled derivative of
+`VRM1_Constraint_Twist_Sample.vrm` by pixiv Inc. The model's embedded VRM 1.0
+metadata permits use by everyone, commercial use by corporations,
+redistribution, and modification with redistribution. Credit is marked as
+unnecessary; we retain this notice for transparency.
 
-The original Google VALID avatar is licensed under the
-[Creative Commons Attribution 4.0 International license](https://creativecommons.org/licenses/by/4.0/).
-Credit: **Google**. The local derivative preserves the character and facial
-blendshapes while applying meshopt geometry compression and WebP texture
-compression for web delivery.
+- Original author: pixiv Inc.
+- Original source: https://github.com/pixiv/three-vrm/tree/dev/packages/three-vrm/examples/models
+- Embedded license URL: https://vrm.dev/licenses/1.0/
+- Copyright: (c) 2022 pixiv Inc.
+- Original version: v1.0.1
+- SHA-256 of shipped VRM: `12c2b97e95e700783a6a550dc0eee2d7880aeedccef9ae67bc4c5a2f0f2631a2`
+
+`mira-anime-fallback.png` is the thumbnail embedded in the same VRM and is
+distributed under the same terms.
+
+Runtime colors and motion are original Companaro presentation choices. This
+avatar is not, and should not be presented as, any named third-party character.
