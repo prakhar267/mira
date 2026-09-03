@@ -9,7 +9,7 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 export type AvatarMouthPose = 0 | 1 | 2 | 3;
 export type AvatarEmotion = "natural" | "happy" | "playful" | "tender" | "intimate" | "sad" | "angry";
 
-const avatarAsset = "/assets/mira/avatar/mira-anime-original.vrm";
+const avatarAsset = "/assets/mira/avatar/mira-anime-adult.vrm";
 
 type TintableMaterial = THREE.Material & {
   color?: THREE.Color;
@@ -79,7 +79,7 @@ function lavenderIrisTexture(texture: THREE.Texture) {
   return tinted;
 }
 
-function tintOriginalAvatar(root: THREE.Object3D) {
+function styleAdultAvatar(root: THREE.Object3D) {
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     object.frustumCulled = false;
@@ -216,7 +216,7 @@ export function LiveAvatar3D({
       VRMUtils.rotateVRM0(loadedVrm);
       VRMUtils.removeUnnecessaryVertices(avatar);
       VRMUtils.combineSkeletons(avatar);
-      tintOriginalAvatar(avatar);
+      styleAdultAvatar(avatar);
 
       const sourceBounds = new THREE.Box3().setFromObject(avatar);
       const sourceSize = sourceBounds.getSize(new THREE.Vector3());
@@ -280,13 +280,15 @@ export function LiveAvatar3D({
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerleave", onPointerLeave);
 
-    const clock = new THREE.Clock();
     const startedAt = performance.now();
+    let lastFrameAt = startedAt;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const animate = () => {
       frame = window.requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), .05);
-      const elapsed = (performance.now() - startedAt) / 1_000;
+      const now = performance.now();
+      const delta = Math.min((now - lastFrameAt) / 1_000, .05);
+      const elapsed = (now - startedAt) / 1_000;
+      lastFrameAt = now;
       const state = stateRef.current;
       const pose = targetForPose(state.mouthPose);
       const expression = emotionTargets(state.emotion);
@@ -341,7 +343,7 @@ export function LiveAvatar3D({
 
   return (
     <div className={`live-avatar-3d live-avatar-3d--${loadState}`}>
-      <img className="live-avatar-3d__fallback" src="/assets/mira/avatar/mira-anime-fallback.png" alt="" draggable={false} />
+      <img className="live-avatar-3d__fallback" src="/assets/mira/avatar/mira-anime-adult-fallback.png" alt="" draggable={false} />
       <canvas ref={canvasRef} className="live-avatar-3d__canvas" role="img" aria-label={`${companionName}, an expressive original anime 3D companion`} />
       {loadState === "loading" ? <span className="live-avatar-3d__loading">Bringing {companionName} into the call…</span> : null}
       {loadState === "fallback" ? <span className="live-avatar-3d__loading">3D is unavailable on this device · using anime portrait mode</span> : null}

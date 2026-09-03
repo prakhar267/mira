@@ -11,11 +11,12 @@ export const speechLanguageOptions: Array<{ value: SpeechLanguage; label: string
 
 const devanagari = /[\u0900-\u097f]/;
 const hinglishWords = /\b(?:aaj|accha|acha|arey|aur|bahut|bas|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|kya|kyun|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sach|samajh|theek|thik|thoda|tum|tumhara|yaar)\b/i;
-const femaleHindiNames = /aditi|heera|kavya|lekha|swara|veena|google.*(?:hindi|हिन्दी)|female/i;
+const blockedVoiceNames = /\blekha\b|bad news|bahh|bells|boing|bubbles|cellos|grandpa|jester|junior|organ|ralph|rocko|superstar|trinoids|whisper|zarvox/i;
+const femaleHindiNames = /aditi|heera|kavya|swara|veena|google.*(?:hindi|हिन्दी)|female/i;
 const femaleIndianEnglishNames = /aditi|kavya|neerja|swara|tara|veena|google.*(?:india|indian)|female/i;
 const naturalEnglishNames = /andromeda|aria|ava|cora|flo|helena|jenny|juno|karen|luna|moira|nova|samantha|sandy|serena|shelley|shimmer|tara|tessa|thalia|vesta|zira|google.*english.*female/i;
 const enhancedNames = /enhanced|natural|neural|online|premium/i;
-const noveltyOrMaleNames = /albert|\baman\b|bad news|bahh|bells|boing|bubbles|cellos|daniel|eddy|fred|grandpa|jester|junior|organ|ralph|reed|rishi|rocko|superstar|trinoids|whisper|zarvox/i;
+const noveltyOrMaleNames = /albert|\baman\b|daniel|eddy|fred|reed|rishi/i;
 const companionFallbackNames = [/^tara\b/i, /^samantha\b/i, /^karen\b/i, /^tessa\b/i, /^moira\b/i, /^flo\b/i, /^shelley\b/i, /^sandy\b/i, /google.*english.*female/i];
 
 export interface RecognitionResultLike extends ArrayLike<{ transcript?: string; confidence?: number }> {
@@ -43,6 +44,10 @@ export function recognitionLocale(language: SpeechLanguage, browserLanguage = "e
   if (language === "hi") return "hi-IN";
   if (language === "en" || language === "hinglish") return "en-IN";
   return /^hi(?:-|$)/i.test(browserLanguage) ? "hi-IN" : "en-IN";
+}
+
+export function synthesisLanguageCode(text: string, requested: SpeechLanguage = "auto") {
+  return detectSpeechLanguage(text, requested) === "en" ? "en-IN" : "hi-IN";
 }
 
 function bestRecognitionAlternative(result: RecognitionResultLike) {
@@ -123,30 +128,29 @@ export function cloudSpeakerForVoice(voiceId: string) {
 
 export function selectPreferredVoice<T extends { name: string; lang: string; default?: boolean; localService?: boolean }>(
   voices: T[],
-  _text: string,
+  text: string,
   _voiceId: string,
-  _language?: SpeechLanguage,
+  language: SpeechLanguage = "auto",
 ) {
-  void _text;
   void _voiceId;
-  void _language;
+  const requestedLanguage = detectSpeechLanguage(text, language);
   return [...voices].sort((left, right) => {
     const score = (voice: T) => {
       const locale = voice.lang.replace("_", "-").toLowerCase();
       const isHindi = /^hi(?:-|$)/i.test(locale);
       const isIndianEnglish = /^en-in$/i.test(locale);
-      const isLekha = /^lekha\b/i.test(voice.name);
       const namedHindiFemale = femaleHindiNames.test(voice.name);
       const namedIndianFemale = femaleIndianEnglishNames.test(voice.name);
       const namedEnglishFemale = naturalEnglishNames.test(voice.name);
       const fallbackRank = companionFallbackNames.findIndex((pattern) => pattern.test(voice.name));
       const fallbackScore = fallbackRank >= 0 ? 180 - fallbackRank * 12 : 0;
 
-      // Lekha is Mira's on-device identity. Keep it for English, Hindi, and
-      // Hinglish so a language switch never sounds like a different person.
-      return (isLekha ? 8_000 : 0)
-        + (isHindi && namedHindiFemale ? 5_000 : 0)
-        + (isHindi ? 1_600 : 0)
+      if (blockedVoiceNames.test(voice.name)) return -100_000;
+      return (requestedLanguage === "hi" && isHindi && namedHindiFemale ? 6_000 : 0)
+        + (requestedLanguage === "hi" && isHindi ? 3_000 : 0)
+        + (requestedLanguage === "hinglish" && isIndianEnglish && namedIndianFemale ? 5_000 : 0)
+        + (requestedLanguage === "hinglish" && isHindi && namedHindiFemale ? 3_500 : 0)
+        + (requestedLanguage === "en" && isIndianEnglish && namedIndianFemale ? 2_000 : 0)
         + (isIndianEnglish && namedIndianFemale ? 1_250 : 0)
         + (namedEnglishFemale ? 800 : 0)
         + fallbackScore
@@ -186,26 +190,41 @@ export function playCompanionSpeech(text: string, options: {
   stopCompanionSpeech();
   const voiceId = options.voiceId ?? "mira-natural-01";
   const language = options.language ?? "auto";
+  const profile = voiceProfile(voiceId);
+  const abortController = new AbortController();
   let canceled = false;
   let finished = false;
-  let speechStarted = false;
+  let browserStarted = false;
+  let playbackStarted = false;
+  let audio: HTMLAudioElement | null = null;
+  let objectUrl: string | null = null;
+  let boundaryTimer: number | null = null;
+  let requestTimer: number | null = null;
   let voiceTimer: number | null = null;
   let voicesChanged: (() => void) | null = null;
 
   const end = (notify = true) => {
     if (finished) return;
     finished = true;
+    if (requestTimer) window.clearTimeout(requestTimer);
+    if (boundaryTimer) window.clearInterval(boundaryTimer);
     if (voiceTimer) window.clearTimeout(voiceTimer);
     if (voicesChanged) window.speechSynthesis?.removeEventListener("voiceschanged", voicesChanged);
+    if (objectUrl) window.URL.revokeObjectURL(objectUrl);
     if (activePlayback === playback) activePlayback = null;
     if (notify) options.onEnd?.();
   };
 
-  const speakWithCompanionVoice = () => {
-    if (speechStarted || canceled) return;
-    speechStarted = true;
+  const notifyStart = () => {
+    if (playbackStarted || canceled || finished) return;
+    playbackStarted = true;
+    options.onStart?.();
+  };
+
+  const speakWithBrowserFallback = () => {
+    if (browserStarted || canceled || finished) return;
+    browserStarted = true;
     if (!("speechSynthesis" in window)) return end();
-    const profile = voiceProfile(voiceId);
     const segments = splitMultilingualSpeechSegments(text, language);
     const selectedVoice = selectPreferredVoice(window.speechSynthesis.getVoices(), text, voiceId, language);
     let segmentIndex = 0;
@@ -217,13 +236,11 @@ export function playCompanionSpeech(text: string, options: {
       if (!segment) return end();
       const utterance = new SpeechSynthesisUtterance(segment.text);
       if (selectedVoice) utterance.voice = selectedVoice;
-      utterance.lang = selectedVoice?.lang ?? "hi-IN";
+      utterance.lang = selectedVoice?.lang ?? recognitionLocale(segment.language);
       utterance.rate = profile.rate;
       utterance.pitch = profile.pitch;
       utterance.volume = profile.volume;
-      utterance.onstart = () => {
-        if (segmentIndex === 0) options.onStart?.();
-      };
+      utterance.onstart = notifyStart;
       utterance.onboundary = (event) => options.onBoundary?.({
         charIndex: characterOffset + event.charIndex,
         charLength: event.charLength,
@@ -246,19 +263,76 @@ export function playCompanionSpeech(text: string, options: {
     cancel() {
       if (canceled) return;
       canceled = true;
+      abortController.abort();
+      audio?.pause();
       window.speechSynthesis?.cancel();
       end(false);
     },
   };
   activePlayback = playback;
 
-  if (!("speechSynthesis" in window) || window.speechSynthesis.getVoices().length > 0) {
-    speakWithCompanionVoice();
-  } else {
-    voicesChanged = speakWithCompanionVoice;
+  const queueBrowserFallback = () => {
+    if (canceled || finished || browserStarted) return;
+    if (!("speechSynthesis" in window) || window.speechSynthesis.getVoices().length > 0) {
+      speakWithBrowserFallback();
+      return;
+    }
+    voicesChanged = speakWithBrowserFallback;
     window.speechSynthesis.addEventListener("voiceschanged", voicesChanged, { once: true });
-    voiceTimer = window.setTimeout(speakWithCompanionVoice, 350);
-  }
+    voiceTimer = window.setTimeout(speakWithBrowserFallback, 350);
+  };
+
+  const playNeuralVoice = async () => {
+    requestTimer = window.setTimeout(() => abortController.abort(), 12_000);
+    const response = await fetch("/api/companion-speech", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, voiceId, language }),
+      signal: abortController.signal,
+    });
+    if (requestTimer) {
+      window.clearTimeout(requestTimer);
+      requestTimer = null;
+    }
+    if (!response.ok) throw new Error(`Neural speech returned ${response.status}.`);
+    const blob = await response.blob();
+    if (!blob.size || !/^audio\//i.test(blob.type)) throw new Error("Neural speech returned invalid audio.");
+    if (canceled || finished) return;
+
+    objectUrl = window.URL.createObjectURL(blob);
+    audio = new Audio(objectUrl);
+    audio.preload = "auto";
+    audio.volume = profile.volume;
+    audio.preservesPitch = true;
+    if (response.headers.get("x-companion-voice-provider") !== "sarvam-bulbul-v3") {
+      audio.playbackRate = profile.rate;
+    }
+    audio.onplaying = () => {
+      notifyStart();
+      let lastBoundary = -1;
+      boundaryTimer = window.setInterval(() => {
+        if (!audio || canceled || finished) return;
+        const ratio = Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.currentTime / audio.duration
+          : Math.min(1, audio.currentTime / Math.max(1, text.length / 13));
+        const charIndex = Math.max(0, Math.min(text.length - 1, Math.floor(ratio * text.length)));
+        if (charIndex === lastBoundary) return;
+        lastBoundary = charIndex;
+        options.onBoundary?.({ charIndex, charLength: 1, elapsedTime: audio.currentTime * 1_000, name: "word" });
+      }, 120);
+    };
+    audio.onended = () => end();
+    audio.onerror = () => {
+      if (playbackStarted) end();
+      else queueBrowserFallback();
+    };
+    await audio.play();
+    notifyStart();
+  };
+
+  void playNeuralVoice().catch(() => {
+    if (!canceled && !finished) queueBrowserFallback();
+  });
 
   return playback;
 }

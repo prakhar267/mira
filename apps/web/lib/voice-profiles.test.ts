@@ -14,8 +14,9 @@ describe("companion voice modes", () => {
       "Angry",
     ]);
     expect(new Set(companionVoiceModes.map((mode) => mode.id)).size).toBe(companionVoiceModes.length);
-    expect(new Set(companionVoiceModes.map((mode) => mode.speaker))).toEqual(new Set(["luna"]));
+    expect(new Set(companionVoiceModes.map((mode) => mode.speaker))).toEqual(new Set(["juno"]));
     expect(new Set(companionVoiceModes.map((mode) => `${mode.rate}:${mode.pitch}:${mode.volume}`)).size).toBe(companionVoiceModes.length);
+    expect(new Set(companionVoiceModes.map((mode) => mode.temperature)).size).toBe(companionVoiceModes.length);
     expect(companionVoiceModes.every((mode) => mode.pitch >= .98 && mode.pitch <= 1.04)).toBe(true);
     expect(companionVoiceModes.every((mode) => mode.rate <= 1)).toBe(true);
   });
