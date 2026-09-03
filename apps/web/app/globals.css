@@ -1510,86 +1510,67 @@ select {
   z-index: -3;
   inset: 0;
   overflow: hidden;
-  background: #211713;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(123,90,105,.46), transparent 30%),
+    radial-gradient(circle at 20% 72%, rgba(221,111,88,.2), transparent 34%),
+    linear-gradient(145deg, #241b22 0%, #171218 48%, #0d0b10 100%);
 }
-.video-call__avatar-stage {
-  --avatar-translate-x: -50%;
+.live-avatar-3d {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: max(100%, calc(100vh * 1.776833));
-  aspect-ratio: 1672 / 941;
+  inset: 0;
   overflow: hidden;
-  transform: translate3d(var(--avatar-translate-x), -50%, 0) scale(1.002);
-  transform-origin: 38% 62%;
-  animation: live-avatar-camera 12s cubic-bezier(.45, 0, .55, 1) infinite alternate;
-  backface-visibility: hidden;
-  contain: paint;
-  will-change: transform;
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(249,204,185,.12), transparent 31%),
+    linear-gradient(180deg, rgba(255,255,255,.025), transparent 38%);
 }
-.video-call__avatar-frame {
+.live-avatar-3d::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(13,9,15,.08), transparent 30%, transparent 61%, rgba(10,7,11,.18) 72%, rgba(10,7,11,.78));
+  pointer-events: none;
+  content: "";
+}
+.live-avatar-3d__fallback,
+.live-avatar-3d__canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: fill;
-  pointer-events: none;
-  user-select: none;
 }
-.video-call__avatar-feature {
-  position: absolute;
-  z-index: 2;
-  display: block;
+.live-avatar-3d__fallback {
+  object-fit: cover;
+  object-position: 42% center;
+  filter: blur(3px) brightness(.58) saturate(.8);
+  transform: scale(1.018);
+  transition: opacity .45s ease;
+}
+.live-avatar-3d__canvas {
+  z-index: 1;
   opacity: 0;
-  pointer-events: none;
-  user-select: none;
-  will-change: opacity;
+  transition: opacity .5s ease;
+  touch-action: none;
 }
-.video-call__avatar-feature--blink {
-  top: 28.693%;
-  left: 27.811%;
-  width: 17.943%;
-  height: 12.221%;
-  -webkit-mask-image: radial-gradient(ellipse 48% 43% at 50% 52%, #000 44%, rgba(0,0,0,.86) 66%, transparent 100%);
-  mask-image: radial-gradient(ellipse 48% 43% at 50% 52%, #000 44%, rgba(0,0,0,.86) 66%, transparent 100%);
-  transition: none;
+.live-avatar-3d--ready .live-avatar-3d__canvas { opacity: 1; }
+.live-avatar-3d--ready .live-avatar-3d__fallback { opacity: 0; }
+.live-avatar-3d__loading {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(16,11,18,.66);
+  color: rgba(255,255,255,.78);
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(16px);
+  font-size: 9px;
+  letter-spacing: .04em;
+  white-space: nowrap;
 }
-.video-call__avatar-feature--blink[data-blinking="true"] { opacity: 1; }
-.video-call__avatar-feature--mouth {
-  top: 43.571%;
-  left: 32.297%;
-  width: 10.766%;
-  height: 12.752%;
-  -webkit-mask-image: radial-gradient(ellipse 43% 36% at 50% 49%, #000 42%, rgba(0,0,0,.86) 68%, transparent 100%);
-  mask-image: radial-gradient(ellipse 43% 36% at 50% 49%, #000 42%, rgba(0,0,0,.86) 68%, transparent 100%);
-  overflow: hidden;
-  transform-origin: 50% 51%;
-  transition: opacity 45ms linear, transform 70ms ease-out;
-}
-.video-call__avatar-feature--mouth img { display: block; width: 100%; height: 100%; transform-origin: 50% 51%; transition: transform 70ms ease-out; }
-.video-call__avatar-feed[data-mouth-pose="1"] .video-call__avatar-feature--mouth { opacity: .78; transform: scaleX(.98) scaleY(.72); }
-.video-call__avatar-feed[data-mouth-pose="1"] .video-call__avatar-feature--mouth img { transform: scaleX(1.015) scaleY(1.22); }
-.video-call__avatar-feed[data-mouth-pose="2"] .video-call__avatar-feature--mouth { opacity: .96; transform: scaleX(.96) scaleY(.9); }
-.video-call__avatar-feed[data-mouth-pose="2"] .video-call__avatar-feature--mouth img { transform: scaleX(1.03) scaleY(1.08); }
-.video-call__avatar-feed[data-mouth-pose="3"] .video-call__avatar-feature--mouth { opacity: 1; transform: scaleX(.88) scaleY(1.04); }
-.video-call__avatar-feed[data-mouth-pose="3"] .video-call__avatar-feature--mouth img { transform: scaleX(1.08) scaleY(.98); }
-.video-call__avatar-feed--speaking .video-call__avatar-stage { animation-duration: 6.8s; }
-.video-call__hair-light { position: absolute; z-index: 1; top: 3%; left: 16%; width: 31%; height: 53%; border-radius: 50%; background: radial-gradient(ellipse at 48% 42%, rgba(255,226,196,.08), transparent 68%); filter: blur(8px); mix-blend-mode: screen; pointer-events: none; animation: live-avatar-hair-light 7.5s ease-in-out infinite alternate; }
-.video-call__feed-badge { position: absolute; left: 22px; bottom: 20px; display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: rgba(12,9,8,.62); color: rgba(255,255,255,.82); font-size: 8px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; backdrop-filter: blur(10px); }
-@keyframes live-avatar-camera {
-  from { transform: translate3d(var(--avatar-translate-x), -50%, 0) scale(1.002); }
-  to { transform: translate3d(var(--avatar-translate-x), -50.04%, 0) scale(1.006); }
-}
-@keyframes live-avatar-hair-light {
-  from { transform: translate3d(-1.2%, .6%, 0); opacity: .46; }
-  to { transform: translate3d(1.5%, -.7%, 0); opacity: .72; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .video-call__avatar-stage,
-  .video-call__avatar-feature--blink,
-  .video-call__avatar-feature--mouth,
-  .video-call__hair-light { animation: none; }
-  .video-call__avatar-feed--speaking .video-call__avatar-feature--mouth { transition: none; }
-}
+.video-call__feed-badge { position: absolute; z-index: 4; left: 22px; bottom: 20px; display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: rgba(12,9,8,.62); color: rgba(255,255,255,.82); font-size: 8px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; backdrop-filter: blur(10px); }
 .video-call__status {
   position: absolute;
   top: 92px;
@@ -1664,7 +1645,6 @@ select {
   .video-call__tools label,
   .video-call__tools button { min-width: 0; min-height: 36px; padding: 0 9px; font-size: 9px; }
   .video-call__tools select { min-width: 0; }
-  .video-call__avatar-stage { --avatar-translate-x: -38%; }
   .video-call__avatar-label { display: none; }
   .video-call__feed-badge { display: none; }
   .video-call__status { top: 162px; }

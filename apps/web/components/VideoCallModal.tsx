@@ -16,6 +16,7 @@ import {
   VideoCamera,
   Waveform,
 } from "@phosphor-icons/react";
+import { LiveAvatar3D, type AvatarMouthPose } from "@/components/LiveAvatar3D";
 import {
   collectRecognitionTranscript,
   playCompanionSpeech,
@@ -27,11 +28,6 @@ import {
 import { companionVoiceProfile, companionVoiceProfiles } from "@/lib/voice-profiles";
 
 const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
-const avatarFrames = {
-  base: "/assets/mira/video-call-real-idle.jpg",
-  mouth: "/assets/mira/video-call-mouth-v2.png",
-  blink: "/assets/mira/video-call-blink-v2.png",
-};
 
 interface VideoSpeechRecognition {
   continuous: boolean;
@@ -93,7 +89,7 @@ export function VideoCallModal({
   const [activity, setActivity] = useState("");
   const [speaking, setSpeaking] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const [mouthPose, setMouthPose] = useState<0 | 1 | 2 | 3>(0);
+  const [mouthPose, setMouthPose] = useState<AvatarMouthPose>(0);
   const [blinking, setBlinking] = useState(false);
   const [companionLine, setCompanionLine] = useState(greeting);
   const [userLine, setUserLine] = useState("");
@@ -247,10 +243,6 @@ export function VideoCallModal({
       if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
     };
   }, [stopRecognition]);
-
-  useEffect(() => {
-    Object.values(avatarFrames).forEach((src) => { const image = new Image(); image.src = src; });
-  }, []);
 
   useEffect(() => {
     let blinkTimer = 0;
@@ -461,14 +453,16 @@ export function VideoCallModal({
 
   return (
     <motion.div className="live-call live-call--video" role="dialog" aria-modal="true" aria-label={`Video call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div className={speaking ? "video-call__avatar-feed video-call__avatar-feed--speaking" : "video-call__avatar-feed"} data-mouth-pose={mouthPose}>
-        <div className="video-call__avatar-stage">
-          <img className="video-call__avatar-frame" src={avatarFrames.base} alt={`${companionName}, a photorealistic animated AI companion, on video`} fetchPriority="high" draggable={false} />
-          <span className="video-call__hair-light" aria-hidden="true" />
-          <img className="video-call__avatar-feature video-call__avatar-feature--blink" data-blinking={blinking ? "true" : "false"} src={avatarFrames.blink} alt="" draggable={false} />
-          <span className="video-call__avatar-feature video-call__avatar-feature--mouth" aria-hidden="true"><img src={avatarFrames.mouth} alt="" draggable={false} /></span>
-        </div>
-        <span className="video-call__feed-badge"><i className="status-dot" /> Responsive live portrait</span>
+      <div className={speaking ? "video-call__avatar-feed video-call__avatar-feed--speaking" : "video-call__avatar-feed"}>
+        <LiveAvatar3D
+          companionName={companionName}
+          speaking={speaking}
+          thinking={thinking}
+          listening={listening}
+          blinking={blinking}
+          mouthPose={mouthPose}
+        />
+        <span className="video-call__feed-badge"><i className="status-dot" /> Live 3D face · speech synced</span>
       </div>
       <div className="live-call__veil live-call__veil--video" />
       <header className="live-call__header"><span><i className="status-dot" /> Live together</span><strong>{companionName}</strong><time>{time}</time></header>
@@ -481,7 +475,7 @@ export function VideoCallModal({
       </div>
 
       <div className="video-call__tools">
-        <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Animated photoreal avatar</span>
+        <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Open-source 3D avatar</span>
         <label>Language<select aria-label="Video call language" value={language} onChange={(event) => { stopRecognition(); playbackRef.current?.cancel(); changeSpeaking(false); setLanguage(event.target.value as SpeechLanguage); setListening(true); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <label>Tone<select aria-label="Video call voice tone" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const profile = companionVoiceProfile(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${profile.name} tone will start on your next call.`); else { setCompanionLine(`${profile.name} tone selected.`); speak(`Okay… this is my ${profile.name.toLowerCase()} tone.`, true, next); } }}>{companionVoiceProfiles.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}</select></label>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>

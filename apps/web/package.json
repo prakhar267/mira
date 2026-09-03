@@ -29,6 +29,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-server-dom-webpack": "^19.2.8",
+    "three": "0.185.1",
     "vinext": "1.0.0-beta.8"
   },
   "devDependencies": {
@@ -36,6 +37,7 @@
     "@types/node": "26.4.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.3",
+    "@types/three": "0.185.0",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitejs/plugin-rsc": "^0.5.34",
     "autoprefixer": "10.4.21",
