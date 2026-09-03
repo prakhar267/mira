@@ -15,6 +15,7 @@ type TintableMaterial = THREE.Material & {
   color?: THREE.Color;
   shadeColorFactor?: THREE.Color;
   emissive?: THREE.Color;
+  map?: THREE.Texture | null;
 };
 
 function targetForPose(pose: AvatarMouthPose) {
@@ -39,6 +40,45 @@ function setExpression(vrm: VRM, name: string, target: number, smoothing = .2) {
   vrm.expressionManager?.setValue(name, THREE.MathUtils.lerp(current, target, smoothing));
 }
 
+function lavenderIrisTexture(texture: THREE.Texture) {
+  const source = texture.image as (CanvasImageSource & { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number }) | undefined;
+  const width = source?.naturalWidth ?? source?.width ?? 0;
+  const height = source?.naturalHeight ?? source?.height ?? 0;
+  if (!source || width < 1 || height < 1) return texture;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return texture;
+
+  context.drawImage(source, 0, 0, width, height);
+  const image = context.getImageData(0, 0, width, height);
+  for (let index = 0; index < image.data.length; index += 4) {
+    if (image.data[index + 3]! < 8) continue;
+    const red = image.data[index]!;
+    const green = image.data[index + 1]!;
+    const blue = image.data[index + 2]!;
+    const light = red * .24 + green * .58 + blue * .18;
+    if (light < 48) {
+      image.data[index] = Math.round(light * .38);
+      image.data[index + 1] = Math.round(light * .32);
+      image.data[index + 2] = Math.round(light * .58);
+    } else {
+      image.data[index] = Math.min(255, Math.round(light * .96 + 18));
+      image.data[index + 1] = Math.min(255, Math.round(light * .78 + 12));
+      image.data[index + 2] = Math.min(255, Math.round(light * 1.28 + 30));
+    }
+  }
+  context.putImageData(image, 0, 0);
+
+  const tinted = texture.clone();
+  tinted.image = canvas;
+  tinted.colorSpace = THREE.SRGBColorSpace;
+  tinted.needsUpdate = true;
+  return tinted;
+}
+
 function tintOriginalAvatar(root: THREE.Object3D) {
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
@@ -56,7 +96,8 @@ function tintOriginalAvatar(root: THREE.Object3D) {
         material.shadeColorFactor?.setRGB(.055, .06, .13);
         material.side = THREE.DoubleSide;
       } else if (/eyeiris/i.test(name)) {
-        material.color?.setRGB(.76, .67, 1);
+        material.color?.setRGB(1, 1, 1);
+        if (material.map) material.map = lavenderIrisTexture(material.map);
         material.emissive?.setRGB(.018, .012, .04);
       } else if (/tops/i.test(name)) {
         material.color?.setRGB(.89, .84, 1);

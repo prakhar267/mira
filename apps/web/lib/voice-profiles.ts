@@ -18,13 +18,13 @@ export const companionVoiceIdentity = {
 
 // These are delivery moods for one voice identity, not separate characters or voices.
 export const companionVoiceModes: CompanionVoiceMode[] = [
-  { id: "mira-natural-01", name: "Natural", detail: "Soft-spoken, shy and conversational", emotion: "natural", speaker: "luna", rate: .91, pitch: 1.08, volume: .92 },
-  { id: "mira-happy-01", name: "Happy", detail: "Light, smiling and bright", emotion: "happy", speaker: "luna", rate: .98, pitch: 1.12, volume: .96 },
-  { id: "mira-playful-01", name: "Playful", detail: "Gentle teasing with lively warmth", emotion: "playful", speaker: "luna", rate: .95, pitch: 1.11, volume: .94 },
-  { id: "mira-tender-01", name: "Tender", detail: "Delicate, caring and unhurried", emotion: "tender", speaker: "luna", rate: .85, pitch: 1.07, volume: .82 },
-  { id: "mira-intimate-01", name: "Intimate", detail: "Close, quiet and warmly restrained", emotion: "intimate", speaker: "luna", rate: .84, pitch: 1.04, volume: .84 },
-  { id: "mira-sad-01", name: "Sad", detail: "Quiet, vulnerable and subdued", emotion: "sad", speaker: "luna", rate: .82, pitch: 1.02, volume: .78 },
-  { id: "mira-angry-01", name: "Angry", detail: "Firm and emotional without shouting", emotion: "angry", speaker: "luna", rate: .99, pitch: 1.05, volume: .95 },
+  { id: "mira-natural-01", name: "Natural", detail: "Soft-spoken, shy and conversational", emotion: "natural", speaker: "luna", rate: .94, pitch: 1.01, volume: .94 },
+  { id: "mira-happy-01", name: "Happy", detail: "Light, smiling and bright", emotion: "happy", speaker: "luna", rate: .99, pitch: 1.04, volume: .97 },
+  { id: "mira-playful-01", name: "Playful", detail: "Gentle teasing with lively warmth", emotion: "playful", speaker: "luna", rate: .97, pitch: 1.035, volume: .95 },
+  { id: "mira-tender-01", name: "Tender", detail: "Delicate, caring and unhurried", emotion: "tender", speaker: "luna", rate: .88, pitch: 1, volume: .84 },
+  { id: "mira-intimate-01", name: "Intimate", detail: "Close, quiet and warmly restrained", emotion: "intimate", speaker: "luna", rate: .86, pitch: .99, volume: .86 },
+  { id: "mira-sad-01", name: "Sad", detail: "Quiet, vulnerable and subdued", emotion: "sad", speaker: "luna", rate: .84, pitch: .98, volume: .8 },
+  { id: "mira-angry-01", name: "Angry", detail: "Firm and emotional without shouting", emotion: "angry", speaker: "luna", rate: 1, pitch: .995, volume: .96 },
 ];
 
 const legacyModeAliases: Record<string, string> = {

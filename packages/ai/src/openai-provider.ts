@@ -46,13 +46,13 @@ function openAIVoiceStyle(voiceId?: string) {
 }
 
 function openAIVoiceSpeed(voiceId?: string) {
-  if (voiceId?.includes("intimate") || voiceId?.includes("seductive")) return .84;
-  if (voiceId?.includes("tender") || voiceId?.includes("soft")) return .85;
-  if (voiceId?.includes("sad")) return .82;
-  if (voiceId?.includes("angry") || voiceId?.includes("sharp")) return .99;
-  if (voiceId?.includes("happy") || voiceId?.includes("confident")) return .98;
-  if (voiceId?.includes("playful")) return .95;
-  return .91;
+  if (voiceId?.includes("intimate") || voiceId?.includes("seductive")) return .86;
+  if (voiceId?.includes("tender") || voiceId?.includes("soft")) return .88;
+  if (voiceId?.includes("sad")) return .84;
+  if (voiceId?.includes("angry") || voiceId?.includes("sharp")) return 1;
+  if (voiceId?.includes("happy") || voiceId?.includes("confident")) return .99;
+  if (voiceId?.includes("playful")) return .97;
+  return .94;
 }
 
 class OpenAIHttpClient {
