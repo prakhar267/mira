@@ -14,7 +14,7 @@ export interface CompanionVoiceMode {
 
 export const companionVoiceIdentity = {
   name: "Mira Aster",
-  detail: "Cloudflare Melo voice · English, हिन्दी and Hinglish",
+  detail: "Cloudflare neural voice · English, हिन्दी and Hinglish",
 } as const;
 
 // These are delivery moods for one voice identity, not separate characters or voices.

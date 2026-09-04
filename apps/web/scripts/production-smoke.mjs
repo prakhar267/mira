@@ -154,13 +154,19 @@ const verifyFreeCloudflareSpeech = async (text, language, expectedLanguage) => {
   });
   expect(response.ok, `speech returned ${response.status}`);
   expect(response.headers.get("content-type")?.includes("audio/"), "speech was not audio");
-  expect(response.headers.get("x-companion-voice-provider") === "cloudflare-melotts", "Cloudflare MeloTTS provider was not used");
-  expect(response.headers.get("x-companion-voice-model") === "@cf/myshell-ai/melotts", "MeloTTS model header missing");
-  expect(response.headers.get("x-companion-voice") === "melo-female", "Melo voice identity was not used");
+  const provider = response.headers.get("x-companion-voice-provider");
+  const model = response.headers.get("x-companion-voice-model");
+  const voice = response.headers.get("x-companion-voice");
+  expect(provider === "cloudflare-melotts" || provider === "cloudflare-aura-1", "a free Cloudflare TTS provider was not used");
+  if (provider === "cloudflare-melotts") {
+    expect(model === "@cf/myshell-ai/melotts" && voice === "melo-female", "MeloTTS identity headers missing");
+  } else {
+    expect(model === "@cf/deepgram/aura-1" && voice === "luna", "Aura failover identity headers missing");
+  }
   expect(response.headers.get("x-companion-language") === expectedLanguage, `expected ${expectedLanguage} language routing`);
   const bytes = (await response.arrayBuffer()).byteLength;
   expect(bytes > 1_000, `speech payload too small (${bytes} bytes)`);
-  return `cloudflare-melotts/melo-female/${expectedLanguage}, ${bytes} bytes`;
+  return `${provider}/${voice}/${expectedLanguage}, ${bytes} bytes`;
 };
 
 await run("English free Cloudflare voice", async () => {
