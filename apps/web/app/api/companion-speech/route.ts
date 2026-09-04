@@ -33,9 +33,11 @@ async function normalizeSpeechResult(result: unknown, requestId: string, started
     if (!result.ok || !result.body) throw new Error(`MeloTTS returned ${result.status}.`);
     return audioResponse(result.body, result.headers.get("content-type") ?? "audio/mpeg", requestId, startedAt, language);
   }
-  if (result instanceof ReadableStream) return audioResponse(result, "audio/mpeg", requestId, startedAt, language);
-  if (result instanceof ArrayBuffer) return audioResponse(result, "audio/mpeg", requestId, startedAt, language);
-  if (ArrayBuffer.isView(result)) return audioResponse(result as unknown as BodyInit, "audio/mpeg", requestId, startedAt, language);
+  // Cloudflare's current MeloTTS binding returns RIFF/WAV bytes even though the
+  // catalog schema also documents an MP3 response variant.
+  if (result instanceof ReadableStream) return audioResponse(result, "audio/wav", requestId, startedAt, language);
+  if (result instanceof ArrayBuffer) return audioResponse(result, "audio/wav", requestId, startedAt, language);
+  if (ArrayBuffer.isView(result)) return audioResponse(result as unknown as BodyInit, "audio/wav", requestId, startedAt, language);
 
   const payload = result && typeof result === "object" ? result as Record<string, unknown> : {};
   const nested = payload.result && typeof payload.result === "object" ? payload.result as Record<string, unknown> : {};
@@ -71,10 +73,18 @@ export async function POST(request: Request) {
     // without adding another paid provider or changing the visible chat reply.
     const prompt = language === "hi" ? romanizeHindiForEnglishTts(text) : text;
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const result = await env.AI.run(MODEL, {
-      prompt,
-      lang: "en",
-    });
+    const synthesize = () => env.AI.run(MODEL, { prompt, lang: "en" });
+    let result: unknown;
+    try {
+      result = await synthesize();
+    } catch (error) {
+      // MeloTTS occasionally emits transient 3043 provider errors. A single
+      // short retry prevents a call from going silent without masking quota or
+      // validation failures.
+      if (!(error instanceof Error) || !/\b3043\b/.test(error.message)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 160));
+      result = await synthesize();
+    }
     return await normalizeSpeechResult(result, requestId, startedAt, language);
   } catch (error) {
     console.error("Cloudflare MeloTTS speech failed", error instanceof Error ? error.message : "unknown error");
