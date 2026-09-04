@@ -12,6 +12,12 @@ function decodeBase64(value: string) {
   return bytes;
 }
 
+function detectedAudioContentType(bytes: Uint8Array, declared: string) {
+  if (bytes.length >= 4 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return "audio/wav";
+  if (bytes.length >= 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return "audio/mpeg";
+  return declared;
+}
+
 function audioResponse(audio: BodyInit, contentType: string, requestId: string, startedAt: number, language: string) {
   console.log(JSON.stringify({ event: "edge_request", requestId, route: "companion-speech", status: 200, latencyMs: Date.now() - startedAt, provider: PROVIDER, model: MODEL, voice: VOICE, language }));
   return new Response(audio, {
@@ -52,7 +58,8 @@ async function normalizeSpeechResult(result: unknown, requestId: string, started
   }
 
   const dataMatch = audio.match(/^data:([^;,]+);base64,(.+)$/s);
-  return audioResponse(decodeBase64(dataMatch?.[2] ?? audio), dataMatch?.[1] ?? contentType, requestId, startedAt, language);
+  const bytes = decodeBase64(dataMatch?.[2] ?? audio);
+  return audioResponse(bytes, detectedAudioContentType(bytes, dataMatch?.[1] ?? contentType), requestId, startedAt, language);
 }
 
 export async function POST(request: Request) {
@@ -73,17 +80,18 @@ export async function POST(request: Request) {
     // without adding another paid provider or changing the visible chat reply.
     const prompt = language === "hi" ? romanizeHindiForEnglishTts(text) : text;
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const synthesize = () => env.AI.run(MODEL, { prompt, lang: "en" });
     let result: unknown;
-    try {
-      result = await synthesize();
-    } catch (error) {
-      // MeloTTS occasionally emits transient 3043 provider errors. A single
-      // short retry prevents a call from going silent without masking quota or
-      // validation failures.
-      if (!(error instanceof Error) || !/\b3043\b/.test(error.message)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 160));
-      result = await synthesize();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        result = await env.AI.run(MODEL, { prompt, lang: "en" });
+        break;
+      } catch (error) {
+        // MeloTTS occasionally emits transient 3043 provider errors. Brief
+        // retries prevent calls from going silent without masking quota or
+        // validation failures.
+        if (!(error instanceof Error) || !/\b3043\b/.test(error.message) || attempt === 2) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+      }
     }
     return await normalizeSpeechResult(result, requestId, startedAt, language);
   } catch (error) {
