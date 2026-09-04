@@ -1,4 +1,4 @@
-import { cloudSpeakerForVoice, synthesisLanguageCode, type SpeechLanguage } from "@/lib/speech";
+import { cloudSpeakerForVoice, detectSpeechLanguage, synthesisLanguageCode, type SpeechLanguage } from "@/lib/speech";
 import { companionVoiceMode } from "@/lib/voice-profiles";
 
 const MODEL = "@cf/deepgram/aura-2-en";
@@ -77,6 +77,13 @@ export async function POST(request: Request) {
       } catch (error) {
         console.error("Sarvam companion speech failed", error instanceof Error ? error.message : "unknown error");
       }
+    }
+    const resolvedLanguage = detectSpeechLanguage(text, language);
+    if (resolvedLanguage !== "en") {
+      return Response.json(
+        { error: "Use the device's native Hindi voice for this turn.", fallback: "browser" },
+        { status: 422, headers: { "cache-control": "no-store", "x-companion-voice-provider": "browser-native" } },
+      );
     }
     const audio = await env.AI.run(MODEL as never, {
       text,

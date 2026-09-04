@@ -9,6 +9,12 @@
   "ai": {
     "binding": "AI"
   },
+  "kv_namespaces": [
+    {
+      "binding": "LUMA_ACCOUNTS",
+      "id": "8e9c00cb8b39465aa02b07e1fc9e47ec"
+    }
+  ],
   "assets": {
     "directory": "dist/client",
     "not_found_handling": "none",

@@ -357,14 +357,14 @@ export function VoiceCallModal({
     <motion.div className="live-call live-call--voice" role="dialog" aria-modal="true" aria-label={`Voice call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <img className="live-call__backdrop" src="/assets/mira/loft-morning.png" alt="" />
       <div className="live-call__veil" />
-      <header className="live-call__header"><span><i className="status-dot" /> {transport === "realtime" ? "Mira Velvet · neural" : transport === "connecting" ? "Connecting secure voice…" : "Mira Velvet · on device"}</span><strong>{companionName}</strong><time>{time}</time></header>
+      <header className="live-call__header"><span><i className="status-dot" /> {transport === "realtime" ? "Mira Aster · live neural" : transport === "connecting" ? "Connecting secure voice…" : "Mira Aster · adaptive multilingual"}</span><strong>{companionName}</strong><time>{time}</time></header>
       <div className="voice-call__portrait">
         <motion.img src={phase === "speaking" ? "/assets/mira/portrait-speaking.png" : "/assets/mira/portrait.png"} alt={`${companionName}, your AI companion`} animate={phase === "speaking" ? { scale: [1, 1.012, 1], y: [0, -1, 0] } : { scale: 1, y: 0 }} transition={{ duration: 3.2, repeat: phase === "speaking" ? Infinity : 0 }} />
         <i className={phase === "speaking" ? "voice-call__ring voice-call__ring--active" : "voice-call__ring"} />
         <AnimatePresence mode="wait"><motion.span key={phase} initial={{ opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{phaseCopy[phase]}</motion.span></AnimatePresence>
       </div>
 
-      {captions ? <div className="call-conversation" aria-live="polite">{heard ? <p className="call-conversation__user"><span>You</span>{heard}</p> : null}<p><span>{companionName}</span>{companionLine}</p></div> : null}
+      {captions ? <div className="call-conversation" aria-live="polite">{heard ? <p className="call-conversation__user"><span>You</span><strong>{heard}</strong></p> : null}<p><span>{companionName}</span><strong>{companionLine}</strong></p></div> : null}
       {speechError ? <p className="call-speech-error" role="status">{speechError}</p> : null}
 
       <div className="call-pickers">
@@ -384,7 +384,7 @@ export function VoiceCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.3, y: -90 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening pauses while {companionName} speaks · raw microphone audio is not retained · {transport === "realtime" ? "secure multilingual audio connected" : transport === "connecting" ? "connecting…" : "English · हिन्दी · Hinglish"}</small>
+      <small className="live-call__disclosure">Hands-free listening pauses while {companionName} speaks · Companaro does not save a call recording · {transport === "realtime" ? "secure multilingual audio connected" : transport === "connecting" ? "connecting…" : "English · हिन्दी · Hinglish"}</small>
     </motion.div>
   );
 }

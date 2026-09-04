@@ -1,17 +1,31 @@
-import { buildCompanionSystemPrompt, buildMemoryRecallReply, isGenericCompanionReply, isMemoryRecallRequest, sanitizeCompanionReply, type EdgeCompanionRequest } from "@/lib/companion-prompt";
+import { buildCompanionSystemPrompt, buildMemoryRecallReply, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, type EdgeCompanionRequest } from "@/lib/companion-prompt";
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 const windowMs = 60_000;
 const requestWindows = new Map<string, { count: number; startedAt: number }>();
 
 function readModelText(result: unknown) {
+  if (typeof result === "string") return result;
   if (!result || typeof result !== "object") return "";
   const record = result as Record<string, unknown>;
   if (typeof record.response === "string") return record.response;
+  if (typeof record.output_text === "string") return record.output_text;
   const choices = Array.isArray(record.choices) ? record.choices : [];
   const first = choices[0] as Record<string, unknown> | undefined;
   const message = first?.message as Record<string, unknown> | undefined;
-  return typeof message?.content === "string" ? message.content : typeof first?.text === "string" ? first.text : "";
+  if (typeof message?.content === "string") return message.content;
+  if (Array.isArray(message?.content)) {
+    return message.content.flatMap((item) => item && typeof item === "object" && typeof (item as Record<string, unknown>).text === "string" ? [(item as Record<string, unknown>).text as string] : []).join("");
+  }
+  if (typeof first?.text === "string") return first.text;
+  if (Array.isArray(record.output)) {
+    return record.output.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const content = (item as Record<string, unknown>).content;
+      return Array.isArray(content) ? content.flatMap((part) => part && typeof part === "object" && typeof (part as Record<string, unknown>).text === "string" ? [(part as Record<string, unknown>).text as string] : []) : [];
+    }).join("");
+  }
+  return "";
 }
 
 function parseRequest(value: unknown): EdgeCompanionRequest | null {
@@ -65,22 +79,20 @@ export async function POST(request: Request) {
 
   try {
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const suppressQuestions = input.responsePreferences?.questionFrequency === "rare";
+    const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
     const messages = [
       { role: "system", content: buildCompanionSystemPrompt(input) },
       ...input.messages,
     ];
     const run = async (promptMessages: typeof messages) => sanitizeCompanionReply(readModelText(await env.AI.run(MODEL as never, {
         messages: promptMessages,
-        max_tokens: input.delivery === "text" ? 180 : 120,
-        temperature: 0.85,
-        top_p: 0.9,
-        frequency_penalty: 0.35,
-        presence_penalty: 0.15,
-        repetition_penalty: 1.08,
+        max_tokens: input.delivery === "text" ? 220 : 150,
+        temperature: 0.72,
+        top_p: 0.88,
+        repetition_penalty: 1.1,
       } as never)));
     let reply = await run(messages);
-    if (isGenericCompanionReply(reply) || (suppressQuestions && reply.includes("?"))) {
+    if (isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions)) {
       reply = await run([
         {
           role: "system",
@@ -89,7 +101,7 @@ export async function POST(request: Request) {
         ...input.messages,
       ]);
     }
-    if (isGenericCompanionReply(reply) || (suppressQuestions && reply.includes("?"))) return Response.json({ error: "The generated reply missed the conversation style." }, { status: 503 });
+    if (isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions)) return Response.json({ error: "The generated reply missed the conversation style." }, { status: 503 });
     return Response.json({ reply, model: MODEL });
   } catch (error) {
     console.error("Companion inference failed", error instanceof Error ? error.message : "unknown error");

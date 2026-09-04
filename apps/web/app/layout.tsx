@@ -11,7 +11,7 @@ import { ServiceWorker } from "@/components/ServiceWorker";
 
 export const metadata: Metadata = {
   title: `${brand.displayName} — ${brand.promise}`,
-  description: "An original adults-only AI companion prototype centered on memory, continuity, voice, and user control.",
+  description: "An original adults-only AI companion centered on memory, continuity, voice, and user control.",
   robots: { index: false, follow: false },
 };
 

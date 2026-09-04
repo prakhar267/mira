@@ -1,0 +1,43 @@
+import { type NextRequest, NextResponse } from "next/server";
+
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "connect-src 'self' blob: https://api.openai.com",
+  "font-src 'self' data:",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "img-src 'self' data: blob:",
+  "media-src 'self' data: blob:",
+  "object-src 'none'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "worker-src 'self' blob:",
+].join("; ");
+
+const securityHeaders = {
+  "Content-Security-Policy": contentSecurityPolicy,
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(), payment=()",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+};
+
+export function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname === "/app" && !request.cookies.has("__Host-companaro_session")) {
+    const login = request.nextUrl.clone();
+    login.pathname = "/login";
+    login.search = "";
+    return NextResponse.redirect(login);
+  }
+
+  const response = NextResponse.next();
+  for (const [name, value] of Object.entries(securityHeaders)) response.headers.set(name, value);
+  return response;
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|assets/|favicon.ico).*)"],
+};

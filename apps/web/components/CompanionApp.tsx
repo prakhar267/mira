@@ -23,6 +23,7 @@ import { VoiceCallModal } from "./VoiceCallModal";
 import { initialState, storageKey, type AppView, type DemoState, type EnvironmentId, type FeedbackReason } from "@/lib/state";
 import { canAccessItem, currencyBalance, environmentForItem } from "@/lib/product-rules";
 import { companionApi } from "@/lib/api-client";
+import { accountClient } from "@/lib/account-client";
 import { messagesForConversation, previousUserMessage } from "@/lib/conversation-state";
 import { relevantMemoryContents } from "@/lib/memory-relevance";
 import { playCompanionSpeech } from "@/lib/speech";
@@ -63,9 +64,11 @@ function rememberConversationMessage(current: DemoState, content: string, source
   return memories;
 }
 
-export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
+export function CompanionApp({ forceDemo = false, productionAccount = false }: { forceDemo?: boolean; productionAccount?: boolean }) {
   const router = useRouter();
-  const liveMode = companionApi.enabled && !forceDemo;
+  const accountMode = productionAccount && !forceDemo;
+  const liveMode = companionApi.enabled && !forceDemo && !accountMode;
+  const cloudBacked = accountMode || liveMode;
   const [state, setState] = useState<DemoState>(initialState);
   const [hydrated, setHydrated] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -78,12 +81,14 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const [hydrationError, setHydrationError] = useState("");
   const [momentsTab, setMomentsTab] = useState<MomentsTab>("moments");
   const companionSyncTimer = useRef<number | null>(null);
+  const accountSyncTimer = useRef<number | null>(null);
+  const accountReady = useRef(false);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const preview = query.get("preview");
     const onboarding = query.get("onboarding");
-    if (preview === "home") {
+    if (preview === "home" && forceDemo) {
       setState({ ...initialState, onboardingComplete: true, firstMeetingComplete: true, currentView: "home" });
       setHydrated(true);
       return;
@@ -119,6 +124,22 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
         setState({ ...initialState, onboardingComplete: true, firstMeetingComplete: true });
       }
       setHydrated(true);
+      return;
+    }
+    if (accountMode) {
+      void accountClient.load().then(({ state: savedState }) => {
+        accountReady.current = true;
+        setState({
+          ...initialState,
+          ...savedState,
+          onboardingComplete: true,
+          relationship: { ...initialState.relationship, ...savedState.relationship },
+          responsePreferences: { ...initialState.responsePreferences, ...savedState.responsePreferences },
+        });
+      }).catch((cause) => {
+        if (cause instanceof Error && /sign in|session expired/i.test(cause.message)) router.replace("/login");
+        else setHydrationError(cause instanceof Error ? cause.message : "Your account could not be loaded just now.");
+      }).finally(() => setHydrated(true));
       return;
     }
     if (liveMode && companionApi.hasSession()) {
@@ -206,10 +227,19 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       // A clean local demo remains available when saved state is malformed.
     }
     setHydrated(true);
-  }, [forceDemo, liveMode, router]);
+  }, [accountMode, forceDemo, liveMode, router]);
 
   useEffect(() => {
     if (!hydrated) return;
+    if (accountMode) {
+      document.documentElement.dataset.theme = state.theme;
+      if (!accountReady.current || !state.onboardingComplete) return;
+      if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current);
+      accountSyncTimer.current = window.setTimeout(() => {
+        void accountClient.save(state).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Your latest changes could not be synced."));
+      }, 700);
+      return;
+    }
     if (liveMode) {
       try {
         window.localStorage.setItem(livePreferencesKey(state.user.id), JSON.stringify({
@@ -235,7 +265,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       // The current session stays usable without persistent browser storage.
     }
     document.documentElement.dataset.theme = state.theme;
-  }, [hydrated, liveMode, state]);
+  }, [accountMode, hydrated, liveMode, state]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -246,6 +276,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
 
   useEffect(() => () => {
     if (companionSyncTimer.current !== null) window.clearTimeout(companionSyncTimer.current);
+    if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current);
   }, []);
 
   const activeMemories = useMemo(() => state.memories.filter((memory) => memory.status === "active"), [state.memories]);
@@ -313,23 +344,24 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       ]);
       liveConversationId = (await companionApi.createConversation(liveAccount.companion.id)).id;
     }
-    setState((current) => ({
-      ...current,
+    const nextState: DemoState = {
+      ...state,
       onboardingComplete: true,
       firstMeetingComplete: false,
       currentView: "home",
-      activeConversationId: liveConversationId ?? current.activeConversationId,
-      user: { ...current.user, ...(liveAccount?.user ?? {}), name: draft.name.trim(), birthday: draft.birthday, pronouns: draft.pronouns, interests: draft.interests, adultConfirmed: draft.adultConfirmed },
+      activeConversationId: liveConversationId ?? crypto.randomUUID(),
+      user: { ...state.user, ...(liveAccount?.user ?? {}), name: draft.name.trim(), birthday: draft.birthday, pronouns: draft.pronouns, interests: draft.interests, adultConfirmed: draft.adultConfirmed },
       companion: {
-        ...current.companion,
+        ...state.companion,
         ...(liveAccount?.companion ?? {}),
+        id: liveAccount?.companion.id ?? crypto.randomUUID(),
         name: draft.companionName.trim() || "Mira",
         pronouns: draft.companionPronouns,
         presentation: draft.presentation,
         voiceId: draft.voiceId,
         relationshipMode: draft.relationshipMode,
         personality: {
-          ...current.companion.personality,
+          ...state.companion.personality,
           warmth: draft.warmth / 100,
           playfulness: draft.playfulness / 100,
           energy: draft.energy / 100,
@@ -338,7 +370,7 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
         },
       },
       relationship: {
-        ...current.relationship,
+        ...state.relationship,
         stage: "New",
         level: 1,
         progress: 8,
@@ -369,13 +401,21 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
       mediaLibrary: [],
       messages: [{
         id: crypto.randomUUID(),
-        conversationId: liveConversationId ?? current.activeConversationId,
+        conversationId: liveConversationId ?? "pending",
         role: "assistant",
         content: `Hi ${draft.name.trim()}. I’m ${draft.companionName.trim() || "Mira"}. We can start with whatever feels easy—even a quiet hello.`,
         createdAt: new Date().toISOString(),
         status: "sent",
       }],
-    }));
+    };
+    if (!liveConversationId) nextState.messages[0]!.conversationId = nextState.activeConversationId;
+    if (accountMode) {
+      const created = await accountClient.signup({ email: draft.email, password: draft.password, name: draft.name.trim(), state: nextState });
+      accountReady.current = true;
+      setState(created.state);
+    } else {
+      setState(nextState);
+    }
     router.replace(forceDemo ? "/demo" : "/app");
   };
 
@@ -398,9 +438,6 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
 
   const generateDemoReply = async (messages: ChatMessage[], delivery: "text" | "voice" | "video", fallback: CompanionTurn) => {
     if (fallback.adaptations.includes("safety-support")) return fallback.text;
-    const latestUserText = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
-    const hasCuratedAnswer = fallback.intent === "self" || fallback.intent === "greeting" || fallback.intent === "choice" || /\b(?:monotonous|monotony|same (?:old )?(?:routine|thing|day)|every day (?:is|feels) the same|repetitive|mundane|stuck in a rut|nothing changes)\b/i.test(latestUserText);
-    if (hasCuratedAnswer) return fallback.text;
     try {
       return await companionApi.demoReply({
         messages: messagesForConversation(messages, state.activeConversationId)
@@ -541,6 +578,10 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const speakWithProvider = async (content: string) => {
+    if (!liveMode) {
+      playCompanionSpeech(content, { voiceId: state.companion.voiceId });
+      return;
+    }
     const speech = await companionApi.synthesize(content, state.companion.voiceId);
     if (speech.mock) {
       playCompanionSpeech(content, { voiceId: state.companion.voiceId });
@@ -771,7 +812,12 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const rememberTranscribedCallTurn = async (content: string) => {
-    if (!liveMode || !state.memoryEnabled || assessSafety(content).level !== "safe") return;
+    if (!state.memoryEnabled || assessSafety(content).level !== "safe") return;
+    if (!liveMode) {
+      const sourceMessageId = crypto.randomUUID();
+      setState((current) => ({ ...current, memories: rememberConversationMessage(current, content, sourceMessageId, new Date()) }));
+      return;
+    }
     const candidates = extractMemoryCandidates(content);
     if (!candidates.length) return;
     const known = new Set(state.memories.filter((memory) => memory.status === "active").map((memory) => memory.content.trim().toLocaleLowerCase()));
@@ -824,17 +870,22 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const exportData = async () => {
-    const payload = liveMode ? await companionApi.exportData() : { exportedAt: new Date().toISOString(), source: "mira-local-mock", ...state };
+    const payload = accountMode ? await accountClient.exportData() : liveMode ? await companionApi.exportData() : { exportedAt: new Date().toISOString(), source: "companaro-demo", ...state };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = liveMode ? "mira-account-export.json" : "mira-demo-export.json";
+    anchor.download = cloudBacked ? "companaro-account-export.json" : "companaro-demo-export.json";
     anchor.click();
     URL.revokeObjectURL(url);
   };
 
   const deleteDemo = async () => {
+    if (accountMode) {
+      await accountClient.deleteAccount();
+      router.replace("/");
+      return;
+    }
     if (liveMode) {
       await companionApi.deleteAccount("DELETE");
       router.replace("/");
@@ -845,7 +896,8 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   };
 
   const logout = async () => {
-    await companionApi.logout();
+    if (accountMode) await accountClient.logout();
+    else await companionApi.logout();
     router.replace("/login");
   };
 
@@ -857,12 +909,12 @@ export function CompanionApp({ forceDemo = false }: { forceDemo?: boolean }) {
   const renderView = () => {
     switch (state.currentView) {
       case "home": return <HomeView state={state} onChat={() => navigate("chat")} onCall={openVoiceCall} onVideoCall={openVideoCall} onMoments={() => openMoments("moments")} onMemory={() => navigate("memory")} onCompanion={() => navigate("companion")} onSpendTime={() => openMoments("together")} onEnvironmentChange={(activeEnvironment) => setState((current) => ({ ...current, activeEnvironment }))} onAmbienceChange={() => setState((current) => ({ ...current, ambienceEnabled: !current.ambienceEnabled }))} />;
-      case "chat": return <ChatView state={state} streaming={streaming} processingEnabled={state.aiProcessingConsent} liveMode={liveMode} onSend={sendMessage} onNewConversation={() => runAction(newConversation(), "A new conversation could not be started.")} onDeleteConversation={deleteConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} {...(liveMode ? { onVoiceRecording: sendVoiceRecording, onSpeak: (content: string) => speakWithProvider(content).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Speech playback failed.")) } : {})} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={(messageId) => runAction(regenerateResponse(messageId), "The response could not be regenerated.")} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!processingAllowed()) return; if (!featureEntitlements.has(state.subscription.planId, "cameraConversation")) setPlansOpen(true); else setCameraOpen(true); }} />;
-      case "moments": return <MomentsView key={momentsTab} defaultTab={momentsTab} state={state} liveMode={liveMode} onCompleteActivity={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onStartDate={startDate} onGenerateSelfie={addSelfie} onVideoCall={openVideoCall} />;
+      case "chat": return <ChatView state={state} streaming={streaming} processingEnabled={state.aiProcessingConsent} liveMode={cloudBacked} onSend={sendMessage} onNewConversation={() => runAction(newConversation(), "A new conversation could not be started.")} onDeleteConversation={deleteConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} {...(liveMode ? { onVoiceRecording: sendVoiceRecording } : {})} onSpeak={(content: string) => speakWithProvider(content).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Speech playback failed."))} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={(messageId) => runAction(regenerateResponse(messageId), "The response could not be regenerated.")} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!processingAllowed()) return; if (!featureEntitlements.has(state.subscription.planId, "cameraConversation")) setPlansOpen(true); else setCameraOpen(true); }} />;
+      case "moments": return <MomentsView key={momentsTab} defaultTab={momentsTab} state={state} liveMode={cloudBacked} onCompleteActivity={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onStartDate={startDate} onGenerateSelfie={addSelfie} onVideoCall={openVideoCall} />;
       case "companion": return <CompanionView companion={state.companion} backstory={state.companionBackstory} storeItems={state.storeItems} ownedItems={state.ownedItems} wallet={state.wallet} subscription={state.subscription} onChange={changeCompanion} onBackstoryChange={(companionBackstory) => setState((current) => ({ ...current, companionBackstory }))} onPurchase={purchaseItem} onEquip={equipItem} onUpgrade={() => setPlansOpen(true)} />;
       case "memory": return <MemoryView memories={state.memories} enabled={state.memoryEnabled} companionName={state.companion.name} onToggle={() => setState((current) => ({ ...current, memoryEnabled: !current.memoryEnabled }))} onUpdate={(memory) => runAction(updateMemory(memory), "The memory could not be updated.")} onDelete={(memoryId) => runAction(deleteMemory(memoryId), "The memory could not be deleted.")} onAdd={(content, type) => runAction(addMemory(content, type), "The memory could not be added.")} />;
-      case "activities": return <ActivitiesView activities={state.activities} completedIds={state.completedActivityIds} wallet={state.wallet} journalEntries={state.journalEntries} futureEvents={state.futureEvents} nudges={state.nudges} companionName={state.companion.name} liveMode={liveMode} onComplete={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onAddJournal={(entry) => runAction(addJournal(entry), "The journal entry could not be saved.")} onDeleteJournal={(entryId) => runAction(deleteJournal(entryId), "The journal entry could not be deleted.")} onReflect={(entry) => runAction(reflectOnJournal(entry), "The reflection could not be created.")} onAddEvent={(event) => runAction(addFutureEvent(event), "The future plan could not be saved.")} />;
-      case "profile": return <ProfileView state={state} liveMode={liveMode} onChange={changeProfile} onExport={() => runAction(exportData(), "Your data export could not be created.")} onDelete={() => runAction(deleteDemo(), "Your account could not be deleted.")} {...(liveMode ? { onLogout: () => runAction(logout(), "You could not be signed out.") } : {})} onUpgrade={() => setPlansOpen(true)} onOpenMemory={() => navigate("memory")} onOpenActivities={() => openMoments("together")} />;
+      case "activities": return <ActivitiesView activities={state.activities} completedIds={state.completedActivityIds} wallet={state.wallet} journalEntries={state.journalEntries} futureEvents={state.futureEvents} nudges={state.nudges} companionName={state.companion.name} liveMode={cloudBacked} onComplete={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onAddJournal={(entry) => runAction(addJournal(entry), "The journal entry could not be saved.")} onDeleteJournal={(entryId) => runAction(deleteJournal(entryId), "The journal entry could not be deleted.")} onReflect={(entry) => runAction(reflectOnJournal(entry), "The reflection could not be created.")} onAddEvent={(event) => runAction(addFutureEvent(event), "The future plan could not be saved.")} />;
+      case "profile": return <ProfileView state={state} liveMode={cloudBacked} onChange={changeProfile} onExport={() => runAction(exportData(), "Your data export could not be created.")} onDelete={() => runAction(deleteDemo(), "Your account could not be deleted.")} {...(cloudBacked ? { onLogout: () => runAction(logout(), "You could not be signed out.") } : {})} onUpgrade={() => setPlansOpen(true)} onOpenMemory={() => navigate("memory")} onOpenActivities={() => openMoments("together")} />;
     }
   };
 

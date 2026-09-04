@@ -146,7 +146,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
             <>
               <span className="eyebrow">Adults only</span>
               <h1>Confirm you’re 18 or older.</h1>
-              <p>Your birthday supports eligibility and age-appropriate features. A production launch will require stronger age assurance.</p>
+              <p>Your birthday supports eligibility and age-appropriate features. Do not continue unless you are at least 18.</p>
               <label className="field">Birthday<input type="date" max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().slice(0, 10)} value={draft.birthday} onInput={(event) => setDraft({ ...draft, birthday: event.currentTarget.value })} onChange={(event) => setDraft({ ...draft, birthday: event.target.value })} /></label>
               <label className="check-line"><input type="checkbox" checked={draft.adultConfirmed} onChange={(event) => setDraft({ ...draft, adultConfirmed: event.target.checked })} /><span>I confirm I am 18 or older.</span></label>
             </>
@@ -178,7 +178,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <h1>Make the introduction yours.</h1>
               <div className="companion-pick">
                 <img src="/assets/mira/portrait.png" alt="Mira, an original AI companion avatar" />
-                <span><strong>Playful & warm</strong><small>Original prototype avatar</small></span>
+                <span><strong>Playful & warm</strong><small>Original expressive avatar</small></span>
               </div>
               <label className="field">Companion name<input maxLength={40} value={draft.companionName} onChange={(event) => setDraft({ ...draft, companionName: event.target.value })} /></label>
               <label className="field">Companion pronouns<select value={draft.companionPronouns} onChange={(event) => setDraft({ ...draft, companionPronouns: event.target.value as Draft["companionPronouns"] })}><option>she/her</option><option>he/him</option><option>they/them</option></select></label>

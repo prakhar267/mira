@@ -2091,8 +2091,16 @@ select {
 .video-call__avatar-frame { filter: brightness(.88) saturate(.94); }
 .live-call__header strong,
 .call-orb { color: #fffaf4; }
+.live-call__header { color: rgba(255,250,244,.78); }
 .call-conversation,
 .video-call__captions { background: rgba(31,25,22,.68); }
+.live-call .call-conversation p { display: flex; min-height: 20px; align-items: center; gap: 10px; color: rgba(255,250,244,.9); }
+.live-call .call-conversation p span { display: inline-block; flex: 0 0 auto; margin: 0; color: #ff927a; }
+.live-call .call-conversation p strong { display: block; color: #fffaf4; font-size: 13px; font-weight: 500; line-height: 1.45; }
+.live-call .call-language-picker { color: rgba(255,250,244,.72); }
+.live-call .call-language-picker span { color: #ffd1c6; }
+.live-call .call-language-picker select { color: #fffaf4; }
+.live-call .call-language-picker option { background: #211a18; color: #fffaf4; }
 .barge-in { min-height: 48px; padding: 0 20px; border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.12); color: #fff1ea; cursor: pointer; }
 .barge-in svg { color: #ff927a; }
 .call-speech-error { color: #ffd1c6; }

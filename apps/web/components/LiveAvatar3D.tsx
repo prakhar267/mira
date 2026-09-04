@@ -4,19 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { type VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
 export type AvatarMouthPose = 0 | 1 | 2 | 3;
 export type AvatarEmotion = "natural" | "happy" | "playful" | "tender" | "intimate" | "sad" | "angry";
 
-const avatarAsset = "/assets/mira/avatar/mira-anime-adult.vrm";
-
-type TintableMaterial = THREE.Material & {
-  color?: THREE.Color;
-  shadeColorFactor?: THREE.Color;
-  emissive?: THREE.Color;
-  map?: THREE.Texture | null;
-};
+const avatarAsset = "/assets/mira/avatar/mira-anime-live-v2.vrm";
 
 function targetForPose(pose: AvatarMouthPose) {
   if (pose === 1) return { aa: 0, ee: .08, ih: .44, oh: 0, ou: 0 };
@@ -40,73 +32,12 @@ function setExpression(vrm: VRM, name: string, target: number, smoothing = .2) {
   vrm.expressionManager?.setValue(name, THREE.MathUtils.lerp(current, target, smoothing));
 }
 
-function lavenderIrisTexture(texture: THREE.Texture) {
-  const source = texture.image as (CanvasImageSource & { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number }) | undefined;
-  const width = source?.naturalWidth ?? source?.width ?? 0;
-  const height = source?.naturalHeight ?? source?.height ?? 0;
-  if (!source || width < 1 || height < 1) return texture;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) return texture;
-
-  context.drawImage(source, 0, 0, width, height);
-  const image = context.getImageData(0, 0, width, height);
-  for (let index = 0; index < image.data.length; index += 4) {
-    if (image.data[index + 3]! < 8) continue;
-    const red = image.data[index]!;
-    const green = image.data[index + 1]!;
-    const blue = image.data[index + 2]!;
-    const light = red * .24 + green * .58 + blue * .18;
-    if (light < 48) {
-      image.data[index] = Math.round(light * .38);
-      image.data[index + 1] = Math.round(light * .32);
-      image.data[index + 2] = Math.round(light * .58);
-    } else {
-      image.data[index] = Math.min(255, Math.round(light * .96 + 18));
-      image.data[index + 1] = Math.min(255, Math.round(light * .78 + 12));
-      image.data[index + 2] = Math.min(255, Math.round(light * 1.28 + 30));
-    }
-  }
-  context.putImageData(image, 0, 0);
-
-  const tinted = texture.clone();
-  tinted.image = canvas;
-  tinted.colorSpace = THREE.SRGBColorSpace;
-  tinted.needsUpdate = true;
-  return tinted;
-}
-
-function styleAdultAvatar(root: THREE.Object3D) {
+function prepareAvatar(root: THREE.Object3D) {
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     object.frustumCulled = false;
     object.castShadow = false;
     object.receiveShadow = false;
-
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    for (const source of materials) {
-      const material = source as TintableMaterial;
-      const name = material.name;
-
-      if (/hair/i.test(name)) {
-        material.color?.setRGB(.11, .09, .2);
-        material.shadeColorFactor?.setRGB(.025, .018, .065);
-        material.side = THREE.DoubleSide;
-      } else if (/eyeiris/i.test(name)) {
-        material.color?.setRGB(1, 1, 1);
-        if (material.map) material.map = lavenderIrisTexture(material.map);
-        material.emissive?.setRGB(.018, .012, .04);
-      } else if (/tops/i.test(name)) {
-        material.color?.setRGB(.89, .84, 1);
-      } else if (/bottoms|shoes/i.test(name)) {
-        material.color?.setRGB(.2, .22, .34);
-      }
-
-      material.needsUpdate = true;
-    }
   });
 }
 
@@ -165,6 +96,8 @@ export function LiveAvatar3D({
     let spineBase: THREE.Euler | null = null;
     let pointerX = 0;
     let pointerY = 0;
+    let modelLoaded = false;
+    let stableFrames = 0;
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -185,10 +118,6 @@ export function LiveAvatar3D({
     camera.position.set(0, 1.53, 1.04);
     camera.lookAt(0, 1.53, 0);
 
-    const gazeTarget = new THREE.Object3D();
-    gazeTarget.position.set(0, 1.54, 2);
-    scene.add(gazeTarget);
-
     const hemisphere = new THREE.HemisphereLight(0xfff5f2, 0x25213b, 2.3);
     const key = new THREE.DirectionalLight(0xffe4d8, 3.2);
     key.position.set(-1.5, 2.7, 2.4);
@@ -199,7 +128,6 @@ export function LiveAvatar3D({
     scene.add(hemisphere, key, rim, fill);
 
     const loader = new GLTFLoader();
-    loader.setMeshoptDecoder(MeshoptDecoder);
     loader.register((parser) => new VRMLoaderPlugin(parser));
 
     loader.loadAsync(avatarAsset).then((gltf) => {
@@ -212,11 +140,9 @@ export function LiveAvatar3D({
 
       vrm = loadedVrm;
       avatar = loadedVrm.scene;
-      avatar.name = "MiraOriginalAnimeAvatar";
+      avatar.name = "MiraOpenLicensedAnimeAvatar";
       VRMUtils.rotateVRM0(loadedVrm);
-      VRMUtils.removeUnnecessaryVertices(avatar);
-      VRMUtils.combineSkeletons(avatar);
-      styleAdultAvatar(avatar);
+      prepareAvatar(avatar);
 
       const sourceBounds = new THREE.Box3().setFromObject(avatar);
       const sourceSize = sourceBounds.getSize(new THREE.Vector3());
@@ -231,10 +157,10 @@ export function LiveAvatar3D({
       const rightUpperArm = humanoid.getNormalizedBoneNode("rightUpperArm");
       const leftLowerArm = humanoid.getNormalizedBoneNode("leftLowerArm");
       const rightLowerArm = humanoid.getNormalizedBoneNode("rightLowerArm");
-      if (leftUpperArm) leftUpperArm.rotation.set(.04, -.11, 1.18);
-      if (rightUpperArm) rightUpperArm.rotation.set(.04, .11, -1.18);
-      if (leftLowerArm) leftLowerArm.rotation.set(0, -.12, -.08);
-      if (rightLowerArm) rightLowerArm.rotation.set(0, .12, .08);
+      if (leftUpperArm) leftUpperArm.rotation.set(.04, -.11, -1.18);
+      if (rightUpperArm) rightUpperArm.rotation.set(.04, .11, 1.18);
+      if (leftLowerArm) leftLowerArm.rotation.set(0, -.12, .08);
+      if (rightLowerArm) rightLowerArm.rotation.set(0, .12, -.08);
 
       head = humanoid.getNormalizedBoneNode("head");
       neck = humanoid.getNormalizedBoneNode("neck");
@@ -243,14 +169,15 @@ export function LiveAvatar3D({
       neckBase = neck?.rotation.clone() ?? null;
       spineBase = spine?.rotation.clone() ?? null;
 
-      if (loadedVrm.lookAt) {
-        loadedVrm.lookAt.autoUpdate = true;
-        loadedVrm.lookAt.target = gazeTarget;
-      }
+      // Some VRM 0 models define a bone-based look-at range that can turn the
+      // irises completely away from the camera. Head and neck tracking below
+      // provides natural gaze without corrupting the model's authored eyes.
+      if (loadedVrm.lookAt) loadedVrm.lookAt.autoUpdate = false;
 
       scene.add(avatar);
-      loadedVrm.update(0);
-      setLoadState("ready");
+      loadedVrm.humanoid.update();
+      loadedVrm.expressionManager?.update();
+      modelLoaded = true;
     }).catch((cause) => {
       console.warn("Anime VRM avatar failed to load", cause);
       if (active) setLoadState("fallback");
@@ -321,12 +248,18 @@ export function LiveAvatar3D({
           head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, headBase.z + Math.sin(elapsed * .27) * .012, .035);
         }
 
-        gazeTarget.position.set(pointerX * .16, 1.54 - pointerY * .1, 2);
+        // The current VRM 1 avatar has a stable standards-compliant spring rig.
+        // Its full update is required for MToon textures, expressions, constraints,
+        // and secondary motion to remain synchronized.
         vrm.update(delta);
       }
 
       camera.lookAt(pointerX * -.012, 1.53 + pointerY * -.008, 0);
       renderer.render(scene, camera);
+      if (modelLoaded && stableFrames < 12) {
+        stableFrames += 1;
+        if (stableFrames === 12 && active) setLoadState("ready");
+      }
     };
     animate();
 
@@ -343,8 +276,8 @@ export function LiveAvatar3D({
 
   return (
     <div className={`live-avatar-3d live-avatar-3d--${loadState}`}>
-      <img className="live-avatar-3d__fallback" src="/assets/mira/avatar/mira-anime-adult-fallback.png" alt="" draggable={false} />
-      <canvas ref={canvasRef} className="live-avatar-3d__canvas" role="img" aria-label={`${companionName}, an expressive original anime 3D companion`} />
+      <img className="live-avatar-3d__fallback" src="/assets/mira/avatar/mira-anime-live-v2.png" alt="" draggable={false} />
+      <canvas ref={canvasRef} className="live-avatar-3d__canvas" role="img" aria-label={`${companionName}, an expressive open-licensed anime 3D companion`} />
       {loadState === "loading" ? <span className="live-avatar-3d__loading">Bringing {companionName} into the call…</span> : null}
       {loadState === "fallback" ? <span className="live-avatar-3d__loading">3D is unavailable on this device · using anime portrait mode</span> : null}
     </div>

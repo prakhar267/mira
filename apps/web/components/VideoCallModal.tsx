@@ -466,7 +466,7 @@ export function VideoCallModal({
           mouthPose={mouthPose}
           emotion={companionVoiceMode(activeVoiceId).emotion}
         />
-        <span className="video-call__feed-badge"><i className="status-dot" /> Live expressive 3D face · speech synced</span>
+        <span className="video-call__feed-badge"><i className="status-dot" /> Live 3D avatar · expression synced</span>
       </div>
       <div className="live-call__veil live-call__veil--video" />
       <header className="live-call__header"><span><i className="status-dot" /> Live together</span><strong>{companionName}</strong><time>{time}</time></header>
@@ -479,7 +479,7 @@ export function VideoCallModal({
       </div>
 
       <div className="video-call__tools">
-        <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Original anime VRM · live expressions</span>
+        <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Open-licensed anime avatar · stable live expressions</span>
         <label>Language<select aria-label="Video call language" value={language} onChange={(event) => { stopRecognition(); playbackRef.current?.cancel(); changeSpeaking(false); setLanguage(event.target.value as SpeechLanguage); setListening(true); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <label>Mood<select aria-label="Video call voice mood" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const mode = companionVoiceMode(next); setActiveVoiceId(next); onVoiceChange?.(next); if (transport === "realtime") setCompanionLine(`${mode.name} delivery will start on your next call.`); else { setCompanionLine(`${mode.name} mood selected.`); speak(`Okay… I’ll sound ${mode.name.toLowerCase()} now.`, true, next); } }}>{companionVoiceModes.map((mode) => <option key={mode.id} value={mode.id}>{mode.name}</option>)}</select></label>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
@@ -503,7 +503,7 @@ export function VideoCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End video call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.4, y: -110 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening pauses while {companionName} speaks · camera stays local until Show frame · raw call media is not recorded · {transport === "realtime" ? "secure multilingual audio connected" : transport === "connecting" ? "connecting secure audio…" : "English · हिन्दी · Hinglish"}</small>
+      <small className="live-call__disclosure">Hands-free listening pauses while {companionName} speaks · camera stays local until Show frame · Companaro does not save a call recording · {transport === "realtime" ? "secure multilingual audio connected" : transport === "connecting" ? "connecting secure audio…" : "English · हिन्दी · Hinglish"}</small>
     </motion.div>
   );
 }

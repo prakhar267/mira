@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompanionSystemPrompt, buildMemoryRecallReply, isGenericCompanionReply, isMemoryRecallRequest, sanitizeCompanionReply } from "./companion-prompt";
+import { buildCompanionSystemPrompt, buildMemoryRecallReply, detectCompanionLanguage, isGenericCompanionReply, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply } from "./companion-prompt";
 
 const request = {
   messages: [{ role: "user" as const, content: "nothing just monotonous" }],
@@ -17,10 +17,25 @@ describe("edge companion prompting", () => {
     expect(prompt).toContain("Ordinary statements deserve ordinary conversation");
     expect(prompt).toContain("Do not announce that you are listening or not fixing");
     expect(prompt).toContain("Speech recognition can be imperfect");
-    expect(prompt).toContain("everyday Hinglish");
-    expect(prompt).toContain("Devanagari");
+    expect(prompt).toContain("natural English");
+    expect(prompt).toContain("required reply language");
     expect(prompt).toContain("same conversational cadence in every language");
     expect(prompt).toContain("more poetic, therapeutic, verbose, formal, or performative than Hindi");
+  });
+
+  it("locks every reply to the language of the latest turn", () => {
+    expect(detectCompanionLanguage("How are you today?")).toBe("en");
+    expect(detectCompanionLanguage("आज तुम कैसी हो?" )).toBe("hi");
+    expect(detectCompanionLanguage("yaar aaj kaafi busy tha")).toBe("hinglish");
+    expect(isInvalidCompanionReply("आज मैं अच्छी हूँ।", "How are you today?")).toBe(true);
+    expect(isInvalidCompanionReply("I am good today.", "आज तुम कैसी हो?" )).toBe(true);
+    expect(isInvalidCompanionReply("Haan, aaj mood kaafi accha hai.", "yaar tum kaisi ho?")).toBe(false);
+  });
+
+  it("enforces listen-only intent and rejects provider identity hallucinations", () => {
+    expect(requestsListeningOnly("Please just listen, no advice and no questions.")).toBe(true);
+    expect(isInvalidCompanionReply("That meeting really drained you. What happened next?", "Please just listen, no advice and no questions.")).toBe(true);
+    expect(isInvalidCompanionReply("Meta designed me and Llama is my basis.", "Who made you?")).toBe(true);
   });
 
   it("detects generic replies so the UI can use its contextual fallback", () => {
