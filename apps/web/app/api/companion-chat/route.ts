@@ -2,7 +2,7 @@ import { buildCompanionSystemPrompt, buildMemoryRecallReply, isInvalidCompanionR
 import { assessSafety } from "@companion/ai";
 import { assertEdgeSameOrigin, containsDisallowedAbuse, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
 
 function readModelText(result: unknown) {
   if (typeof result === "string") return result;
@@ -75,14 +75,15 @@ export async function POST(request: Request) {
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
     const messages = [
-      { role: "system", content: buildCompanionSystemPrompt(input) },
+      { role: "system", content: `/no_think\n${buildCompanionSystemPrompt(input)}` },
       ...input.messages,
     ];
     const run = async (promptMessages: typeof messages) => sanitizeCompanionReply(readModelText(await env.AI.run(MODEL as never, {
         messages: promptMessages,
-        max_tokens: input.delivery === "text" ? 220 : 150,
-        temperature: 0.72,
-        top_p: 0.88,
+        max_tokens: input.delivery === "text" ? 260 : 190,
+        temperature: 0.68,
+        top_p: 0.86,
+        top_k: 40,
         repetition_penalty: 1.1,
       } as never)));
     let reply = await run(messages);
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
       reply = await run([
         {
           role: "system",
-          content: `${buildCompanionSystemPrompt(input)}\n\nCRITICAL REWRITE: Start with the concrete subject of the user's last message. Do not start with empathy, agreement, acknowledgment, or any version of “I’m here/listening,” “I hear you,” or “that sounds.” Write an actual conversational reaction, not a supportive holding statement.${suppressQuestions ? " This reply must be a complete statement with no question and no question mark." : ""}`,
+          content: `/no_think\n${buildCompanionSystemPrompt(input)}\n\nCRITICAL REWRITE: Start with the concrete subject of the user's last message. Preserve every relevant person, fact, pronoun referent, and correction from recent turns even when the language changed. Use only the writing system requested for this turn. Do not start with empathy, agreement, acknowledgment, or any version of “I’m here/listening,” “I hear you,” or “that sounds.” Write an actual conversational reaction, not a supportive holding statement.${suppressQuestions ? " This reply must be a complete statement with no question and no question mark." : ""}`,
         },
         ...input.messages,
       ]);

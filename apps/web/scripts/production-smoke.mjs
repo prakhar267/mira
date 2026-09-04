@@ -98,6 +98,21 @@ await run("Hindi language switching", async () => {
   return reply;
 });
 
+await run("cross-language conversation continuity", async () => {
+  const reply = await chat([
+    { role: "user", content: "My sister Priya has an interview tomorrow and she is nervous." },
+    { role: "assistant", content: "Big day for Priya. Is she excited or mostly nervous?" },
+    { role: "user", content: "main uske liye kya kar sakta hoon?" },
+    { role: "assistant", content: "Uske saath normal raho. Ek simple good-luck text kaafi hai." },
+    { role: "user", content: "लेकिन उसे सलाह पसंद नहीं है।" },
+    { role: "assistant", content: "तो सलाह छोड़ दो। बस उसे बता दो कि तुम उसके साथ हो।" },
+    { role: "user", content: "Okay, what should I text her tonight?" },
+  ]);
+  expect(/(?:Priya|interview|tomorrow|good luck|you(?:'|’)ve got this)/i.test(reply), `reply lost the sister/interview context: ${reply}`);
+  expect(!/who (?:is|are)|which (?:person|one)|who do you mean/i.test(reply), `reply asked for known context: ${reply}`);
+  return reply;
+});
+
 await run("explicit memory recall", async () => {
   const reply = await chat([{ role: "user", content: "What do you remember about me?" }], ["QA likes masala chai", "QA works on companion apps"]);
   expect(/masala chai/i.test(reply), `saved memory was not recalled: ${reply}`);

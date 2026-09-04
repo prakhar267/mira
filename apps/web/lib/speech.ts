@@ -10,7 +10,8 @@ export const speechLanguageOptions: Array<{ value: SpeechLanguage; label: string
 ];
 
 const devanagari = /[\u0900-\u097f]/;
-const hinglishWords = /\b(?:aaj|accha|acha|arey|aur|bahut|bas|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|kya|kyun|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sach|samajh|theek|thik|thoda|tum|tumhara|yaar)\b/i;
+const arabicScript = /\p{Script=Arabic}/u;
+const hinglishWords = /\b(?:aaj|abhi|accha|acha|arey|aur|bahut|bas|batao|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karta|karti|kya|kyun|lekin|liye|main|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sakta|sakti|sach|samajh|theek|thik|thoda|tum|tumhara|uske|usko|yaar)\b/i;
 export interface RecognitionResultLike extends ArrayLike<{ transcript?: string; confidence?: number }> {
   isFinal?: boolean;
 }
@@ -27,7 +28,7 @@ export interface RecognitionTranscript {
 
 export function detectSpeechLanguage(text: string, requested: SpeechLanguage = "auto"): Exclude<SpeechLanguage, "auto"> {
   if (requested !== "auto") return requested;
-  if (devanagari.test(text)) return "hi";
+  if (devanagari.test(text) || arabicScript.test(text)) return "hi";
   if (hinglishWords.test(text)) return "hinglish";
   return "en";
 }

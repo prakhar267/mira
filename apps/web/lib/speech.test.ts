@@ -6,6 +6,8 @@ describe("companion speech", () => {
     expect(detectSpeechLanguage("That meeting was endless")).toBe("en");
     expect(detectSpeechLanguage("आज मेरा मन ठीक नहीं है")).toBe("hi");
     expect(detectSpeechLanguage("yaar aaj mood bilkul off hai")).toBe("hinglish");
+    expect(detectSpeechLanguage("main uske liye kya kar sakta hoon")).toBe("hinglish");
+    expect(detectSpeechLanguage("main اس کے لئے کیا کر سکتا ہوں")).toBe("hi");
   });
 
   it("starts automatic recognition in English and adapts after each turn", () => {

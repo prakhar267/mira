@@ -27,8 +27,12 @@ describe("edge companion prompting", () => {
     expect(detectCompanionLanguage("How are you today?")).toBe("en");
     expect(detectCompanionLanguage("आज तुम कैसी हो?" )).toBe("hi");
     expect(detectCompanionLanguage("yaar aaj kaafi busy tha")).toBe("hinglish");
+    expect(detectCompanionLanguage("main uske liye kya kar sakta hoon")).toBe("hinglish");
     expect(isInvalidCompanionReply("आज मैं अच्छी हूँ।", "How are you today?")).toBe(true);
     expect(isInvalidCompanionReply("I am good today.", "आज तुम कैसी हो?" )).toBe(true);
+    expect(isInvalidCompanionReply("तो फिर बस उसके साथ समय bitta karne ki koshish karo, movie dekhne jao.", "लेकिन उसे सलाह पसंद नहीं है।")).toBe(true);
+    expect(isInvalidCompanionReply("main اس کے لئے کیا کر سکتا ہوں", "main uske liye kya kar sakta hoon")).toBe(true);
+    expect(isInvalidCompanionReply("तो सलाह छोड़ दो। बस प्रिया को बता दो कि तुम उसके साथ हो, बिना लंबा भाषण दिए।", "लेकिन उसे सलाह पसंद नहीं है।")).toBe(false);
     expect(isInvalidCompanionReply("Haan, aaj mood kaafi accha hai.", "yaar tum kaisi ho?")).toBe(false);
   });
 

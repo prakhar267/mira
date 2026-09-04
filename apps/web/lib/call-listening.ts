@@ -126,13 +126,13 @@ export async function startCallListening(options: CallListeningOptions): Promise
     const now = performance.now();
 
     if (!heardSpeech) noiseFloor = noiseFloor * .985 + Math.min(level, .03) * .015;
-    const speechThreshold = Math.max(.022, noiseFloor * 2.7);
-    const silenceThreshold = Math.max(.014, noiseFloor * 1.65);
+    const speechThreshold = Math.max(.014, noiseFloor * 2.25);
+    const silenceThreshold = Math.max(.009, noiseFloor * 1.45);
 
     if (level >= speechThreshold) {
       voicedFrames += 1;
       quietSince = 0;
-      if (!heardSpeech && voicedFrames >= 3) {
+      if (!heardSpeech && voicedFrames >= 2) {
         heardSpeech = true;
         options.onSpeechStart?.();
       }
@@ -142,11 +142,11 @@ export async function startCallListening(options: CallListeningOptions): Promise
       else quietSince = 0;
     }
 
-    if ((heardSpeech && quietSince && now - quietSince >= 900) || now - startedAt >= 24_000) {
+    if ((heardSpeech && quietSince && now - quietSince >= 1_350) || now - startedAt >= 30_000) {
       stop();
       return;
     }
-    if (!heardSpeech && now - startedAt >= 10_000) {
+    if (!heardSpeech && now - startedAt >= 12_000) {
       stop();
       return;
     }
