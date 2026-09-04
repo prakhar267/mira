@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adaptiveRecognitionLocale, cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, mouthPoseForText, recognitionLocale, splitMultilingualSpeechSegments, splitSpeechSegments, synthesisLanguageCode } from "./speech";
+import { adaptiveRecognitionLocale, cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, mouthPoseForText, recognitionLocale, romanizeHindiForEnglishTts, splitMultilingualSpeechSegments, splitSpeechSegments, synthesisLanguageCode } from "./speech";
 
 describe("companion speech", () => {
   it("detects English, Hindi, and Roman-script Hinglish", () => {
@@ -22,6 +22,11 @@ describe("companion speech", () => {
     expect(synthesisLanguageCode("आज तुम कैसी हो?")).toBe("hi");
     expect(synthesisLanguageCode("yaar aaj tum bahut cute lag rahi ho")).toBe("auto");
     expect(synthesisLanguageCode("A number like 10,000", "hinglish")).toBe("auto");
+  });
+
+  it("romanizes visible Hindi for the single free Cloudflare voice", () => {
+    expect(romanizeHindiForEnglishTts("आज तुमसे बात करके अच्छा लगा।")).toBe("aaj tumase baat karake achchhaa lagaa.");
+    expect(romanizeHindiForEnglishTts("मैं ठीक हूँ।")).toBe("main theek hoon.");
   });
 
   it("maps nearby English and Devanagari vowels to stable mouth shapes", () => {
@@ -67,14 +72,14 @@ describe("companion speech", () => {
     ]);
   });
 
-  it("keeps Ara as the neural voice identity for every delivery style", () => {
-    expect(cloudSpeakerForVoice("mira-playful-01")).toBe("ara");
-    expect(cloudSpeakerForVoice("mira-natural-01")).toBe("ara");
-    expect(cloudSpeakerForVoice("mira-happy-01")).toBe("ara");
-    expect(cloudSpeakerForVoice("mira-tender-01")).toBe("ara");
-    expect(cloudSpeakerForVoice("mira-intimate-01")).toBe("ara");
-    expect(cloudSpeakerForVoice("mira-sad-01")).toBe("ara");
-    expect(cloudSpeakerForVoice("mira-angry-01")).toBe("ara");
-    expect(cloudSpeakerForVoice("unknown-voice")).toBe("ara");
+  it("keeps MeloTTS as the neural voice identity for every delivery style", () => {
+    expect(cloudSpeakerForVoice("mira-playful-01")).toBe("melotts");
+    expect(cloudSpeakerForVoice("mira-natural-01")).toBe("melotts");
+    expect(cloudSpeakerForVoice("mira-happy-01")).toBe("melotts");
+    expect(cloudSpeakerForVoice("mira-tender-01")).toBe("melotts");
+    expect(cloudSpeakerForVoice("mira-intimate-01")).toBe("melotts");
+    expect(cloudSpeakerForVoice("mira-sad-01")).toBe("melotts");
+    expect(cloudSpeakerForVoice("mira-angry-01")).toBe("melotts");
+    expect(cloudSpeakerForVoice("unknown-voice")).toBe("melotts");
   });
 });

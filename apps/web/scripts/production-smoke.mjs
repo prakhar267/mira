@@ -146,7 +146,7 @@ await run("voice upload validation", async () => {
   return "malformed/non-audio upload rejected";
 });
 
-const verifyAraSpeech = async (text, language, expectedLanguage) => {
+const verifyFreeCloudflareSpeech = async (text, language, expectedLanguage) => {
   const response = await fetch(`${baseUrl}/api/companion-speech`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -154,25 +154,25 @@ const verifyAraSpeech = async (text, language, expectedLanguage) => {
   });
   expect(response.ok, `speech returned ${response.status}`);
   expect(response.headers.get("content-type")?.includes("audio/"), "speech was not audio");
-  expect(response.headers.get("x-companion-voice-provider") === "xai-grok-tts", "Grok TTS provider was not used");
-  expect(response.headers.get("x-companion-voice-model") === "xai/grok-tts", "Grok TTS model header missing");
-  expect(response.headers.get("x-companion-voice") === "ara", "Ara voice was not used");
+  expect(response.headers.get("x-companion-voice-provider") === "cloudflare-melotts", "Cloudflare MeloTTS provider was not used");
+  expect(response.headers.get("x-companion-voice-model") === "@cf/myshell-ai/melotts", "MeloTTS model header missing");
+  expect(response.headers.get("x-companion-voice") === "melo-female", "Melo voice identity was not used");
   expect(response.headers.get("x-companion-language") === expectedLanguage, `expected ${expectedLanguage} language routing`);
   const bytes = (await response.arrayBuffer()).byteLength;
   expect(bytes > 1_000, `speech payload too small (${bytes} bytes)`);
-  return `xai-grok-tts/ara/${expectedLanguage}, ${bytes} bytes`;
+  return `cloudflare-melotts/melo-female/${expectedLanguage}, ${bytes} bytes`;
 };
 
-await run("English Ara neural voice", async () => {
-  return verifyAraSpeech("Hey, I am glad you called.", "auto", "en");
+await run("English free Cloudflare voice", async () => {
+  return verifyFreeCloudflareSpeech("Hey, I am glad you called.", "auto", "en");
 });
 
-await run("Hindi Ara neural voice", async () => {
-  return verifyAraSpeech("आज तुमसे बात करके अच्छा लगा।", "auto", "hi");
+await run("Hindi free Cloudflare voice", async () => {
+  return verifyFreeCloudflareSpeech("आज तुमसे बात करके अच्छा लगा।", "auto", "hi");
 });
 
-await run("Hinglish Ara neural voice", async () => {
-  return verifyAraSpeech("Yaar, aaj tumse baat karke accha laga.", "auto", "auto");
+await run("Hinglish free Cloudflare voice", async () => {
+  return verifyFreeCloudflareSpeech("Yaar, aaj tumse baat karke accha laga.", "auto", "hinglish");
 });
 
 await run("invalid login rejection", async () => {
