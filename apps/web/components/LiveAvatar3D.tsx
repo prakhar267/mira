@@ -91,9 +91,14 @@ export function LiveAvatar3D({
     let head: THREE.Object3D | null = null;
     let neck: THREE.Object3D | null = null;
     let spine: THREE.Object3D | null = null;
+    let leftEye: THREE.Object3D | null = null;
+    let rightEye: THREE.Object3D | null = null;
     let headBase: THREE.Euler | null = null;
     let neckBase: THREE.Euler | null = null;
     let spineBase: THREE.Euler | null = null;
+    let leftEyeBase: THREE.Euler | null = null;
+    let rightEyeBase: THREE.Euler | null = null;
+    let spineBaseY = 0;
     let pointerX = 0;
     let pointerY = 0;
     let modelLoaded = false;
@@ -165,9 +170,14 @@ export function LiveAvatar3D({
       head = humanoid.getNormalizedBoneNode("head");
       neck = humanoid.getNormalizedBoneNode("neck");
       spine = humanoid.getNormalizedBoneNode("upperChest") ?? humanoid.getNormalizedBoneNode("chest");
+      leftEye = humanoid.getNormalizedBoneNode("leftEye");
+      rightEye = humanoid.getNormalizedBoneNode("rightEye");
       headBase = head?.rotation.clone() ?? null;
       neckBase = neck?.rotation.clone() ?? null;
       spineBase = spine?.rotation.clone() ?? null;
+      spineBaseY = spine?.position.y ?? 0;
+      leftEyeBase = leftEye?.rotation.clone() ?? null;
+      rightEyeBase = rightEye?.rotation.clone() ?? null;
 
       // Some VRM 0 models define a bone-based look-at range that can turn the
       // irises completely away from the camera. Head and neck tracking below
@@ -190,8 +200,8 @@ export function LiveAvatar3D({
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       const compact = width < 720;
-      camera.fov = compact ? 31 : 28;
-      camera.position.set(0, compact ? 1.52 : 1.53, compact ? 1.14 : 1.04);
+      camera.fov = compact ? 32 : 30;
+      camera.position.set(0, compact ? 1.46 : 1.45, compact ? 1.58 : 1.43);
       camera.updateProjectionMatrix();
     };
     const resizeObserver = new ResizeObserver(resize);
@@ -235,6 +245,8 @@ export function LiveAvatar3D({
 
         const movement = reducedMotion ? 0 : state.speaking ? 1 : .42;
         if (spine && spineBase) {
+          const breath = Math.sin(elapsed * 1.08) * .0045;
+          spine.position.y = THREE.MathUtils.lerp(spine.position.y, spineBaseY + breath, .055);
           spine.rotation.x = spineBase.x + Math.sin(elapsed * 1.25) * .009 * movement;
           spine.rotation.z = spineBase.z + Math.sin(elapsed * .48) * .008;
         }
@@ -243,9 +255,20 @@ export function LiveAvatar3D({
           neck.rotation.x = THREE.MathUtils.lerp(neck.rotation.x, neckBase.x + pointerY * .025 + Math.sin(elapsed * .53) * .007, .035);
         }
         if (head && headBase) {
-          const nod = state.speaking ? Math.sin(elapsed * 2.05) * .016 : Math.sin(elapsed * .47) * .006;
-          head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, headBase.x + nod, .04);
+          const conversationalNod = state.speaking
+            ? Math.sin(elapsed * 2.05) * .016
+            : state.listening ? Math.max(0, Math.sin(elapsed * .72)) * .009 : Math.sin(elapsed * .47) * .006;
+          const thinkingTurn = state.thinking ? .045 : 0;
+          head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, headBase.x + conversationalNod, .04);
+          head.rotation.y = THREE.MathUtils.lerp(head.rotation.y, headBase.y + thinkingTurn + pointerX * -.022, .032);
           head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, headBase.z + Math.sin(elapsed * .27) * .012, .035);
+        }
+        const eyeSaccadeX = reducedMotion ? 0 : Math.sin(elapsed * .83) * .012 + Math.sin(elapsed * 2.17) * .004;
+        const eyeSaccadeY = reducedMotion ? 0 : Math.sin(elapsed * .57) * .006;
+        for (const [eye, base] of [[leftEye, leftEyeBase], [rightEye, rightEyeBase]] as const) {
+          if (!eye || !base) continue;
+          eye.rotation.y = THREE.MathUtils.lerp(eye.rotation.y, base.y + pointerX * -.035 + eyeSaccadeX + (state.thinking ? .025 : 0), .08);
+          eye.rotation.x = THREE.MathUtils.lerp(eye.rotation.x, base.x + pointerY * .018 + eyeSaccadeY, .08);
         }
 
         // The current VRM 1 avatar has a stable standards-compliant spring rig.
@@ -254,7 +277,7 @@ export function LiveAvatar3D({
         vrm.update(delta);
       }
 
-      camera.lookAt(pointerX * -.012, 1.53 + pointerY * -.008, 0);
+      camera.lookAt(pointerX * -.012, 1.45 + pointerY * -.008, 0);
       renderer.render(scene, camera);
       if (modelLoaded && stableFrames < 12) {
         stableFrames += 1;

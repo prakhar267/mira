@@ -16,6 +16,7 @@ import type {
   WalletTransactionRecord,
 } from "@companion/shared";
 import type { EdgeCompanionRequest } from "@/lib/companion-prompt";
+import type { SemanticMemoryMatch } from "@/lib/semantic-memory";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://127.0.0.1:4000";
 const TOKEN_KEY = "luma.production-session.v1";
@@ -109,6 +110,32 @@ export const companionApi = {
     const body = await response.json().catch(() => null) as { reply?: string; error?: string } | null;
     if (!response.ok || !body?.reply) throw new Error(body?.error ?? "Mira could not respond just now.");
     return body.reply;
+  },
+
+  async semanticMemories(query: string, memories: MemoryRecord[], limit = 8) {
+    const response = await fetch("/api/companion-memory", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        query,
+        limit,
+        memories: memories.map(({ id, content, importance, pinned, updatedAt, retrievalCount }) => ({ id, content, importance, pinned, updatedAt, retrievalCount })),
+      }),
+    });
+    const body = await response.json().catch(() => null) as { matches?: SemanticMemoryMatch[]; model?: string; error?: string } | null;
+    if (!response.ok || !Array.isArray(body?.matches)) throw new Error(body?.error ?? "Memory retrieval is unavailable.");
+    return { matches: body.matches, model: body.model ?? "unknown" };
+  },
+
+  async edgeTranscribe(audioBase64: string, contentType: string) {
+    const response = await fetch("/api/companion-transcribe", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ audioBase64, contentType }),
+    });
+    const body = await response.json().catch(() => null) as { text?: string; language?: string; error?: string } | null;
+    if (!response.ok || !body?.text) throw new Error(body?.error ?? "The voice note could not be transcribed.");
+    return { text: body.text, durationMs: 0 };
   },
 
   async signup(input: SignupInput) {

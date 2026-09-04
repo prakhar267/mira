@@ -19,6 +19,8 @@ const enhancedNames = /enhanced|natural|neural|online|premium/i;
 const noveltyOrMaleNames = /albert|\baman\b|daniel|eddy|fred|reed|rishi/i;
 const companionFallbackNames = [/^tara\b/i, /^samantha\b/i, /^karen\b/i, /^tessa\b/i, /^moira\b/i, /^flo\b/i, /^shelley\b/i, /^sandy\b/i, /google.*english.*female/i];
 
+let lockedCompanionVoice = "";
+
 export interface RecognitionResultLike extends ArrayLike<{ transcript?: string; confidence?: number }> {
   isFinal?: boolean;
 }
@@ -133,7 +135,10 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
   language: SpeechLanguage = "auto",
 ) {
   void _voiceId;
-  const requestedLanguage = detectSpeechLanguage(text, language);
+  void text;
+  void language;
+  const locked = voices.find((voice) => `${voice.name}\u0000${voice.lang}` === lockedCompanionVoice);
+  if (locked) return locked;
   return [...voices].sort((left, right) => {
     const score = (voice: T) => {
       const locale = voice.lang.replace("_", "-").toLowerCase();
@@ -146,12 +151,10 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
       const fallbackScore = fallbackRank >= 0 ? 180 - fallbackRank * 12 : 0;
 
       if (blockedVoiceNames.test(voice.name)) return -100_000;
-      return (requestedLanguage === "hi" && isHindi && namedHindiFemale ? 6_000 : 0)
-        + (requestedLanguage === "hi" && isHindi ? 3_000 : 0)
-        + (requestedLanguage === "hinglish" && isIndianEnglish && namedIndianFemale ? 5_000 : 0)
-        + (requestedLanguage === "hinglish" && isHindi && namedHindiFemale ? 3_500 : 0)
-        + (requestedLanguage === "en" && isIndianEnglish && namedIndianFemale ? 2_000 : 0)
-        + (isIndianEnglish && namedIndianFemale ? 1_250 : 0)
+      return (isHindi && namedHindiFemale ? 7_000 : 0)
+        + (isIndianEnglish && namedIndianFemale ? 5_500 : 0)
+        + (isHindi ? 2_000 : 0)
+        + (isIndianEnglish ? 1_250 : 0)
         + (namedEnglishFemale ? 800 : 0)
         + fallbackScore
         + (enhancedNames.test(voice.name) ? 100 : 0)
@@ -160,7 +163,20 @@ export function selectPreferredVoice<T extends { name: string; lang: string; def
         - (noveltyOrMaleNames.test(voice.name) ? 2_400 : 0);
     };
     return score(right) - score(left);
+  }).map((voice, index) => {
+    if (index === 0) lockedCompanionVoice = `${voice.name}\u0000${voice.lang}`;
+    return voice;
   })[0];
+}
+
+export function mouthPoseForText(text: string, charIndex: number): 0 | 1 | 2 | 3 {
+  const sample = text.slice(Math.max(0, charIndex), Math.max(0, charIndex) + 8).toLowerCase();
+  if (!sample.trim()) return 0;
+  const firstVowel = sample.match(/[aeiouअआइईउऊएऐओऔािीुूेैोौ]/u)?.[0] ?? "";
+  if (/[ouउऊओऔुूोौ]/u.test(firstVowel)) return 3;
+  if (/[aअआा]/u.test(firstVowel)) return 2;
+  if (/[eiइईएऐिीेै]/u.test(firstVowel)) return 1;
+  return charIndex % 3 === 0 ? 2 : 1;
 }
 
 function voiceProfile(voiceId: string) {
@@ -330,7 +346,11 @@ export function playCompanionSpeech(text: string, options: {
     notifyStart();
   };
 
-  void playNeuralVoice().catch(() => {
+  // A single OS voice is deliberately preferred for every language. This keeps
+  // the companion's identity stable when a sentence switches between English,
+  // Hindi and Hinglish. The edge neural voice remains the device fallback.
+  if ("speechSynthesis" in window) queueBrowserFallback();
+  else void playNeuralVoice().catch(() => {
     if (!canceled && !finished) queueBrowserFallback();
   });
 

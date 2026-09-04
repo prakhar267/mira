@@ -45,7 +45,7 @@ function base64UrlToBytes(value: string) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-async function sha256(value: string) {
+export async function sha256(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return bytesToBase64Url(new Uint8Array(digest));
 }
@@ -198,7 +198,12 @@ export async function writeState(userId: string, state: unknown) {
   if (!state || typeof state !== "object" || Array.isArray(state)) throw new AccountError("Companion state is invalid.");
   const encoded = JSON.stringify(state);
   if (new TextEncoder().encode(encoded).byteLength > 2_000_000) throw new AccountError("Your account data is too large to sync. Remove large photo uploads and try again.", 413);
-  await (await store()).put(`state:${userId}`, encoded);
+  const kv = await store();
+  const backupDate = new Date().toISOString().slice(0, 10);
+  await Promise.all([
+    kv.put(`state:${userId}`, encoded),
+    kv.put(`backup:${userId}:${backupDate}`, encoded, { expirationTtl: 60 * 60 * 24 * 30 }),
+  ]);
   await stateCache().put(stateCacheRequest(userId), new Response(encoded, { headers: { "cache-control": "max-age=600", "content-type": "application/json" } }));
 }
 
@@ -208,12 +213,20 @@ export async function revokeSession(tokenHash: string) {
 
 export async function deleteAccount(account: AccountRecord, tokenHash: string) {
   const kv = await store();
+  const backupKeys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await kv.list({ prefix: `backup:${account.id}:`, ...(cursor ? { cursor } : {}) });
+    backupKeys.push(...page.keys.map((key) => key.name));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
   await Promise.all([
     kv.delete(`session:${tokenHash}`),
     kv.delete(`state:${account.id}`),
     kv.delete(`email:${account.emailKey}`),
     kv.delete(`account:${account.id}`),
     stateCache().delete(stateCacheRequest(account.id)),
+    ...backupKeys.map((key) => kv.delete(key)),
   ]);
 }
 

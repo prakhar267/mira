@@ -1,8 +1,8 @@
 import { buildCompanionSystemPrompt, buildMemoryRecallReply, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, type EdgeCompanionRequest } from "@/lib/companion-prompt";
+import { assessSafety } from "@companion/ai";
+import { assertEdgeSameOrigin, containsDisallowedAbuse, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-const windowMs = 60_000;
-const requestWindows = new Map<string, { count: number; startedAt: number }>();
 
 function readModelText(result: unknown) {
   if (typeof result === "string") return result;
@@ -58,26 +58,20 @@ function parseRequest(value: unknown): EdgeCompanionRequest | null {
   };
 }
 
-function rateLimited(request: Request) {
-  const key = request.headers.get("cf-connecting-ip") ?? "local";
-  const now = Date.now();
-  const current = requestWindows.get(key);
-  if (!current || now - current.startedAt >= windowMs) {
-    requestWindows.set(key, { count: 1, startedAt: now });
-    return false;
-  }
-  current.count += 1;
-  return current.count > 24;
-}
-
 export async function POST(request: Request) {
-  if (rateLimited(request)) return Response.json({ error: "Please give Mira a moment before sending more." }, { status: 429 });
-  const input = parseRequest(await request.json().catch(() => null));
-  if (!input) return Response.json({ error: "Invalid conversation request." }, { status: 400 });
-  const latestUserMessage = input.messages.at(-1)?.content ?? "";
-  if (isMemoryRecallRequest(latestUserMessage)) return Response.json({ reply: buildMemoryRecallReply(input), model: "memory" });
-
+  const startedAt = Date.now();
+  const requestId = crypto.randomUUID();
+  const respond = (body: unknown, status = 200, details: Record<string, unknown> = {}) => edgeJson(requestId, "companion-chat", startedAt, body, status, details);
   try {
+    assertEdgeSameOrigin(request);
+    if (await edgeRateLimited(request, "companion-chat", 24)) return respond({ error: "Please give Mira a moment before sending more." }, 429, { limited: true });
+    const input = parseRequest(await readEdgeJson(request, 55_000));
+    if (!input) return respond({ error: "Invalid conversation request." }, 400);
+    const latestUserMessage = input.messages.at(-1)?.content ?? "";
+    const safety = assessSafety(latestUserMessage);
+    if (safety.level !== "safe" && safety.response) return respond({ reply: safety.response, model: "safety" }, 200, { guard: safety.category });
+    if (containsDisallowedAbuse(latestUserMessage)) return respond({ reply: "I can’t help sexualize minors, remove consent, or facilitate exploitation. We can keep this between consenting adults and talk about something safe instead.", model: "safety" }, 200, { guard: "exploitation" });
+    if (isMemoryRecallRequest(latestUserMessage)) return respond({ reply: buildMemoryRecallReply(input), model: "memory" }, 200, { model: "memory" });
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
     const messages = [
@@ -101,10 +95,11 @@ export async function POST(request: Request) {
         ...input.messages,
       ]);
     }
-    if (isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions)) return Response.json({ error: "The generated reply missed the conversation style." }, { status: 503 });
-    return Response.json({ reply, model: MODEL });
+    if (isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions)) return respond({ error: "The generated reply missed the conversation style." }, 503, { model: MODEL });
+    return respond({ reply, model: MODEL }, 200, { model: MODEL, delivery: input.delivery ?? "text" });
   } catch (error) {
     console.error("Companion inference failed", error instanceof Error ? error.message : "unknown error");
-    return Response.json({ error: "Mira could not form a fresh reply just now." }, { status: 503 });
+    if (error instanceof EdgeRequestError) return edgeError(requestId, "companion-chat", startedAt, error);
+    return respond({ error: "Mira could not form a fresh reply just now." }, 503, { model: MODEL });
   }
 }

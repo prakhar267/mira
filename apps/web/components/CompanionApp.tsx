@@ -439,6 +439,28 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   const generateDemoReply = async (messages: ChatMessage[], delivery: "text" | "voice" | "video", fallback: CompanionTurn) => {
     if (fallback.adaptations.includes("safety-support")) return fallback.text;
     try {
+      const latestUserText = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+      const lexicalMemories = state.memoryEnabled ? relevantMemoryContents(activeMemories, messages) : [];
+      let recalledMemories = lexicalMemories;
+      if (state.memoryEnabled && latestUserText && activeMemories.length) {
+        const semantic = await optional(companionApi.semanticMemories(latestUserText, activeMemories), { matches: [], model: "fallback" });
+        const byId = new Map(activeMemories.map((memory) => [memory.id, memory]));
+        const semanticMemories = semantic.matches.flatMap((match) => {
+          const memory = byId.get(match.id);
+          return memory ? [memory] : [];
+        });
+        recalledMemories = [...new Set([...semanticMemories.map((memory) => memory.content), ...lexicalMemories])].slice(0, 10);
+        if (semanticMemories.length) {
+          const retrievedIds = new Set(semanticMemories.map((memory) => memory.id));
+          const retrievedAt = new Date().toISOString();
+          setState((current) => ({
+            ...current,
+            memories: current.memories.map((memory) => retrievedIds.has(memory.id)
+              ? { ...memory, lastRetrievedAt: retrievedAt, retrievalCount: memory.retrievalCount + 1 }
+              : memory),
+          }));
+        }
+      }
       return await companionApi.demoReply({
         messages: messagesForConversation(messages, state.activeConversationId)
           .filter((message) => message.role === "user" || message.role === "assistant")
@@ -447,7 +469,7 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
         companion: { name: state.companion.name, backstory: state.companionBackstory, personality: { ...state.companion.personality } },
         user: { name: state.user.name },
         relationshipMode: state.companion.relationshipMode,
-        memories: state.memoryEnabled ? relevantMemoryContents(activeMemories, messages) : [],
+        memories: recalledMemories,
         responsePreferences: state.responsePreferences,
         delivery,
       });
@@ -572,7 +594,9 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   const sendVoiceRecording = async (audioBase64: string, contentType: string) => {
     if (!processingAllowed()) return;
     if (!featureEntitlements.has(state.subscription.planId, "voiceNotes")) { setPlansOpen(true); return; }
-    const transcription = await companionApi.transcribe(audioBase64, contentType);
+    const transcription = liveMode
+      ? await companionApi.transcribe(audioBase64, contentType)
+      : await companionApi.edgeTranscribe(audioBase64, contentType);
     if (!transcription.text.trim()) throw new Error("I couldn’t hear words in that voice note.");
     await sendMessage(transcription.text);
   };
@@ -909,7 +933,7 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   const renderView = () => {
     switch (state.currentView) {
       case "home": return <HomeView state={state} onChat={() => navigate("chat")} onCall={openVoiceCall} onVideoCall={openVideoCall} onMoments={() => openMoments("moments")} onMemory={() => navigate("memory")} onCompanion={() => navigate("companion")} onSpendTime={() => openMoments("together")} onEnvironmentChange={(activeEnvironment) => setState((current) => ({ ...current, activeEnvironment }))} onAmbienceChange={() => setState((current) => ({ ...current, ambienceEnabled: !current.ambienceEnabled }))} />;
-      case "chat": return <ChatView state={state} streaming={streaming} processingEnabled={state.aiProcessingConsent} liveMode={cloudBacked} onSend={sendMessage} onNewConversation={() => runAction(newConversation(), "A new conversation could not be started.")} onDeleteConversation={deleteConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} {...(liveMode ? { onVoiceRecording: sendVoiceRecording } : {})} onSpeak={(content: string) => speakWithProvider(content).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Speech playback failed."))} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={(messageId) => runAction(regenerateResponse(messageId), "The response could not be regenerated.")} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!processingAllowed()) return; if (!featureEntitlements.has(state.subscription.planId, "cameraConversation")) setPlansOpen(true); else setCameraOpen(true); }} />;
+      case "chat": return <ChatView state={state} streaming={streaming} processingEnabled={state.aiProcessingConsent} liveMode={cloudBacked} onSend={sendMessage} onNewConversation={() => runAction(newConversation(), "A new conversation could not be started.")} onDeleteConversation={deleteConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} {...(cloudBacked ? { onVoiceRecording: sendVoiceRecording } : {})} onSpeak={(content: string) => speakWithProvider(content).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Speech playback failed."))} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={(messageId) => runAction(regenerateResponse(messageId), "The response could not be regenerated.")} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!processingAllowed()) return; if (!featureEntitlements.has(state.subscription.planId, "cameraConversation")) setPlansOpen(true); else setCameraOpen(true); }} />;
       case "moments": return <MomentsView key={momentsTab} defaultTab={momentsTab} state={state} liveMode={cloudBacked} onCompleteActivity={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onStartDate={startDate} onGenerateSelfie={addSelfie} onVideoCall={openVideoCall} />;
       case "companion": return <CompanionView companion={state.companion} backstory={state.companionBackstory} storeItems={state.storeItems} ownedItems={state.ownedItems} wallet={state.wallet} subscription={state.subscription} onChange={changeCompanion} onBackstoryChange={(companionBackstory) => setState((current) => ({ ...current, companionBackstory }))} onPurchase={purchaseItem} onEquip={equipItem} onUpgrade={() => setPlansOpen(true)} />;
       case "memory": return <MemoryView memories={state.memories} enabled={state.memoryEnabled} companionName={state.companion.name} onToggle={() => setState((current) => ({ ...current, memoryEnabled: !current.memoryEnabled }))} onUpdate={(memory) => runAction(updateMemory(memory), "The memory could not be updated.")} onDelete={(memoryId) => runAction(deleteMemory(memoryId), "The memory could not be deleted.")} onAdd={(content, type) => runAction(addMemory(content, type), "The memory could not be added.")} />;

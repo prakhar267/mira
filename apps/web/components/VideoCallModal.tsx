@@ -20,6 +20,7 @@ import { LiveAvatar3D, type AvatarMouthPose } from "@/components/LiveAvatar3D";
 import {
   collectRecognitionTranscript,
   detectSpeechLanguage,
+  mouthPoseForText,
   playCompanionSpeech,
   recognitionLocale,
   speechLanguageOptions,
@@ -27,6 +28,7 @@ import {
   type SpeechLanguage,
 } from "@/lib/speech";
 import { companionVoiceMode, companionVoiceModes } from "@/lib/voice-profiles";
+import { startVoiceActivityMonitor } from "@/lib/voice-activity";
 
 const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
 
@@ -97,6 +99,7 @@ export function VideoCallModal({
   const [language, setLanguage] = useState<SpeechLanguage>("auto");
   const [activeVoiceId, setActiveVoiceId] = useState(voiceId);
   const [transport, setTransport] = useState<"connecting" | "realtime" | "fallback">(onRealtimeConnect ? "connecting" : "fallback");
+  const [bargeInReady, setBargeInReady] = useState(false);
   const realtimeRef = useRef<{ peer: RTCPeerConnection; events: RTCDataChannel; audio: HTMLAudioElement; disconnect(): void } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -117,6 +120,7 @@ export function VideoCallModal({
   const mouthSequenceRef = useRef(0);
   const ignoredRecognitionsRef = useRef(new WeakSet<VideoSpeechRecognition>());
   const adaptiveLocaleRef = useRef("en-IN");
+  const interruptRef = useRef<() => void>(() => undefined);
 
   useEffect(() => { onTranscribedTurnRef.current = onTranscribedTurn; }, [onTranscribedTurn]);
   useEffect(() => { setActiveVoiceId(companionVoiceMode(voiceId).id); }, [voiceId]);
@@ -189,9 +193,7 @@ export function VideoCallModal({
       onBoundary: ({ charIndex }) => {
         if (speechTurn.current !== turn) return;
         lastMouthBoundaryRef.current = performance.now();
-        const poses = [1, 2, 1, 3, 2, 1] as const;
-        mouthSequenceRef.current = (mouthSequenceRef.current + 1 + (charIndex % 2)) % poses.length;
-        setMouthPose(poses[mouthSequenceRef.current]!);
+        setMouthPose(mouthPoseForText(text, charIndex));
       },
       onEnd: () => {
         if (speechTurn.current !== turn || !activeRef.current) return;
@@ -245,6 +247,27 @@ export function VideoCallModal({
       if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
     };
   }, [stopRecognition]);
+
+  useEffect(() => {
+    if (transport !== "fallback") return;
+    let disposed = false;
+    let monitor: Awaited<ReturnType<typeof startVoiceActivityMonitor>> | null = null;
+    void startVoiceActivityMonitor({
+      shouldDetect: () => activeRef.current && !mutedRef.current && speakingRef.current,
+      onSpeech: () => interruptRef.current(),
+    }).then((created) => {
+      if (disposed) created.stop();
+      else {
+        monitor = created;
+        setBargeInReady(true);
+      }
+    }).catch(() => setBargeInReady(false));
+    return () => {
+      disposed = true;
+      monitor?.stop();
+      setBargeInReady(false);
+    };
+  }, [transport]);
 
   useEffect(() => {
     let blinkTimer = 0;
@@ -338,7 +361,7 @@ export function VideoCallModal({
     }
   };
 
-  const submitContent = async (content: string) => {
+  const submitContent = useCallback(async (content: string) => {
     const clean = content.trim();
     if (!clean || thinkingRef.current) return;
     setUserLine(clean);
@@ -362,9 +385,9 @@ export function VideoCallModal({
     } finally {
       changeThinking(false);
     }
-  };
+  }, [changeThinking, onUserTurn, speak, transport]);
 
-  const beginListening = () => {
+  const beginListening = useCallback(() => {
     if (listenTimerRef.current) {
       window.clearTimeout(listenTimerRef.current);
       listenTimerRef.current = null;
@@ -449,8 +472,19 @@ export function VideoCallModal({
       setSpeechError("The microphone is already busy. I’ll retry in a moment.");
       queueAutoListen(900);
     }
-  };
-  useEffect(() => { startListeningRef.current = beginListening; });
+  }, [changeSpeaking, language, queueAutoListen, submitContent, transport]);
+  useEffect(() => { startListeningRef.current = beginListening; }, [beginListening]);
+
+  const interrupt = useCallback(() => {
+    if (mutedRef.current || thinkingRef.current) return;
+    speechTurn.current += 1;
+    playbackRef.current?.cancel();
+    if (realtimeRef.current?.events.readyState === "open") realtimeRef.current.events.send(JSON.stringify({ type: "response.cancel" }));
+    changeSpeaking(false);
+    setListening(true);
+    window.setTimeout(beginListening, 160);
+  }, [beginListening, changeSpeaking]);
+  useEffect(() => { interruptRef.current = interrupt; }, [interrupt]);
 
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
@@ -489,7 +523,7 @@ export function VideoCallModal({
       {activityOpen ? <div className="call-activity-menu">{callActivities.map((item) => <button type="button" key={item} onClick={() => { setActivity(item); setActivityOpen(false); }}>{item}</button>)}</div> : null}
       {activity ? <div className="call-activity-card"><span>Playing together</span><strong>{activity}</strong><p>{activity === "Would you rather" ? "Sunrise coffee or a midnight city walk? Tell me why." : "Take turns. There are no perfect answers."}</p><button type="button" onClick={() => setActivity("")}>Close card</button></div> : null}
 
-      <button type="button" className="barge-in" onClick={beginListening} disabled={muted || thinking}><Waveform aria-hidden="true" /> {thinking ? "Thinking…" : speaking ? "Speak now to interrupt" : listening ? "Listening automatically" : "Start hands-free listening"}</button>
+      <button type="button" className="barge-in" onClick={speaking ? interrupt : beginListening} disabled={muted || thinking}><Waveform aria-hidden="true" /> {thinking ? "Thinking…" : speaking ? bargeInReady ? "Just speak · auto-interrupt is on" : "Speak now to interrupt" : listening ? "Listening automatically" : "Start hands-free listening"}</button>
       {speechError ? <p className="call-speech-error" role="status">{speechError}</p> : null}
       {cameraError ? <p className="camera-error" role="status">{cameraError}</p> : null}
       {captions ? <div className="video-call__captions" aria-live="polite">{userLine ? <p><span>You</span>{userLine}</p> : null}<p><span>{companionName}</span>{thinking ? "…" : companionLine}</p></div> : null}
@@ -503,7 +537,7 @@ export function VideoCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End video call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.4, y: -110 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening pauses while {companionName} speaks · camera stays local until Show frame · Companaro does not save a call recording · {transport === "realtime" ? "secure multilingual audio connected" : transport === "connecting" ? "connecting secure audio…" : "English · हिन्दी · Hinglish"}</small>
+      <small className="live-call__disclosure">{bargeInReady ? "Automatic interruption is on" : "Hands-free listening resumes after speech"} · one companion voice across English, हिन्दी and Hinglish · camera stays local until Show frame · no call recording is saved</small>
     </motion.div>
   );
 }

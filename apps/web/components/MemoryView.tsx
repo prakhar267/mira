@@ -52,7 +52,7 @@ export function MemoryView({ memories, enabled, companionName, onToggle, onUpdat
         {enabled ? visible.map((memory) => (
           <article key={memory.id} className="memory-row">
             <div className={`memory-type memory-type--${memory.type}`}><Sparkles aria-hidden="true" /></div>
-            <div className="memory-row__content"><span>{memory.type.replace("episodic", "important event")}</span><p>{memory.content}</p><small>Source: conversation · {Math.round(memory.confidence * 100)}% confidence</small></div>
+            <div className="memory-row__content"><span>{memory.type.replace("episodic", "important event")}</span><p>{memory.content}</p><small>Source: conversation · {Math.round(memory.confidence * 100)}% confidence{memory.lastRetrievedAt ? ` · recalled ${memory.retrievalCount} ${memory.retrievalCount === 1 ? "time" : "times"}` : " · not recalled yet"}</small></div>
             <div className="memory-row__actions">
               <button type="button" className={memory.pinned ? "icon-button icon-button--active" : "icon-button"} aria-label={memory.pinned ? "Unpin memory" : "Pin memory"} onClick={() => onUpdate({ ...memory, pinned: !memory.pinned, updatedAt: new Date().toISOString() })}><Bookmark aria-hidden="true" /></button>
               <button type="button" className="icon-button" aria-label="Edit memory" onClick={() => { setEditing(memory); setDraft(memory.content); }}><Edit3 aria-hidden="true" /></button>

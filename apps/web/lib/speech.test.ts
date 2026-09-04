@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, recognitionLocale, selectPreferredVoice, splitMultilingualSpeechSegments, splitSpeechSegments, synthesisLanguageCode } from "./speech";
+import { cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, mouthPoseForText, recognitionLocale, selectPreferredVoice, splitMultilingualSpeechSegments, splitSpeechSegments, synthesisLanguageCode } from "./speech";
 
 describe("companion speech", () => {
   it("detects English, Hindi, and Roman-script Hinglish", () => {
@@ -29,7 +29,7 @@ describe("companion speech", () => {
     expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01")?.name).toBe("Google हिन्दी Female");
   });
 
-  it("uses the best available feminine fallback for each supported language", () => {
+  it("locks one feminine Hindi-capable identity across every supported language", () => {
     const voices = [
       { name: "Samantha", lang: "en-US", default: true },
       { name: "Tessa", lang: "en-ZA", default: false },
@@ -41,12 +41,18 @@ describe("companion speech", () => {
       { name: "Google हिन्दी Female", lang: "hi-IN", default: false },
     ];
 
-    expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Tara");
-    expect(selectPreferredVoice(voices, "Stay close to me", "mira-intimate-01", "en")?.name).toBe("Tara");
-    expect(selectPreferredVoice(voices, "Be direct with me", "mira-angry-01", "en")?.name).toBe("Tara");
-    expect(selectPreferredVoice(voices, "I need some confidence", "mira-happy-01", "en")?.name).toBe("Tara");
-    expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-natural-01", "hinglish")?.name).toBe("Tara");
+    expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Google हिन्दी Female");
+    expect(selectPreferredVoice(voices, "Stay close to me", "mira-intimate-01", "en")?.name).toBe("Google हिन्दी Female");
+    expect(selectPreferredVoice(voices, "Be direct with me", "mira-angry-01", "en")?.name).toBe("Google हिन्दी Female");
+    expect(selectPreferredVoice(voices, "I need some confidence", "mira-happy-01", "en")?.name).toBe("Google हिन्दी Female");
+    expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-natural-01", "hinglish")?.name).toBe("Google हिन्दी Female");
     expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-natural-01", "hi")?.name).toBe("Google हिन्दी Female");
+  });
+
+  it("maps nearby English and Devanagari vowels to stable mouth shapes", () => {
+    expect(mouthPoseForText("open", 0)).toBe(3);
+    expect(mouthPoseForText("aaj", 0)).toBe(2);
+    expect(mouthPoseForText("ईमान", 0)).toBe(1);
   });
 
   it("accumulates final and interim recognition segments without repeating earlier words", () => {

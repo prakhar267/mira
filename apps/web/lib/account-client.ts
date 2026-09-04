@@ -18,6 +18,6 @@ export const accountClient = {
   load: () => accountRequest<{ account: { id: string; email: string; name: string }; state: DemoState }>("state"),
   save: (state: DemoState) => accountRequest<{ saved: true }>("state", { method: "PUT", body: JSON.stringify({ state }) }),
   logout: () => accountRequest<{ signedOut: true }>("logout", { method: "POST" }),
-  exportData: () => accountRequest<{ exportedAt: string; account: { id: string; email: string; name: string; createdAt: string }; state: DemoState }>("export"),
+  exportData: () => accountRequest<{ schemaVersion: number; exportedAt: string; checksum: string; backupPolicy: { rolling: boolean; retentionDays: number }; account: { id: string; email: string; name: string; createdAt: string }; state: DemoState }>("export"),
   deleteAccount: () => accountRequest<{ deleted: true }>("delete", { method: "DELETE" }),
 };
