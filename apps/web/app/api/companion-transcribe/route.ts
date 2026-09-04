@@ -1,15 +1,7 @@
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
-import { detectSpeechLanguage, romanizeHindiForEnglishTts, type SpeechLanguage } from "@/lib/speech";
+import { detectSpeechLanguage, looksLikeCodeMixedDevanagari, romanizeHindiForEnglishTts, type SpeechLanguage } from "@/lib/speech";
 
-const MODEL = "@cf/deepgram/nova-3";
-const FALLBACK_MODEL = "@cf/openai/whisper-large-v3-turbo";
-
-function decodedAudio(value: string) {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
-}
+const MODEL = "@cf/openai/whisper-large-v3-turbo";
 
 function transcriptionResult(result: unknown) {
   if (!result || typeof result !== "object") return { text: "", language: "" };
@@ -55,51 +47,35 @@ export async function POST(request: Request) {
     }
     const language = body?.language === "en" || body?.language === "hi" || body?.language === "hinglish" ? body.language as SpeechLanguage : "auto";
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const runWhisper = (forcedLanguage = language) => env.AI.run(FALLBACK_MODEL as never, {
+    const runWhisper = (forcedLanguage = language) => env.AI.run(MODEL as never, {
       audio: audioBase64,
       task: "transcribe",
       vad_filter: true,
       condition_on_previous_text: false,
       no_speech_threshold: .65,
-      initial_prompt: "Natural one-person conversation. The speaker may switch between English, Hindi, and Roman-script Hinglish. Preserve names and the language actually spoken.",
-      ...(forcedLanguage === "en" ? { language: "en" } : forcedLanguage === "hi" ? { language: "hi" } : {}),
+      initial_prompt: forcedLanguage === "hi"
+        ? "स्वाभाविक हिन्दी बातचीत। नाम और अंग्रेज़ी के शब्दों की सही वर्तनी बनाए रखें।"
+        : "Natural Indian conversation. The speaker may switch between English and Hindi. For Hinglish or mixed Hindi-English, write the entire transcript in Roman letters and keep English words spelled in English. Preserve names.",
+      ...(forcedLanguage === "en" || forcedLanguage === "hinglish" ? { language: "en" } : forcedLanguage === "hi" ? { language: "hi" } : {}),
     } as never);
-    let result: unknown;
-    let model = MODEL;
-    try {
-      result = await env.AI.run(MODEL as never, {
-        audio: { body: decodedAudio(audioBase64), contentType },
-        language: language === "en" ? "en-IN" : language === "hi" ? "hi" : "multi",
-        detect_language: true,
-        smart_format: true,
-        punctuate: true,
-        filler_words: false,
-        mip_opt_out: true,
-      } as never);
-    } catch (error) {
-      console.warn("Nova-3 transcription failed; using Whisper fallback", error instanceof Error ? error.message : "unknown");
-      model = FALLBACK_MODEL;
-      result = await runWhisper();
-    }
-    let transcription = transcriptionResult(result);
-    if (!transcription.text && model === MODEL) {
-      model = FALLBACK_MODEL;
-      transcription = transcriptionResult(await runWhisper());
-    }
+    let transcription = transcriptionResult(await runWhisper());
     let normalizationLanguage = language;
+    if (language === "auto" && looksLikeCodeMixedDevanagari(transcription.text)) {
+      transcription = transcriptionResult(await runWhisper("hinglish"));
+      normalizationLanguage = "hinglish";
+    }
     if (/\p{Script=Arabic}/u.test(transcription.text)) {
       const wasCodeMixed = /[a-z]{2,}/i.test(transcription.text);
       transcription = transcriptionResult(await runWhisper(language === "en" ? "en" : "hi"));
-      model = FALLBACK_MODEL;
       if (language === "auto" && wasCodeMixed) normalizationLanguage = "hinglish";
     }
     const text = normalizeTranscript(transcription.text, normalizationLanguage);
     if (!text) return respond({ error: "I couldn’t hear clear speech in that recording." }, 422, { model: MODEL });
     const detectedLanguage = detectSpeechLanguage(text);
-    return respond({ text, language: detectedLanguage, detectedLanguage: transcription.language || detectedLanguage }, 200, { model });
+    return respond({ text, language: detectedLanguage, detectedLanguage: transcription.language || detectedLanguage }, 200, { model: MODEL });
   } catch (cause) {
     console.error("Companion transcription failed", cause instanceof Error ? cause.message : "unknown");
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-transcribe", startedAt, cause);
-    return respond({ error: "Voice transcription is temporarily unavailable." }, 503, { model: `${MODEL}+${FALLBACK_MODEL}` });
+    return respond({ error: "Voice transcription is temporarily unavailable." }, 503, { model: MODEL });
   }
 }

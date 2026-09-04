@@ -14,7 +14,7 @@ describe("companion voice modes", () => {
       "Angry",
     ]);
     expect(new Set(companionVoiceModes.map((mode) => mode.id)).size).toBe(companionVoiceModes.length);
-    expect(new Set(companionVoiceModes.map((mode) => mode.speaker))).toEqual(new Set(["melotts"]));
+    expect(new Set(companionVoiceModes.map((mode) => mode.speaker))).toEqual(new Set(["kokoro"]));
     expect(new Set(companionVoiceModes.map((mode) => mode.emotion)).size).toBe(companionVoiceModes.length);
     expect(new Set(companionVoiceModes.map((mode) => mode.volume)).size).toBeGreaterThan(3);
     expect(new Set(companionVoiceModes.map((mode) => mode.temperature)).size).toBe(companionVoiceModes.length);

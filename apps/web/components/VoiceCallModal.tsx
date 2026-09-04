@@ -253,7 +253,7 @@ export function VoiceCallModal({
 
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const phaseCopy: Record<CallPhase, string> = {
-    connecting: "Calling…",
+    connecting: "Preparing private voice…",
     listening: "Listening to you",
     thinking: "Thinking about that",
     speaking: "Talking with you",
@@ -279,8 +279,8 @@ export function VoiceCallModal({
         <label className="call-language-picker"><span>Mood</span><select aria-label="Mira voice mood" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const mode = companionVoiceMode(next); setActiveVoiceId(next); onVoiceChange?.(next); setCompanionLine(`${mode.name} mood selected.`); speak(`Okay… I’ll sound ${mode.name.toLowerCase()} now.`, true, next); }}>{companionVoiceModes.map((mode) => <option key={mode.id} value={mode.id}>{mode.name}</option>)}</select></label>
       </div>
 
-      <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking"}>
-        <Waveform aria-hidden="true" /> {phase === "speaking" ? bargeInReady ? "Just speak · auto-interrupt is on" : "Speak now to interrupt" : phase === "thinking" ? "Thinking…" : phase === "listening" ? "Listening automatically" : "Start hands-free listening"}
+      <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking" || phase === "connecting"}>
+        <Waveform aria-hidden="true" /> {phase === "speaking" ? bargeInReady ? "Just speak · auto-interrupt is on" : "Speak now to interrupt" : phase === "thinking" ? "Thinking…" : phase === "connecting" ? "Preparing voice…" : phase === "listening" ? "Listening automatically" : "Start hands-free listening"}
       </button>
 
       <div className="live-call__controls">
@@ -291,7 +291,7 @@ export function VoiceCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.3, y: -90 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">{bargeInReady ? "Automatic interruption is on" : "Hands-free listening resumes after speech"} · language automatically follows English, हिन्दी and Hinglish · no browser/system voice · Companaro does not save a call recording</small>
+      <small className="live-call__disclosure">{bargeInReady ? "Automatic interruption is on" : "Hands-free listening resumes after speech"} · private voice model downloads once, then stays cached · language automatically follows English, हिन्दी and Hinglish · no browser/system voice · Companaro does not save a call recording</small>
     </motion.div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adaptiveRecognitionLocale, cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, mouthPoseForText, recognitionLocale, romanizeHindiForEnglishTts, splitMultilingualSpeechSegments, splitSpeechSegments, synthesisLanguageCode } from "./speech";
+import { adaptiveRecognitionLocale, cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, looksLikeCodeMixedDevanagari, mouthPoseForText, recognitionLocale, romanizeHindiForEnglishTts, splitMultilingualSpeechSegments, splitSpeechSegments, synthesisLanguageCode } from "./speech";
 
 describe("companion speech", () => {
   it("detects English, Hindi, and Roman-script Hinglish", () => {
@@ -19,6 +19,11 @@ describe("companion speech", () => {
     expect(adaptiveRecognitionLocale("Tell me about your day")).toBe("en-IN");
   });
 
+  it("recognizes code-mixed Devanagari that should be retried as Roman Hinglish", () => {
+    expect(looksLikeCodeMixedDevanagari("आज ऑफिस में बहुत स्ट्रेसफुल डे था, बट अब बेटर हूँ")).toBe(true);
+    expect(looksLikeCodeMixedDevanagari("आज मेरा दिन बहुत मुश्किल था")).toBe(false);
+  });
+
   it("normalizes English, Hindi, and Hinglish for the multilingual neural voice", () => {
     expect(synthesisLanguageCode("Tell me about your day")).toBe("en");
     expect(synthesisLanguageCode("आज तुम कैसी हो?")).toBe("hi");
@@ -26,7 +31,7 @@ describe("companion speech", () => {
     expect(synthesisLanguageCode("A number like 10,000", "hinglish")).toBe("auto");
   });
 
-  it("romanizes visible Hindi for the single free Cloudflare voice", () => {
+  it("romanizes Hindi transcripts when Whisper returns mixed scripts", () => {
     expect(romanizeHindiForEnglishTts("आज तुमसे बात करके अच्छा लगा।")).toBe("aaj tumase baat karake achchhaa lagaa.");
     expect(romanizeHindiForEnglishTts("मैं ठीक हूँ।")).toBe("main theek hoon.");
   });
@@ -74,14 +79,14 @@ describe("companion speech", () => {
     ]);
   });
 
-  it("keeps MeloTTS as the neural voice identity for every delivery style", () => {
-    expect(cloudSpeakerForVoice("mira-playful-01")).toBe("melotts");
-    expect(cloudSpeakerForVoice("mira-natural-01")).toBe("melotts");
-    expect(cloudSpeakerForVoice("mira-happy-01")).toBe("melotts");
-    expect(cloudSpeakerForVoice("mira-tender-01")).toBe("melotts");
-    expect(cloudSpeakerForVoice("mira-intimate-01")).toBe("melotts");
-    expect(cloudSpeakerForVoice("mira-sad-01")).toBe("melotts");
-    expect(cloudSpeakerForVoice("mira-angry-01")).toBe("melotts");
-    expect(cloudSpeakerForVoice("unknown-voice")).toBe("melotts");
+  it("keeps Kokoro as the neural voice identity for every delivery style", () => {
+    expect(cloudSpeakerForVoice("mira-playful-01")).toBe("kokoro");
+    expect(cloudSpeakerForVoice("mira-natural-01")).toBe("kokoro");
+    expect(cloudSpeakerForVoice("mira-happy-01")).toBe("kokoro");
+    expect(cloudSpeakerForVoice("mira-tender-01")).toBe("kokoro");
+    expect(cloudSpeakerForVoice("mira-intimate-01")).toBe("kokoro");
+    expect(cloudSpeakerForVoice("mira-sad-01")).toBe("kokoro");
+    expect(cloudSpeakerForVoice("mira-angry-01")).toBe("kokoro");
+    expect(cloudSpeakerForVoice("unknown-voice")).toBe("kokoro");
   });
 });

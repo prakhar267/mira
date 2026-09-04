@@ -161,39 +161,15 @@ await run("voice upload validation", async () => {
   return "malformed/non-audio upload rejected";
 });
 
-const verifyFreeCloudflareSpeech = async (text, language, expectedLanguage) => {
-  const response = await fetch(`${baseUrl}/api/companion-speech`, {
+await run("retired server speech endpoint", async () => {
+  const { response, body } = await json("/api/companion-speech", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text, voiceId: "mira-tender-01", language }),
+    body: JSON.stringify({ text: "This must not call the removed hosted voices." }),
   });
-  expect(response.ok, `speech returned ${response.status}`);
-  expect(response.headers.get("content-type")?.includes("audio/"), "speech was not audio");
-  const provider = response.headers.get("x-companion-voice-provider");
-  const model = response.headers.get("x-companion-voice-model");
-  const voice = response.headers.get("x-companion-voice");
-  expect(provider === "cloudflare-melotts" || provider === "cloudflare-aura-1", "a free Cloudflare TTS provider was not used");
-  if (provider === "cloudflare-melotts") {
-    expect(model === "@cf/myshell-ai/melotts" && voice === "melo-female", "MeloTTS identity headers missing");
-  } else {
-    expect(model === "@cf/deepgram/aura-1" && voice === "luna", "Aura failover identity headers missing");
-  }
-  expect(response.headers.get("x-companion-language") === expectedLanguage, `expected ${expectedLanguage} language routing`);
-  const bytes = (await response.arrayBuffer()).byteLength;
-  expect(bytes > 1_000, `speech payload too small (${bytes} bytes)`);
-  return `${provider}/${voice}/${expectedLanguage}, ${bytes} bytes`;
-};
-
-await run("English free Cloudflare voice", async () => {
-  return verifyFreeCloudflareSpeech("Hey, I am glad you called.", "auto", "en");
-});
-
-await run("Hindi free Cloudflare voice", async () => {
-  return verifyFreeCloudflareSpeech("आज तुमसे बात करके अच्छा लगा।", "auto", "hi");
-});
-
-await run("Hinglish free Cloudflare voice", async () => {
-  return verifyFreeCloudflareSpeech("Yaar, aaj tumse baat karke accha laga.", "auto", "hinglish");
+  expect(response.status === 410, `expected retired endpoint status, received ${response.status}`);
+  expect(body.model === "onnx-community/Kokoro-82M-v1.0-ONNX", "local Kokoro model identity missing");
+  return "hosted Melo/Aura route removed; client-side Kokoro advertised";
 });
 
 await run("invalid login rejection", async () => {
