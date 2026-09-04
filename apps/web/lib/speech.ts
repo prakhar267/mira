@@ -3,7 +3,7 @@ import { companionVoiceMode } from "./voice-profiles";
 export type SpeechLanguage = "auto" | "en" | "hi" | "hinglish";
 
 export const speechLanguageOptions: Array<{ value: SpeechLanguage; label: string }> = [
-  { value: "auto", label: "Auto" },
+  { value: "auto", label: "Auto · English first" },
   { value: "en", label: "English" },
   { value: "hi", label: "हिन्दी" },
   { value: "hinglish", label: "Hinglish" },
@@ -11,16 +11,6 @@ export const speechLanguageOptions: Array<{ value: SpeechLanguage; label: string
 
 const devanagari = /[\u0900-\u097f]/;
 const hinglishWords = /\b(?:aaj|accha|acha|arey|aur|bahut|bas|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|kya|kyun|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sach|samajh|theek|thik|thoda|tum|tumhara|yaar)\b/i;
-const blockedVoiceNames = /\blekha\b|bad news|bahh|bells|boing|bubbles|cellos|grandpa|jester|junior|organ|ralph|rocko|superstar|trinoids|whisper|zarvox/i;
-const femaleHindiNames = /aditi|heera|kavya|swara|veena|google.*(?:hindi|हिन्दी)|female/i;
-const femaleIndianEnglishNames = /aditi|kavya|neerja|swara|tara|veena|google.*(?:india|indian)|female/i;
-const naturalEnglishNames = /andromeda|aria|ava|cora|flo|helena|jenny|juno|karen|luna|moira|nova|samantha|sandy|serena|shelley|shimmer|tara|tessa|thalia|vesta|zira|google.*english.*female/i;
-const enhancedNames = /enhanced|natural|neural|online|premium/i;
-const noveltyOrMaleNames = /albert|\baman\b|daniel|eddy|fred|reed|rishi/i;
-const companionFallbackNames = [/^tara\b/i, /^samantha\b/i, /^karen\b/i, /^tessa\b/i, /^moira\b/i, /^flo\b/i, /^shelley\b/i, /^sandy\b/i, /google.*english.*female/i];
-
-let lockedCompanionVoice = "";
-
 export interface RecognitionResultLike extends ArrayLike<{ transcript?: string; confidence?: number }> {
   isFinal?: boolean;
 }
@@ -44,12 +34,19 @@ export function detectSpeechLanguage(text: string, requested: SpeechLanguage = "
 
 export function recognitionLocale(language: SpeechLanguage, browserLanguage = "en-IN") {
   if (language === "hi") return "hi-IN";
-  if (language === "en" || language === "hinglish") return "en-IN";
+  if (language === "en" || language === "hinglish" || language === "auto") return "en-IN";
   return /^hi(?:-|$)/i.test(browserLanguage) ? "hi-IN" : "en-IN";
 }
 
 export function synthesisLanguageCode(text: string, requested: SpeechLanguage = "auto") {
-  return detectSpeechLanguage(text, requested) === "en" ? "en-IN" : "hi-IN";
+  const detected = detectSpeechLanguage(text, requested);
+  if (detected === "hi") return "hi";
+  if (detected === "hinglish") return "auto";
+  return "en";
+}
+
+export function adaptiveRecognitionLocale(text: string, requested: SpeechLanguage = "auto") {
+  return recognitionLocale(requested === "auto" ? detectSpeechLanguage(text) : requested);
 }
 
 function bestRecognitionAlternative(result: RecognitionResultLike) {
@@ -128,47 +125,6 @@ export function cloudSpeakerForVoice(voiceId: string) {
   return companionVoiceMode(voiceId).speaker;
 }
 
-export function selectPreferredVoice<T extends { name: string; lang: string; default?: boolean; localService?: boolean }>(
-  voices: T[],
-  text: string,
-  _voiceId: string,
-  language: SpeechLanguage = "auto",
-) {
-  void _voiceId;
-  void text;
-  void language;
-  const locked = voices.find((voice) => `${voice.name}\u0000${voice.lang}` === lockedCompanionVoice);
-  if (locked) return locked;
-  return [...voices].sort((left, right) => {
-    const score = (voice: T) => {
-      const locale = voice.lang.replace("_", "-").toLowerCase();
-      const isHindi = /^hi(?:-|$)/i.test(locale);
-      const isIndianEnglish = /^en-in$/i.test(locale);
-      const namedHindiFemale = femaleHindiNames.test(voice.name);
-      const namedIndianFemale = femaleIndianEnglishNames.test(voice.name);
-      const namedEnglishFemale = naturalEnglishNames.test(voice.name);
-      const fallbackRank = companionFallbackNames.findIndex((pattern) => pattern.test(voice.name));
-      const fallbackScore = fallbackRank >= 0 ? 180 - fallbackRank * 12 : 0;
-
-      if (blockedVoiceNames.test(voice.name)) return -100_000;
-      return (isHindi && namedHindiFemale ? 7_000 : 0)
-        + (isIndianEnglish && namedIndianFemale ? 5_500 : 0)
-        + (isHindi ? 2_000 : 0)
-        + (isIndianEnglish ? 1_250 : 0)
-        + (namedEnglishFemale ? 800 : 0)
-        + fallbackScore
-        + (enhancedNames.test(voice.name) ? 100 : 0)
-        + (voice.default ? 2 : 0)
-        + (voice.localService === false ? 6 : 0)
-        - (noveltyOrMaleNames.test(voice.name) ? 2_400 : 0);
-    };
-    return score(right) - score(left);
-  }).map((voice, index) => {
-    if (index === 0) lockedCompanionVoice = `${voice.name}\u0000${voice.lang}`;
-    return voice;
-  })[0];
-}
-
 export function mouthPoseForText(text: string, charIndex: number): 0 | 1 | 2 | 3 {
   const sample = text.slice(Math.max(0, charIndex), Math.max(0, charIndex) + 8).toLowerCase();
   if (!sample.trim()) return 0;
@@ -193,7 +149,6 @@ let activePlayback: CompanionSpeechPlayback | null = null;
 export function stopCompanionSpeech() {
   activePlayback?.cancel();
   activePlayback = null;
-  if (typeof window !== "undefined") window.speechSynthesis?.cancel();
 }
 
 export function playCompanionSpeech(text: string, options: {
@@ -202,6 +157,7 @@ export function playCompanionSpeech(text: string, options: {
   onStart?: () => void;
   onBoundary?: (boundary: { charIndex: number; charLength: number; elapsedTime: number; name: string }) => void;
   onEnd?: () => void;
+  onError?: (message: string) => void;
 } = {}): CompanionSpeechPlayback {
   stopCompanionSpeech();
   const voiceId = options.voiceId ?? "mira-natural-01";
@@ -210,22 +166,17 @@ export function playCompanionSpeech(text: string, options: {
   const abortController = new AbortController();
   let canceled = false;
   let finished = false;
-  let browserStarted = false;
   let playbackStarted = false;
   let audio: HTMLAudioElement | null = null;
   let objectUrl: string | null = null;
   let boundaryTimer: number | null = null;
   let requestTimer: number | null = null;
-  let voiceTimer: number | null = null;
-  let voicesChanged: (() => void) | null = null;
 
   const end = (notify = true) => {
     if (finished) return;
     finished = true;
     if (requestTimer) window.clearTimeout(requestTimer);
     if (boundaryTimer) window.clearInterval(boundaryTimer);
-    if (voiceTimer) window.clearTimeout(voiceTimer);
-    if (voicesChanged) window.speechSynthesis?.removeEventListener("voiceschanged", voicesChanged);
     if (objectUrl) window.URL.revokeObjectURL(objectUrl);
     if (activePlayback === playback) activePlayback = null;
     if (notify) options.onEnd?.();
@@ -237,66 +188,16 @@ export function playCompanionSpeech(text: string, options: {
     options.onStart?.();
   };
 
-  const speakWithBrowserFallback = () => {
-    if (browserStarted || canceled || finished) return;
-    browserStarted = true;
-    if (!("speechSynthesis" in window)) return end();
-    const segments = splitMultilingualSpeechSegments(text, language);
-    const selectedVoice = selectPreferredVoice(window.speechSynthesis.getVoices(), text, voiceId, language);
-    let segmentIndex = 0;
-    let characterOffset = 0;
-
-    const speakNext = () => {
-      if (canceled || finished) return;
-      const segment = segments[segmentIndex];
-      if (!segment) return end();
-      const utterance = new SpeechSynthesisUtterance(segment.text);
-      if (selectedVoice) utterance.voice = selectedVoice;
-      utterance.lang = selectedVoice?.lang ?? recognitionLocale(segment.language);
-      utterance.rate = profile.rate;
-      utterance.pitch = profile.pitch;
-      utterance.volume = profile.volume;
-      utterance.onstart = notifyStart;
-      utterance.onboundary = (event) => options.onBoundary?.({
-        charIndex: characterOffset + event.charIndex,
-        charLength: event.charLength,
-        elapsedTime: event.elapsedTime,
-        name: event.name,
-      });
-      utterance.onend = () => {
-        characterOffset += segment.text.length + 1;
-        segmentIndex += 1;
-        speakNext();
-      };
-      utterance.onerror = () => end();
-      window.speechSynthesis.speak(utterance);
-    };
-
-    speakNext();
-  };
-
   const playback: CompanionSpeechPlayback = {
     cancel() {
       if (canceled) return;
       canceled = true;
       abortController.abort();
       audio?.pause();
-      window.speechSynthesis?.cancel();
       end(false);
     },
   };
   activePlayback = playback;
-
-  const queueBrowserFallback = () => {
-    if (canceled || finished || browserStarted) return;
-    if (!("speechSynthesis" in window) || window.speechSynthesis.getVoices().length > 0) {
-      speakWithBrowserFallback();
-      return;
-    }
-    voicesChanged = speakWithBrowserFallback;
-    window.speechSynthesis.addEventListener("voiceschanged", voicesChanged, { once: true });
-    voiceTimer = window.setTimeout(speakWithBrowserFallback, 350);
-  };
 
   const playNeuralVoice = async () => {
     requestTimer = window.setTimeout(() => abortController.abort(), 12_000);
@@ -320,9 +221,6 @@ export function playCompanionSpeech(text: string, options: {
     audio.preload = "auto";
     audio.volume = profile.volume;
     audio.preservesPitch = true;
-    if (response.headers.get("x-companion-voice-provider") !== "sarvam-bulbul-v3") {
-      audio.playbackRate = profile.rate;
-    }
     audio.onplaying = () => {
       notifyStart();
       let lastBoundary = -1;
@@ -339,19 +237,20 @@ export function playCompanionSpeech(text: string, options: {
     };
     audio.onended = () => end();
     audio.onerror = () => {
-      if (playbackStarted) end();
-      else queueBrowserFallback();
+      options.onError?.("Ara voice playback failed. Please try again.");
+      end();
     };
     await audio.play();
     notifyStart();
   };
 
-  // A single OS voice is deliberately preferred for every language. This keeps
-  // the companion's identity stable when a sentence switches between English,
-  // Hindi and Hinglish. The edge neural voice remains the device fallback.
-  if ("speechSynthesis" in window) queueBrowserFallback();
-  else void playNeuralVoice().catch(() => {
-    if (!canceled && !finished) queueBrowserFallback();
+  // Ara is always generated on the server. Browser/system speech synthesis is
+  // intentionally never used, so the companion keeps one identity on every device.
+  void playNeuralVoice().catch((error) => {
+    if (!canceled && !finished) {
+      options.onError?.(error instanceof Error ? error.message : "Ara voice is temporarily unavailable.");
+      end();
+    }
   });
 
   return playback;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, mouthPoseForText, recognitionLocale, selectPreferredVoice, splitMultilingualSpeechSegments, splitSpeechSegments, synthesisLanguageCode } from "./speech";
+import { adaptiveRecognitionLocale, cloudSpeakerForVoice, collectRecognitionTranscript, detectSpeechLanguage, mouthPoseForText, recognitionLocale, splitMultilingualSpeechSegments, splitSpeechSegments, synthesisLanguageCode } from "./speech";
 
 describe("companion speech", () => {
   it("detects English, Hindi, and Roman-script Hinglish", () => {
@@ -8,45 +8,20 @@ describe("companion speech", () => {
     expect(detectSpeechLanguage("yaar aaj mood bilkul off hai")).toBe("hinglish");
   });
 
-  it("uses Indian recognition locales for Hindi and Hinglish", () => {
+  it("starts automatic recognition in English and adapts after each turn", () => {
+    expect(recognitionLocale("auto", "hi-IN")).toBe("en-IN");
     expect(recognitionLocale("hi")).toBe("hi-IN");
     expect(recognitionLocale("hinglish")).toBe("en-IN");
+    expect(adaptiveRecognitionLocale("आज मेरा मन ठीक नहीं है")).toBe("hi-IN");
+    expect(adaptiveRecognitionLocale("yaar aaj mood bilkul off hai")).toBe("en-IN");
+    expect(adaptiveRecognitionLocale("Tell me about your day")).toBe("en-IN");
   });
 
   it("normalizes English, Hindi, and Hinglish for the multilingual neural voice", () => {
-    expect(synthesisLanguageCode("Tell me about your day")).toBe("en-IN");
-    expect(synthesisLanguageCode("आज तुम कैसी हो?")).toBe("hi-IN");
-    expect(synthesisLanguageCode("yaar aaj tum bahut cute lag rahi ho")).toBe("hi-IN");
-    expect(synthesisLanguageCode("A number like 10,000", "hinglish")).toBe("hi-IN");
-  });
-
-  it("never selects the removed Lekha voice", () => {
-    const voices = [
-      { name: "Alex", lang: "en-US", default: true },
-      { name: "Lekha Enhanced", lang: "hi-IN", default: false },
-      { name: "Google हिन्दी Female", lang: "hi-IN", default: false },
-    ];
-    expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-warm-01")?.name).toBe("Google हिन्दी Female");
-  });
-
-  it("locks one feminine Hindi-capable identity across every supported language", () => {
-    const voices = [
-      { name: "Samantha", lang: "en-US", default: true },
-      { name: "Tessa", lang: "en-ZA", default: false },
-      { name: "Karen", lang: "en-AU", default: false },
-      { name: "Flo (English (US))", lang: "en-US", default: false },
-      { name: "Tara", lang: "en-IN", default: false },
-      { name: "Aman", lang: "en-IN", default: false },
-      { name: "Lekha", lang: "hi-IN", default: false },
-      { name: "Google हिन्दी Female", lang: "hi-IN", default: false },
-    ];
-
-    expect(selectPreferredVoice(voices, "Tell me something fun", "mira-playful-01", "en")?.name).toBe("Google हिन्दी Female");
-    expect(selectPreferredVoice(voices, "Stay close to me", "mira-intimate-01", "en")?.name).toBe("Google हिन्दी Female");
-    expect(selectPreferredVoice(voices, "Be direct with me", "mira-angry-01", "en")?.name).toBe("Google हिन्दी Female");
-    expect(selectPreferredVoice(voices, "I need some confidence", "mira-happy-01", "en")?.name).toBe("Google हिन्दी Female");
-    expect(selectPreferredVoice(voices, "yaar aaj mood off hai", "mira-natural-01", "hinglish")?.name).toBe("Google हिन्दी Female");
-    expect(selectPreferredVoice(voices, "आज कैसा दिन था", "mira-natural-01", "hi")?.name).toBe("Google हिन्दी Female");
+    expect(synthesisLanguageCode("Tell me about your day")).toBe("en");
+    expect(synthesisLanguageCode("आज तुम कैसी हो?")).toBe("hi");
+    expect(synthesisLanguageCode("yaar aaj tum bahut cute lag rahi ho")).toBe("auto");
+    expect(synthesisLanguageCode("A number like 10,000", "hinglish")).toBe("auto");
   });
 
   it("maps nearby English and Devanagari vowels to stable mouth shapes", () => {
@@ -92,14 +67,14 @@ describe("companion speech", () => {
     ]);
   });
 
-  it("keeps Juno as the keyless neural voice identity for every delivery style", () => {
-    expect(cloudSpeakerForVoice("mira-playful-01")).toBe("juno");
-    expect(cloudSpeakerForVoice("mira-natural-01")).toBe("juno");
-    expect(cloudSpeakerForVoice("mira-happy-01")).toBe("juno");
-    expect(cloudSpeakerForVoice("mira-tender-01")).toBe("juno");
-    expect(cloudSpeakerForVoice("mira-intimate-01")).toBe("juno");
-    expect(cloudSpeakerForVoice("mira-sad-01")).toBe("juno");
-    expect(cloudSpeakerForVoice("mira-angry-01")).toBe("juno");
-    expect(cloudSpeakerForVoice("unknown-voice")).toBe("juno");
+  it("keeps Ara as the neural voice identity for every delivery style", () => {
+    expect(cloudSpeakerForVoice("mira-playful-01")).toBe("ara");
+    expect(cloudSpeakerForVoice("mira-natural-01")).toBe("ara");
+    expect(cloudSpeakerForVoice("mira-happy-01")).toBe("ara");
+    expect(cloudSpeakerForVoice("mira-tender-01")).toBe("ara");
+    expect(cloudSpeakerForVoice("mira-intimate-01")).toBe("ara");
+    expect(cloudSpeakerForVoice("mira-sad-01")).toBe("ara");
+    expect(cloudSpeakerForVoice("mira-angry-01")).toBe("ara");
+    expect(cloudSpeakerForVoice("unknown-voice")).toBe("ara");
   });
 });

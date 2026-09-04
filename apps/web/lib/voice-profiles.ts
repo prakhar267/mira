@@ -5,7 +5,7 @@ export interface CompanionVoiceMode {
   name: string;
   detail: string;
   emotion: CompanionVoiceEmotion;
-  speaker: "juno";
+  speaker: "ara";
   rate: number;
   pitch: number;
   volume: number;
@@ -14,18 +14,18 @@ export interface CompanionVoiceMode {
 
 export const companionVoiceIdentity = {
   name: "Mira Aster",
-  detail: "One soft, breathy adult female voice · English, हिन्दी and Hinglish",
+  detail: "Ara neural voice · English, हिन्दी and Hinglish",
 } as const;
 
 // These are delivery moods for one voice identity, not separate characters or voices.
 export const companionVoiceModes: CompanionVoiceMode[] = [
-  { id: "mira-natural-01", name: "Natural", detail: "Soft-spoken, gentle and conversational", emotion: "natural", speaker: "juno", rate: .94, pitch: 1.01, volume: .94, temperature: .45 },
-  { id: "mira-happy-01", name: "Happy", detail: "Light, smiling and bright", emotion: "happy", speaker: "juno", rate: .99, pitch: 1.04, volume: .97, temperature: .72 },
-  { id: "mira-playful-01", name: "Playful", detail: "Gentle teasing with lively warmth", emotion: "playful", speaker: "juno", rate: .97, pitch: 1.035, volume: .95, temperature: .78 },
-  { id: "mira-tender-01", name: "Tender", detail: "Delicate, caring and unhurried", emotion: "tender", speaker: "juno", rate: .88, pitch: 1, volume: .84, temperature: .34 },
-  { id: "mira-intimate-01", name: "Intimate", detail: "Close, quiet and warmly restrained", emotion: "intimate", speaker: "juno", rate: .86, pitch: .99, volume: .86, temperature: .3 },
-  { id: "mira-sad-01", name: "Sad", detail: "Quiet, vulnerable and subdued", emotion: "sad", speaker: "juno", rate: .84, pitch: .98, volume: .8, temperature: .28 },
-  { id: "mira-angry-01", name: "Angry", detail: "Firm and emotional without shouting", emotion: "angry", speaker: "juno", rate: 1, pitch: .995, volume: .96, temperature: .68 },
+  { id: "mira-natural-01", name: "Natural", detail: "Warm, human and conversational", emotion: "natural", speaker: "ara", rate: 1, pitch: 1, volume: .96, temperature: .45 },
+  { id: "mira-happy-01", name: "Happy", detail: "Smiling, bright and affectionate", emotion: "happy", speaker: "ara", rate: 1, pitch: 1, volume: .98, temperature: .72 },
+  { id: "mira-playful-01", name: "Playful", detail: "Teasing, lively and warm", emotion: "playful", speaker: "ara", rate: 1, pitch: 1, volume: .97, temperature: .78 },
+  { id: "mira-tender-01", name: "Tender", detail: "Soft, caring and unhurried", emotion: "tender", speaker: "ara", rate: 1, pitch: 1, volume: .9, temperature: .34 },
+  { id: "mira-intimate-01", name: "Intimate", detail: "Close, breathy and warmly restrained", emotion: "intimate", speaker: "ara", rate: 1, pitch: 1, volume: .9, temperature: .3 },
+  { id: "mira-sad-01", name: "Sad", detail: "Quiet, vulnerable and subdued", emotion: "sad", speaker: "ara", rate: 1, pitch: 1, volume: .88, temperature: .28 },
+  { id: "mira-angry-01", name: "Angry", detail: "Firm and emotional without shouting", emotion: "angry", speaker: "ara", rate: 1, pitch: 1, volume: .98, temperature: .68 },
 ];
 
 const legacyModeAliases: Record<string, string> = {

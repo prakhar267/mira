@@ -7,7 +7,6 @@ declare module "cloudflare:workers" {
   }
 
   export const env: {
-    SARVAM_API_KEY?: string;
     LUMA_ACCOUNTS?: KVNamespace;
     CF_VERSION_METADATA?: { id?: string; tag?: string; timestamp?: string };
     AI: {
