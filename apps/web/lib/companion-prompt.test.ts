@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompanionSystemPrompt, buildMemoryRecallReply, detectCompanionLanguage, isGenericCompanionReply, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply } from "./companion-prompt";
+import { buildCompanionSystemPrompt, buildMemoryRecallReply, detectCompanionLanguage, isGenericCompanionReply, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, sanitizeCompanionReplyForDelivery } from "./companion-prompt";
 
 const request = {
   messages: [{ role: "user" as const, content: "nothing just monotonous" }],
@@ -51,6 +51,12 @@ describe("edge companion prompting", () => {
 
   it("removes model reasoning and speaker labels", () => {
     expect(sanitizeCompanionReply("<think>hidden</think> Mira: That routine would bore me too.")).toBe("That routine would bore me too.");
+  });
+
+  it("removes symbols that should not be spoken during calls", () => {
+    expect(sanitizeCompanionReplyForDelivery("You've got this. 😎", "voice")).toBe("You've got this.");
+    expect(sanitizeCompanionReplyForDelivery("You've got this. 😎", "video")).toBe("You've got this.");
+    expect(sanitizeCompanionReplyForDelivery("You've got this. 😎", "text")).toBe("You've got this. 😎");
   });
 
   it("answers explicit English, Hindi, and Hinglish recall from saved facts", () => {

@@ -161,6 +161,16 @@ export function sanitizeCompanionReply(value: string) {
   return reply;
 }
 
+export function sanitizeCompanionReplyForDelivery(value: string, delivery: EdgeCompanionRequest["delivery"] = "text") {
+  const reply = sanitizeCompanionReply(value);
+  if (delivery === "text") return reply;
+  return reply
+    .replace(/\p{Extended_Pictographic}\uFE0F?/gu, "")
+    .replace(/\s+([,.;!?…।])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function isGenericCompanionReply(value: string) {
   const reply = sanitizeCompanionReply(value);
   return !reply || genericReplyPattern.test(reply) || stiltedReplyPattern.test(reply) || (reply.length > 70 && !/[.!?…][”’"']?$/.test(reply) && danglingReplyPattern.test(reply)) || /(?:i(?:['’]| a)m (?:here|listening)|i hear you|i(?:['’]| a)m with you).*(?:not fixing|take your time|keep going)/i.test(reply);

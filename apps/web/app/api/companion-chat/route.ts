@@ -1,4 +1,4 @@
-import { buildCompanionSystemPrompt, buildMemoryRecallReply, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, type EdgeCompanionRequest } from "@/lib/companion-prompt";
+import { buildCompanionSystemPrompt, buildMemoryRecallReply, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "@/lib/companion-prompt";
 import { assessSafety } from "@companion/ai";
 import { assertEdgeSameOrigin, containsDisallowedAbuse, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 
@@ -78,14 +78,14 @@ export async function POST(request: Request) {
       { role: "system", content: `/no_think\n${buildCompanionSystemPrompt(input)}` },
       ...input.messages,
     ];
-    const run = async (promptMessages: typeof messages) => sanitizeCompanionReply(readModelText(await env.AI.run(MODEL as never, {
+    const run = async (promptMessages: typeof messages) => sanitizeCompanionReplyForDelivery(readModelText(await env.AI.run(MODEL as never, {
         messages: promptMessages,
         max_tokens: input.delivery === "text" ? 260 : 190,
         temperature: 0.68,
         top_p: 0.86,
         top_k: 40,
         repetition_penalty: 1.1,
-      } as never)));
+      } as never)), input.delivery);
     let reply = await run(messages);
     if (isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions)) {
       reply = await run([
