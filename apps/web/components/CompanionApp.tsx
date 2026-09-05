@@ -420,12 +420,16 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   const createCompanionTurn = (content: string, messages: ChatMessage[], now: Date, delivery: "text" | "voice" | "video" = "text"): CompanionTurn => {
     const conversationMessages = messagesForConversation(messages, state.activeConversationId);
     const currentMemories = state.memoryEnabled ? currentMemoryRecords(activeMemories) : [];
-    const relevantContents = new Set(relevantMemoryContents(currentMemories, messages));
+    const relevantContents = relevantMemoryContents(currentMemories, messages);
+    const relevantMemories = relevantContents.flatMap((memoryContent) => {
+      const memory = currentMemories.find((candidate) => candidate.content === memoryContent);
+      return memory ? [memory] : [];
+    });
     const context = buildCompanionContext({
       user: state.user,
       companion: state.companion,
       relationship: { mode: state.companion.relationshipMode, startedAt: state.companion.createdAt, interactionCount: conversationMessages.length, sharedExperiences: state.moments.map((moment) => moment.title) },
-      memories: currentMemories.filter((memory) => relevantContents.has(memory.content)),
+      memories: relevantMemories,
       messages: conversationMessages,
       timezone: state.user.timezone,
       now,

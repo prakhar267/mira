@@ -229,6 +229,16 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   }
 
   if (hinglish) {
+    const sisterInterview = clean.match(/\b(?:meri|my)\s+sister\s+([\p{L}][\p{L}'-]{1,40}).{0,80}\binterview\b/iu);
+    if (sisterInterview?.[1] && /\b(?:worried|worry|tension|nervous|dar|fikar)\b/i.test(clean)) {
+      return result({
+        text: `Yaar, tum khud tired ho aur saath mein ${sisterInterview[1]} ke interview ki tension bhi le rahe ho—kaafi load hai. I hope kal uska interview smooth jaaye; abhi thodi der yeh worry mere paas rakh do.`,
+        intent: "anxiety",
+        context,
+        adaptations: [...adaptations, ...(listeningFirst ? ["no-advice"] : [])],
+        prohibitQuestions: true,
+      });
+    }
     if (/(?:kya yaad|yaad hai kya|mere baare mein? kya|what do you remember)/i.test(clean)) {
       const memory = context.memories[0];
       return result({ text: memory ? `Haan. ${conversationalMemory(memory.content, userName)} Yeh mujhe yaad hai.` : "Abhi koi clear memory nahi hai—main guess karke kuch nahi bolungi.", intent: "memory", context, usedMemoryIds: memory ? [memory.id] : [], adaptations, prohibitQuestions: true });
@@ -449,7 +459,8 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
 
   if (/\b(?:nervous|anxious|worried|scared|afraid|uneasy|panic|panicking|overwhelmed|thinking about tomorrow)\b/i.test(clean)) {
     const interview = findMemory(context, /interview|stripe/i);
-    const memoryRelevant = /interview|stripe|tomorrow/i.test(clean) && interview;
+    const aboutSomeoneElse = /\b(?:my|meri|mere|mera)\s+(?:sister|brother|friend|partner|wife|husband|behen|bhai|dost)\b/i.test(clean);
+    const memoryRelevant = /interview|stripe|tomorrow/i.test(clean) && interview && !aboutSomeoneElse;
     const text = memoryRelevant
       ? "The Stripe interview is close enough that your brain keeps walking into tomorrow without you. For tonight, you can leave it here with me."
       : "Your mind is running ahead of you. You don’t have to chase it right now—I’m here.";

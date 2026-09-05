@@ -126,6 +126,15 @@ describe("companion turn planning", () => {
     expect(planned.text).toContain("Stripe");
   });
 
+  it("responds to the sister named in the current Hinglish turn instead of an older interview memory", () => {
+    const planned = turn("Yaar aaj kaafi thak gaya hoon. Meri sister Aisha ka kal morning interview hai aur main uske liye thoda worried hoon.");
+    expect(planned.intent).toBe("anxiety");
+    expect(planned.text).toContain("Aisha");
+    expect(planned.text).not.toContain("Stripe");
+    expect(planned.usedMemoryIds).toEqual([]);
+    expect(planned.text).not.toContain("?");
+  });
+
   it("recalls a relevant personal memory in conversational language", () => {
     const momo: MemoryRecord = { ...memories[0]!, id: "momo", type: "relationship", content: "Prakhar's dog Momo died last year, and Prakhar misses him most on 2 September.", normalizedContent: "momo", pinned: false };
     const content = "Do you remember what today means for me and Momo?";
