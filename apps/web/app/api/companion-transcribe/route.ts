@@ -1,7 +1,8 @@
 import { normalizeHinglishText } from "@/lib/speech";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
+import { createInworldTranscriptionRequest, INWORLD_STT_ENDPOINT, INWORLD_STT_MODEL, readInworldTranscript } from "@/lib/inworld-transcription";
 
-const MODEL = "@cf/openai/whisper-large-v3-turbo";
+const CLOUDFLARE_MODEL = "@cf/openai/whisper-large-v3-turbo";
 
 function readTranscript(result: unknown) {
   if (!result || typeof result !== "object") return "";
@@ -34,7 +35,23 @@ export async function POST(request: Request) {
     }
 
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const result = await env.AI.run(MODEL as never, {
+    const apiKey = (env as typeof env & { INWORLD_API_KEY?: string }).INWORLD_API_KEY?.trim();
+    if (apiKey) {
+      try {
+        const response = await fetch(INWORLD_STT_ENDPOINT, {
+          ...createInworldTranscriptionRequest(audioBase64, contentType, apiKey),
+          signal: AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]),
+        });
+        if (!response.ok) throw new Error(`Inworld transcription returned ${response.status}.`);
+        const text = normalizeHinglishText(readInworldTranscript(await response.json()));
+        if (text) return respond({ text, language: "hinglish" }, 200, { provider: "inworld", model: INWORLD_STT_MODEL, language: "hinglish" });
+        throw new Error("Inworld returned no transcript.");
+      } catch (cause) {
+        console.warn("Inworld transcription unavailable; trying Cloudflare", cause instanceof Error ? cause.message : "unknown");
+      }
+    }
+
+    const result = await env.AI.run(CLOUDFLARE_MODEL as never, {
       audio: audioBase64,
       task: "transcribe",
       vad_filter: true,
@@ -43,11 +60,11 @@ export async function POST(request: Request) {
       initial_prompt: "Natural Indian Hinglish conversation in Roman letters. Preserve English words and names exactly. Examples: yaar aaj work bahut hectic tha; kal Priya ke saath dinner hai; I am feeling better abhi.",
     } as never);
     const text = normalizeHinglishText(readTranscript(result));
-    if (!text) return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { model: MODEL });
-    return respond({ text, language: "hinglish" }, 200, { model: MODEL, language: "hinglish" });
+    if (!text) return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "cloudflare", model: CLOUDFLARE_MODEL });
+    return respond({ text, language: "hinglish" }, 200, { provider: "cloudflare", model: CLOUDFLARE_MODEL, language: "hinglish" });
   } catch (cause) {
     console.error("Hinglish transcription failed", cause instanceof Error ? cause.message : "unknown");
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-transcribe", startedAt, cause);
-    return respond({ error: "Voice input abhi connect nahi ho paaya. Please phir try karo." }, 503, { model: MODEL });
+    return respond({ error: "Voice input abhi connect nahi ho paaya. Please phir try karo." }, 503, { provider: "unavailable", model: `${INWORLD_STT_MODEL},${CLOUDFLARE_MODEL}` });
   }
 }
