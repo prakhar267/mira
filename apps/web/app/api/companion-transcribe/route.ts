@@ -61,7 +61,6 @@ export async function POST(request: Request) {
     let transcription = transcriptionResult(await runWhisper());
     let normalizationLanguage = language;
     if (language === "auto" && looksLikeCodeMixedDevanagari(transcription.text)) {
-      transcription = transcriptionResult(await runWhisper("hinglish"));
       normalizationLanguage = "hinglish";
     }
     if (/\p{Script=Arabic}/u.test(transcription.text)) {

@@ -19,7 +19,6 @@ import {
   type SpeechLanguage,
 } from "@/lib/speech";
 import { companionVoiceMode, companionVoiceModes } from "@/lib/voice-profiles";
-import { startVoiceActivityMonitor } from "@/lib/voice-activity";
 import { startCallListening, type CallListeningSession } from "@/lib/call-listening";
 
 type CallPhase = "connecting" | "listening" | "thinking" | "speaking" | "interrupted";
@@ -51,7 +50,7 @@ export function VoiceCallModal({
   const [speechError, setSpeechError] = useState("");
   const [language, setLanguage] = useState<SpeechLanguage>("auto");
   const [activeVoiceId, setActiveVoiceId] = useState(voiceId);
-  const [bargeInReady, setBargeInReady] = useState(false);
+  const [detectedLanguage, setDetectedLanguage] = useState<Exclude<SpeechLanguage, "auto">>("en");
   const recognitionRef = useRef<CallListeningSession | null>(null);
   const greetingSpoken = useRef(false);
   const speechTurn = useRef(0);
@@ -62,7 +61,6 @@ export function VoiceCallModal({
   const activeRef = useRef(true);
   const phaseRef = useRef<CallPhase>("connecting");
   const listeningAttemptRef = useRef(0);
-  const interruptRef = useRef<() => void>(() => undefined);
 
   useEffect(() => { setActiveVoiceId(companionVoiceMode(voiceId).id); }, [voiceId]);
 
@@ -111,7 +109,11 @@ export function VoiceCallModal({
     playbackRef.current = playCompanionSpeech(text, {
       voiceId: selectedVoiceId,
       language,
-      onStart: () => { if (speechTurn.current === turn) changePhase("speaking"); },
+      onStart: () => {
+        if (speechTurn.current !== turn) return;
+        setSpeechError("");
+        changePhase("speaking");
+      },
       onEnd: () => {
         if (speechTurn.current !== turn || !activeRef.current) return;
         changePhase("listening");
@@ -132,26 +134,6 @@ export function VoiceCallModal({
       if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
     };
   }, [stopRecognition]);
-
-  useEffect(() => {
-    let disposed = false;
-    let monitor: Awaited<ReturnType<typeof startVoiceActivityMonitor>> | null = null;
-    void startVoiceActivityMonitor({
-      shouldDetect: () => activeRef.current && !mutedRef.current && phaseRef.current === "speaking",
-      onSpeech: () => interruptRef.current(),
-    }).then((created) => {
-      if (disposed) created.stop();
-      else {
-        monitor = created;
-        setBargeInReady(true);
-      }
-    }).catch(() => setBargeInReady(false));
-    return () => {
-      disposed = true;
-      monitor?.stop();
-      setBargeInReady(false);
-    };
-  }, []);
 
   useEffect(() => {
     const speakingFrame = new Image();
@@ -195,14 +177,14 @@ export function VoiceCallModal({
     const attempt = listeningAttemptRef.current + 1;
     listeningAttemptRef.current = attempt;
     setHeard("");
-    setSpeechError("");
     changePhase("listening");
     void startCallListening({
       language,
       onSpeechStart: () => { if (listeningAttemptRef.current === attempt) setHeard("Hearing you…"); },
-      onTranscript: (transcript) => {
+      onTranscript: (transcript, detected) => {
         if (listeningAttemptRef.current !== attempt || !activeRef.current) return;
         recognitionRef.current = null;
+        setDetectedLanguage(detected);
         void submitTurn(transcript);
       },
       onSilence: () => {
@@ -238,7 +220,6 @@ export function VoiceCallModal({
     playbackRef.current?.cancel();
     window.setTimeout(beginListening, 180);
   }, [beginListening, changePhase, muted]);
-  useEffect(() => { interruptRef.current = interrupt; }, [interrupt]);
 
   const toggleSpeaker = () => {
     if (speaker) {
@@ -275,12 +256,12 @@ export function VoiceCallModal({
       {speechError ? <p className="call-speech-error" role="status">{speechError}</p> : null}
 
       <div className="call-pickers">
-        <label className="call-language-picker"><span>Language</span><select aria-label="Voice call language" value={language} onChange={(event) => { stopRecognition(); playbackRef.current?.cancel(); changePhase("listening"); setLanguage(event.target.value as SpeechLanguage); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <label className="call-language-picker"><span>Language · {language === "auto" ? detectedLanguage === "hi" ? "हिन्दी detected" : detectedLanguage === "hinglish" ? "Hinglish detected" : "English detected" : "manual"}</span><select aria-label="Voice call language" value={language} onChange={(event) => { const next = event.target.value as SpeechLanguage; stopRecognition(); playbackRef.current?.cancel(); changePhase("listening"); setLanguage(next); if (next !== "auto") setDetectedLanguage(next); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <label className="call-language-picker"><span>Mood</span><select aria-label="Mira voice mood" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const mode = companionVoiceMode(next); setActiveVoiceId(next); onVoiceChange?.(next); setCompanionLine(`${mode.name} mood selected.`); speak(`Okay… I’ll sound ${mode.name.toLowerCase()} now.`, true, next); }}>{companionVoiceModes.map((mode) => <option key={mode.id} value={mode.id}>{mode.name}</option>)}</select></label>
       </div>
 
       <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking" || phase === "connecting"}>
-        <Waveform aria-hidden="true" /> {phase === "speaking" ? bargeInReady ? "Just speak · auto-interrupt is on" : "Speak now to interrupt" : phase === "thinking" ? "Thinking…" : phase === "connecting" ? "Preparing voice…" : phase === "listening" ? "Listening automatically" : "Start hands-free listening"}
+        <Waveform aria-hidden="true" /> {phase === "speaking" ? "Tap to interrupt" : phase === "thinking" ? "Thinking…" : phase === "connecting" ? "Preparing voice…" : phase === "listening" ? "Listening automatically" : "Start hands-free listening"}
       </button>
 
       <div className="live-call__controls">
@@ -291,7 +272,7 @@ export function VoiceCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.3, y: -90 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">{bargeInReady ? "Automatic interruption is on" : "Hands-free listening resumes after speech"} · private voice model downloads once, then stays cached · language automatically follows English, हिन्दी and Hinglish · no browser/system voice · Companaro does not save a call recording</small>
+      <small className="live-call__disclosure">Hands-free listening resumes after every reply · private voice model downloads once, then stays cached · language automatically follows English, हिन्दी and Hinglish · no browser/system voice · Companaro does not save a call recording</small>
     </motion.div>
   );
 }

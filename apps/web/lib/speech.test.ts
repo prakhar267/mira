@@ -21,6 +21,8 @@ describe("companion speech", () => {
 
   it("recognizes code-mixed Devanagari that should be retried as Roman Hinglish", () => {
     expect(looksLikeCodeMixedDevanagari("आज ऑफिस में बहुत स्ट्रेसफुल डे था, बट अब बेटर हूँ")).toBe(true);
+    expect(looksLikeCodeMixedDevanagari("कल मेरी सिस्टर प्रिया के साथ डिनर है")).toBe(true);
+    expect(looksLikeCodeMixedDevanagari("कल मीटिंग में मैनेजर से बात करनी है")).toBe(true);
     expect(looksLikeCodeMixedDevanagari("आज मेरा दिन बहुत मुश्किल था")).toBe(false);
   });
 

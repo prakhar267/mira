@@ -7,9 +7,20 @@ export interface CallListeningSession {
 export interface CallListeningOptions {
   language: SpeechLanguage;
   onSpeechStart?: () => void;
-  onTranscript: (text: string) => void;
+  onTranscript: (text: string, detectedLanguage: Exclude<SpeechLanguage, "auto">) => void;
   onSilence: () => void;
   onError: (message: string) => void;
+}
+
+export interface CallSpeechEvidence {
+  peakLevel: number;
+  voicedFrames: number;
+  voicedSpanMs: number;
+}
+
+/** Rejects fan noise, clicks and other tiny bursts before paying for STT. */
+export function hasUsableCallSpeech({ peakLevel, voicedFrames, voicedSpanMs }: CallSpeechEvidence) {
+  return peakLevel >= .022 && voicedFrames >= 8 && voicedSpanMs >= 140;
 }
 
 function recorderMimeType() {
@@ -62,6 +73,10 @@ export async function startCallListening(options: CallListeningOptions): Promise
   let cleaned = false;
   let heardSpeech = false;
   let voicedFrames = 0;
+  let totalVoicedFrames = 0;
+  let firstVoicedAt = 0;
+  let lastVoicedAt = 0;
+  let peakLevel = 0;
   let quietSince = 0;
   let noiseFloor = .007;
   const transcriptionController = new AbortController();
@@ -94,7 +109,12 @@ export async function startCallListening(options: CallListeningOptions): Promise
   recorder.onstop = () => {
     cleanup();
     if (canceled) return;
-    if (!heardSpeech || !chunks.length) {
+    const evidence = {
+      peakLevel,
+      voicedFrames: totalVoicedFrames,
+      voicedSpanMs: firstVoicedAt && lastVoicedAt ? lastVoicedAt - firstVoicedAt : 0,
+    };
+    if (!heardSpeech || !chunks.length || !hasUsableCallSpeech(evidence)) {
       options.onSilence();
       return;
     }
@@ -108,9 +128,12 @@ export async function startCallListening(options: CallListeningOptions): Promise
           body: JSON.stringify({ audioBase64, contentType: blob.type, language: options.language }),
           signal: transcriptionController.signal,
         });
-        const body = await response.json().catch(() => null) as { text?: string; error?: string } | null;
+        const body = await response.json().catch(() => null) as { text?: string; language?: SpeechLanguage; error?: string } | null;
         if (!response.ok || !body?.text?.trim()) throw new Error(body?.error ?? "I couldn’t hear that clearly.");
-        if (!canceled) options.onTranscript(body.text.trim());
+        const detectedLanguage = body.language === "hi" || body.language === "hinglish" || body.language === "en"
+          ? body.language
+          : "en";
+        if (!canceled) options.onTranscript(body.text.trim(), detectedLanguage);
       })
       .catch((cause) => {
         if (!canceled) options.onError(cause instanceof Error ? cause.message : "Voice transcription is temporarily unavailable.");
@@ -126,13 +149,21 @@ export async function startCallListening(options: CallListeningOptions): Promise
     const now = performance.now();
 
     if (!heardSpeech) noiseFloor = noiseFloor * .985 + Math.min(level, .03) * .015;
-    const speechThreshold = Math.max(.014, noiseFloor * 2.25);
-    const silenceThreshold = Math.max(.009, noiseFloor * 1.45);
+    if (now - startedAt < 400) {
+      frame = window.requestAnimationFrame(detect);
+      return;
+    }
+    const speechThreshold = Math.max(.018, noiseFloor * 2.8);
+    const silenceThreshold = Math.max(.011, noiseFloor * 1.6);
 
     if (level >= speechThreshold) {
       voicedFrames += 1;
+      totalVoicedFrames += 1;
+      peakLevel = Math.max(peakLevel, level);
+      firstVoicedAt ||= now;
+      lastVoicedAt = now;
       quietSince = 0;
-      if (!heardSpeech && voicedFrames >= 2) {
+      if (!heardSpeech && voicedFrames >= 5) {
         heardSpeech = true;
         options.onSpeechStart?.();
       }

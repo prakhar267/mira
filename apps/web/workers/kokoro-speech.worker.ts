@@ -27,6 +27,46 @@ if (!("window" in workerScope)) {
   });
 }
 
+const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
+const HUGGING_FACE_MODEL_PREFIX = `https://huggingface.co/${MODEL_ID}/resolve/main/`;
+const MODEL_PROXY_PREFIX = new URL(`/api/voice-model/${MODEL_ID}/resolve/main/`, self.location.origin).href;
+const ORT_MJS_URL = new URL(
+  "../node_modules/@huggingface/transformers/dist/ort-wasm-simd-threaded.jsep.mjs",
+  import.meta.url,
+).href;
+const ORT_WASM_URL = new URL(
+  "../node_modules/@huggingface/transformers/dist/ort-wasm-simd-threaded.jsep.wasm",
+  import.meta.url,
+).href;
+const nativeFetch = fetch.bind(self);
+Object.defineProperty(workerScope, "fetch", {
+  configurable: true,
+  value: async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestedUrl = typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+    const effectiveInput = requestedUrl.startsWith(HUGGING_FACE_MODEL_PREFIX)
+      ? `${MODEL_PROXY_PREFIX}${requestedUrl.slice(HUGGING_FACE_MODEL_PREFIX.length)}`
+      : input;
+    let response: Response;
+    try {
+      response = await nativeFetch(effectiveInput, init);
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : "network request failed";
+      throw new Error(`Voice asset fetch failed: ${requestedUrl} (${detail})`);
+    }
+    if (/text\/html/i.test(response.headers.get("content-type") ?? "")) {
+      const redirectedTo = response.url && response.url !== requestedUrl
+        ? ` → ${response.url}`
+        : "";
+      throw new Error(`Voice asset returned HTML (${response.status}): ${requestedUrl}${redirectedTo}`);
+    }
+    return response;
+  },
+});
+
 type AudioResult = { toBlob(): Promise<Blob> };
 type TokenizerResult = { input_ids: unknown };
 type KokoroInstance = {
@@ -36,16 +76,59 @@ type KokoroInstance = {
   _validate_voice(voice: string): string;
 };
 
-const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
+const MODEL_CACHE_MARKER = "Kokoro-82M-v1.0-ONNX";
 const VOICE_ID = "hf_alpha";
 const canceled = new Set<number>();
 let modelPromise: Promise<KokoroInstance> | null = null;
 let hindiPhonemizerPromise: Promise<Awaited<ReturnType<typeof import("ephone")["default"]>>> | null = null;
 let generationQueue = Promise.resolve();
 
+async function removeCorruptModelCacheEntries() {
+  if (typeof caches === "undefined") return;
+
+  for (const cacheName of ["transformers-cache", "kokoro-voices"]) {
+    let cache: Cache;
+    try {
+      cache = await caches.open(cacheName);
+    } catch {
+      continue;
+    }
+
+    const requests = await cache.keys();
+    await Promise.all(requests.map(async (request) => {
+      if (!request.url.includes(MODEL_CACHE_MARKER)) return;
+
+      // Older builds first requested `/models/<repo>/...` from the app origin.
+      // The SPA fallback returned index.html with HTTP 200 and Transformers
+      // cached it as model data. Its cache lookup checks that local key before
+      // the Hugging Face URL even when local models are now disabled.
+      const isObsoleteLocalModel = new URL(request.url).pathname.includes(`/models/${MODEL_ID}/`);
+      const response = await cache.match(request);
+      const isHtml = /text\/html/i.test(response?.headers.get("content-type") ?? "");
+      if (isObsoleteLocalModel || isHtml) await cache.delete(request);
+    }));
+  }
+}
+
 async function model() {
   if (!modelPromise) {
-    modelPromise = import("kokoro-js").then(async ({ KokoroTTS }) => {
+    modelPromise = Promise.all([
+      import("kokoro-js"),
+      import("@huggingface/transformers"),
+    ]).then(async ([{ KokoroTTS }, { env }]) => {
+      // Some production bundlers cannot reliably identify a dedicated worker
+      // and otherwise try `/models/...` on the app origin. That returns the
+      // HTML app shell, which then fails JSON parsing. Force Hub-only loading.
+      env.allowLocalModels = false;
+      env.allowRemoteModels = true;
+      env.remoteHost = new URL("/api/voice-model/", self.location.origin).href;
+      env.remotePathTemplate = "{model}/resolve/{revision}";
+      env.useBrowserCache = typeof caches !== "undefined";
+      const onnxWasm = env.backends.onnx.wasm;
+      if (!onnxWasm) throw new Error("The browser voice runtime is unavailable.");
+      onnxWasm.wasmPaths = { mjs: ORT_MJS_URL, wasm: ORT_WASM_URL };
+      onnxWasm.numThreads = 1;
+      await removeCorruptModelCacheEntries();
       const instance = await KokoroTTS.from_pretrained(MODEL_ID, {
         device: "wasm",
         dtype: "q8",

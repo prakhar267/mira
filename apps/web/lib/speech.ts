@@ -37,7 +37,7 @@ export function detectSpeechLanguage(text: string, requested: SpeechLanguage = "
 export function looksLikeCodeMixedDevanagari(text: string) {
   if (!devanagari.test(text)) return false;
   if (/[a-z]{2,}/i.test(text)) return true;
-  const borrowedWords = text.match(/(?:ऑफिस|ओफिस|वर्क|मीटिंग|कॉल|मैसेज|चैट|स्ट्रेस(?:फुल|्फुल)?|बट|बेटर|फील|फिल|डे|दे|मूड|टाइम|प्लान|डेट)/gu) ?? [];
+  const borrowedWords = text.match(/(?:ऑफिस|ओफिस|वर्क|मीटिंग|कॉल|मैसेज|चैट|स्ट्रेस(?:फुल|्फुल)?|बट|बेटर|फील|फिल|डे|दे|मूड|टाइम|प्लान|डेट|सिस्टर|ब्रदर|डिनर|लंच|मैनेजर|इंटरव्यू|जॉब|ऑफर|कंपनी|प्रोजेक्ट|डेडलाइन|ईमेल|रिज्यूमे|स्टार्टअप|टीम|रिमोट|लैपटॉप|फोन)/gu) ?? [];
   return borrowedWords.length >= 2;
 }
 
