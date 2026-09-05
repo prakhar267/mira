@@ -20,7 +20,7 @@ No public domain or hosting target is configured, as requested. Before starting 
 - `PERSISTENCE_PROVIDER=postgres`, `QUEUE_PROVIDER=redis`, and `STORAGE_PROVIDER=s3`;
 - unique `SESSION_SECRET` and `ADMIN_API_KEY` values;
 - `OPENAI_API_KEY` with every selected OpenAI provider;
-- `SEGMIND_API_KEY` as a Worker secret for the selected Veena Kavya voice across Hindi, English, and Hinglish (`pnpm exec wrangler secret put SEGMIND_API_KEY` from `apps/web`);
+- `INWORLD_API_KEY` as a Worker secret for the selected Inworld TTS-2 Priya voice across Hindi, English, and Hinglish (`pnpm exec wrangler secret put INWORLD_API_KEY` from `apps/web`); the free Inworld On-Demand allowance is capped and the application has no paid fallback;
 - `NOTIFICATION_PROVIDER=webhook` and `NOTIFICATION_WEBHOOK_URL`;
 - managed PostgreSQL/pgvector, Redis, S3 credentials, and exact `APP_ORIGIN`/`API_ORIGIN` values.
 

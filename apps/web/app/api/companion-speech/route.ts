@@ -1,11 +1,10 @@
-import { createVeenaRequest, detectVeenaAudioContentType, fitVeenaSpeechPrompt, VEENA_ENDPOINT } from "@/lib/veena-speech";
+import { createInworldSpeechRequest, decodeInworldAudio, fitInworldSpeechPrompt, INWORLD_TTS_ENDPOINT } from "@/lib/inworld-speech";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 
 const VOICE = {
-  model: "maya-research/Veena",
-  name: "Kavya",
-  provider: "segmind",
-  speaker: "kavya",
+  model: "inworld-tts-2",
+  name: "Priya",
+  provider: "inworld",
   language: "hinglish",
 } as const;
 
@@ -22,19 +21,15 @@ async function fetchWithDeadline(input: string, init: RequestInit, timeoutMs: nu
   }
 }
 
-async function generateVeenaSpeech(prompt: string, apiKey: string, requestSignal: AbortSignal) {
-  const response = await fetchWithDeadline(VEENA_ENDPOINT, createVeenaRequest(prompt, apiKey), 90_000, requestSignal);
-
-  if (!response.ok) throw new Error(`Veena generation returned ${response.status}.`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  const contentType = detectVeenaAudioContentType(bytes);
-  if (!contentType || bytes.length > 8_000_000) {
-    throw new Error("Veena returned invalid audio data.");
-  }
-  return { bytes, contentType };
+async function generateInworldSpeech(prompt: string, apiKey: string, requestSignal: AbortSignal) {
+  const response = await fetchWithDeadline(INWORLD_TTS_ENDPOINT, createInworldSpeechRequest(prompt, apiKey), 45_000, requestSignal);
+  if (!response.ok) throw new Error(`Inworld generation returned ${response.status}.`);
+  const body = await response.json() as { audioContent?: unknown };
+  if (typeof body.audioContent !== "string") throw new Error("Inworld returned no audio.");
+  return decodeInworldAudio(body.audioContent);
 }
 
-function audioResponse(audio: Uint8Array, contentType: string, requestId: string, startedAt: number) {
+function audioResponse(audio: Uint8Array, requestId: string, startedAt: number) {
   console.log(JSON.stringify({
     event: "edge_request",
     requestId,
@@ -49,7 +44,7 @@ function audioResponse(audio: Uint8Array, contentType: string, requestId: string
   return new Response(audio as unknown as BodyInit, {
     headers: {
       "cache-control": "no-store",
-      "content-type": contentType,
+      "content-type": "audio/mpeg",
       "x-companion-voice": VOICE.name,
       "x-companion-voice-model": VOICE.model,
       "x-companion-voice-provider": VOICE.provider,
@@ -68,27 +63,27 @@ export async function POST(request: Request) {
     assertEdgeSameOrigin(request);
     if (await edgeRateLimited(request, "companion-speech", 36)) return respond({ error: "Voice thoda cool down kar raha hai. Ek moment mein try karo." }, 429, { limited: true });
     const body = await readEdgeJson(request, 5_000) as { text?: unknown } | null;
-    const prompt = fitVeenaSpeechPrompt(typeof body?.text === "string" ? body.text : "");
+    const prompt = fitInworldSpeechPrompt(typeof body?.text === "string" ? body.text : "");
     if (!prompt) return respond({ error: "Speech text is required." }, 400);
 
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const apiKey = (env as typeof env & { SEGMIND_API_KEY?: string }).SEGMIND_API_KEY?.trim();
-    if (!apiKey) return respond({ error: "Mira's selected Kavya voice is not configured yet." }, 503, { provider: VOICE.provider, model: VOICE.model, configuration: "missing" });
+    const apiKey = (env as typeof env & { INWORLD_API_KEY?: string }).INWORLD_API_KEY?.trim();
+    if (!apiKey) return respond({ error: "Mira's selected Priya voice is not configured yet." }, 503, { provider: VOICE.provider, model: VOICE.model, configuration: "missing" });
 
-    let audio: Awaited<ReturnType<typeof generateVeenaSpeech>> | undefined;
+    let audio: Uint8Array | undefined;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        audio = await generateVeenaSpeech(prompt, apiKey, request.signal);
+        audio = await generateInworldSpeech(prompt, apiKey, request.signal);
         break;
       } catch (cause) {
         if (attempt === 1 || request.signal.aborted) throw cause;
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
     }
-    if (!audio) throw new Error("Veena returned no audio.");
-    return audioResponse(audio.bytes, audio.contentType, requestId, startedAt);
+    if (!audio) throw new Error("Inworld returned no audio.");
+    return audioResponse(audio, requestId, startedAt);
   } catch (cause) {
-    console.error("Mira Veena speech failed", cause instanceof Error ? cause.message : "unknown");
+    console.error("Mira Inworld speech failed", cause instanceof Error ? cause.message : "unknown");
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-speech", startedAt, cause);
     return respond({ error: "Mira ki voice abhi connect nahi ho paayi. Please phir try karo." }, 503, { provider: VOICE.provider, model: VOICE.model });
   }
