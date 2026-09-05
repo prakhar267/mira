@@ -14,11 +14,8 @@ import {
 } from "@phosphor-icons/react";
 import {
   playCompanionSpeech,
-  speechLanguageOptions,
   type CompanionSpeechPlayback,
-  type SpeechLanguage,
 } from "@/lib/speech";
-import { companionVoiceMode, companionVoiceModes } from "@/lib/voice-profiles";
 import { startCallListening, type CallListeningSession } from "@/lib/call-listening";
 
 type CallPhase = "connecting" | "listening" | "thinking" | "speaking" | "interrupted";
@@ -26,19 +23,15 @@ type CallPhase = "connecting" | "listening" | "thinking" | "speaking" | "interru
 export function VoiceCallModal({
   companionName,
   userName,
-  voiceId,
   onUserTurn,
-  onVoiceChange,
   onClose,
 }: {
   companionName: string;
   userName: string;
-  voiceId: string;
   onUserTurn: (content: string) => Promise<string>;
-  onVoiceChange?: (voiceId: string) => void;
   onClose: (durationSeconds: number) => void;
 }) {
-  const greeting = `Hey ${userName}. What’s going on?`;
+  const greeting = `Hey ${userName}, aa gaye. Batao, kya chal raha hai?`;
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState(true);
   const [captions, setCaptions] = useState(true);
@@ -48,9 +41,6 @@ export function VoiceCallModal({
   const [heard, setHeard] = useState("");
   const [companionLine, setCompanionLine] = useState(greeting);
   const [speechError, setSpeechError] = useState("");
-  const [language, setLanguage] = useState<SpeechLanguage>("auto");
-  const [activeVoiceId, setActiveVoiceId] = useState(voiceId);
-  const [detectedLanguage, setDetectedLanguage] = useState<Exclude<SpeechLanguage, "auto">>("en");
   const recognitionRef = useRef<CallListeningSession | null>(null);
   const greetingSpoken = useRef(false);
   const speechTurn = useRef(0);
@@ -61,8 +51,6 @@ export function VoiceCallModal({
   const activeRef = useRef(true);
   const phaseRef = useRef<CallPhase>("connecting");
   const listeningAttemptRef = useRef(0);
-
-  useEffect(() => { setActiveVoiceId(companionVoiceMode(voiceId).id); }, [voiceId]);
 
   const changePhase = useCallback((next: CallPhase) => {
     phaseRef.current = next;
@@ -91,7 +79,7 @@ export function VoiceCallModal({
     }, delay);
   }, []);
 
-  const speak = useCallback((text: string, force = false, selectedVoiceId = activeVoiceId) => {
+  const speak = useCallback((text: string, force = false) => {
     if (!speaker && !force) {
       changePhase("listening");
       queueAutoListen();
@@ -107,8 +95,6 @@ export function VoiceCallModal({
     playbackRef.current?.cancel();
     changePhase("connecting");
     playbackRef.current = playCompanionSpeech(text, {
-      voiceId: selectedVoiceId,
-      language,
       onStart: () => {
         if (speechTurn.current !== turn) return;
         setSpeechError("");
@@ -119,9 +105,14 @@ export function VoiceCallModal({
         changePhase("listening");
         queueAutoListen();
       },
-      onError: (message) => setSpeechError(message),
+      onError: (message) => {
+        if (speechTurn.current !== turn || !activeRef.current) return;
+        setSpeechError(message);
+        changePhase("listening");
+        queueAutoListen(400);
+      },
     });
-  }, [activeVoiceId, changePhase, language, queueAutoListen, speaker, stopRecognition]);
+  }, [changePhase, queueAutoListen, speaker, stopRecognition]);
 
   useEffect(() => {
     activeRef.current = true;
@@ -161,7 +152,7 @@ export function VoiceCallModal({
       setCompanionLine(reply);
       speak(reply);
     } catch {
-      const fallback = "I lost the reply for a second. Try that once more?";
+      const fallback = "Reply miss ho gaya. Ek baar phir bolo?";
       setCompanionLine(fallback);
       speak(fallback);
     }
@@ -179,12 +170,10 @@ export function VoiceCallModal({
     setHeard("");
     changePhase("listening");
     void startCallListening({
-      language,
       onSpeechStart: () => { if (listeningAttemptRef.current === attempt) setHeard("Hearing you…"); },
-      onTranscript: (transcript, detected) => {
+      onTranscript: (transcript) => {
         if (listeningAttemptRef.current !== attempt || !activeRef.current) return;
         recognitionRef.current = null;
-        setDetectedLanguage(detected);
         void submitTurn(transcript);
       },
       onSilence: () => {
@@ -210,7 +199,7 @@ export function VoiceCallModal({
       setSpeechError(cause instanceof Error ? cause.message : "Microphone access is unavailable.");
       changePhase("listening");
     });
-  }, [changePhase, language, queueAutoListen, submitTurn]);
+  }, [changePhase, queueAutoListen, submitTurn]);
   useEffect(() => { startListeningRef.current = beginListening; }, [beginListening]);
 
   const interrupt = useCallback(() => {
@@ -234,7 +223,7 @@ export function VoiceCallModal({
 
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const phaseCopy: Record<CallPhase, string> = {
-    connecting: "Preparing private voice…",
+    connecting: "Mira ki voice aa rahi hai…",
     listening: "Listening to you",
     thinking: "Thinking about that",
     speaking: "Talking with you",
@@ -245,7 +234,7 @@ export function VoiceCallModal({
     <motion.div className="live-call live-call--voice" role="dialog" aria-modal="true" aria-label={`Voice call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <img className="live-call__backdrop" src="/assets/mira/loft-morning.png" alt="" />
       <div className="live-call__veil" />
-      <header className="live-call__header"><span><i className="status-dot" /> {companionName} · multilingual neural voice</span><strong>{companionName}</strong><time>{time}</time></header>
+      <header className="live-call__header"><span><i className="status-dot" /> {companionName} · Hinglish voice</span><strong>{companionName}</strong><time>{time}</time></header>
       <div className="voice-call__portrait">
         <motion.img src={phase === "speaking" ? "/assets/mira/portrait-speaking.png" : "/assets/mira/portrait.png"} alt={`${companionName}, your AI companion`} animate={phase === "speaking" ? { scale: [1, 1.012, 1], y: [0, -1, 0] } : { scale: 1, y: 0 }} transition={{ duration: 3.2, repeat: phase === "speaking" ? Infinity : 0 }} />
         <i className={phase === "speaking" ? "voice-call__ring voice-call__ring--active" : "voice-call__ring"} />
@@ -256,8 +245,7 @@ export function VoiceCallModal({
       {speechError ? <p className="call-speech-error" role="status">{speechError}</p> : null}
 
       <div className="call-pickers">
-        <label className="call-language-picker"><span>Language · {language === "auto" ? detectedLanguage === "hi" ? "हिन्दी detected" : detectedLanguage === "hinglish" ? "Hinglish detected" : "English detected" : "manual"}</span><select aria-label="Voice call language" value={language} onChange={(event) => { const next = event.target.value as SpeechLanguage; stopRecognition(); playbackRef.current?.cancel(); changePhase("listening"); setLanguage(next); if (next !== "auto") setDetectedLanguage(next); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        <label className="call-language-picker"><span>Mood</span><select aria-label="Mira voice mood" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const mode = companionVoiceMode(next); setActiveVoiceId(next); onVoiceChange?.(next); setCompanionLine(`${mode.name} mood selected.`); speak(`Okay… I’ll sound ${mode.name.toLowerCase()} now.`, true, next); }}>{companionVoiceModes.map((mode) => <option key={mode.id} value={mode.id}>{mode.name}</option>)}</select></label>
+        <div className="call-language-picker"><span>Hinglish only · one natural voice</span></div>
       </div>
 
       <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking" || phase === "connecting"}>
@@ -272,7 +260,7 @@ export function VoiceCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.3, y: -90 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening resumes after every reply · private voice model downloads once, then stays cached · language automatically follows English, हिन्दी and Hinglish · no browser/system voice · Companaro does not save a call recording</small>
+      <small className="live-call__disclosure">Hands-free listening resumes after every reply · one consistent Hinglish voice · no browser/system voice · Companaro does not save a call recording</small>
     </motion.div>
   );
 }

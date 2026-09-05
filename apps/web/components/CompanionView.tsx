@@ -16,7 +16,6 @@ import {
 import type { CompanionProfile, OwnedItemRecord, StoreItemRecord, SubscriptionState, WalletState } from "@companion/shared";
 import { canAccessItem } from "@/lib/product-rules";
 import { playCompanionSpeech, type CompanionSpeechPlayback } from "@/lib/speech";
-import { companionVoiceIdentity, companionVoiceMode, companionVoiceModes } from "@/lib/voice-profiles";
 
 export function CompanionView({ companion, backstory, storeItems, ownedItems, wallet, subscription, onChange, onBackstoryChange, onPurchase, onEquip, onUpgrade }: {
   companion: CompanionProfile;
@@ -39,10 +38,10 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
 
   useEffect(() => () => playbackRef.current?.cancel(), []);
 
-  const previewMood = (mode: typeof companionVoiceModes[number]) => {
+  const previewVoice = () => {
     playbackRef.current?.cancel();
-    playbackRef.current = playCompanionSpeech("Hey… nice to meet you. I was hoping you’d show up.", { voiceId: mode.id });
-    setNotice(`${companionVoiceIdentity.name} · ${mode.name} mood.`);
+    playbackRef.current = playCompanionSpeech("Hey, aa gaye. Tumse baat karne ka wait tha.");
+    setNotice("Mira · natural Hinglish voice");
   };
 
   return (
@@ -101,8 +100,8 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
           </> : null}
 
           {tab === "voice" ? <>
-            <div className="section-heading"><div><span className="luma-kicker">One recognizable voice</span><h2>{companionVoiceIdentity.name}</h2><p>{companionVoiceIdentity.detail}. Change her emotional delivery without swapping her identity.</p></div></div>
-            <div className="voice-list">{companionVoiceModes.map((mode) => <button type="button" key={mode.id} className={companionVoiceMode(companion.voiceId).id === mode.id ? "voice-option voice-option--selected" : "voice-option"} onClick={() => { onChange({ ...companion, voiceId: mode.id }); previewMood(mode); }}><span><Play aria-hidden="true" /></span><strong>{mode.name} mood</strong><small>{mode.detail}</small><Volume2 aria-hidden="true" /></button>)}</div>
+            <div className="section-heading"><div><span className="luma-kicker">One recognizable voice</span><h2>Mira</h2><p>A single warm, conversational Hinglish voice across chat, voice calls, and video calls.</p></div></div>
+            <div className="voice-list"><button type="button" className="voice-option voice-option--selected" onClick={previewVoice}><span><Play aria-hidden="true" /></span><strong>Natural Hinglish</strong><small>One consistent voice, no mood switching</small><Volume2 aria-hidden="true" /></button></div>
           </> : null}
         </div>
       </div>

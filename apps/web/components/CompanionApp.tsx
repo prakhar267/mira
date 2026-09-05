@@ -472,7 +472,7 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
         delivery,
       });
     } catch {
-      return fallback.text;
+      return "Mera reply abhi atak gaya. Jo bola tha ek baar phir bol do?";
     }
   };
 
@@ -571,7 +571,7 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     const deletedId = state.activeConversationId;
     if (liveMode) await companionApi.deleteConversation(deletedId);
     const conversationId = liveMode ? (await companionApi.createConversation(state.companion.id)).id : crypto.randomUUID();
-    setState((current) => ({ ...current, activeConversationId: conversationId, messages: [...current.messages.filter((message) => message.conversationId !== deletedId), { id: crypto.randomUUID(), conversationId, role: "assistant", content: "Clean slate. What would feel good to talk about now?", createdAt: new Date().toISOString(), status: "sent" }] }));
+    setState((current) => ({ ...current, activeConversationId: conversationId, messages: [...current.messages.filter((message) => message.conversationId !== deletedId), { id: crypto.randomUUID(), conversationId, role: "assistant", content: "Fresh start. Batao, abhi kya baat karni hai?", createdAt: new Date().toISOString(), status: "sent" }] }));
   };
 
   const addMockExchange = (userMessage: ChatMessage, assistantMessage: ChatMessage) => setState((current) => ({ ...current, messages: [...current.messages, userMessage, assistantMessage] }));
@@ -600,17 +600,7 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   };
 
   const speakWithProvider = async (content: string) => {
-    if (!liveMode) {
-      playCompanionSpeech(content, { voiceId: state.companion.voiceId });
-      return;
-    }
-    const speech = await companionApi.synthesize(content, state.companion.voiceId);
-    if (speech.mock) {
-      playCompanionSpeech(content, { voiceId: state.companion.voiceId });
-      return;
-    }
-    const audio = new Audio(`data:${speech.contentType};base64,${speech.audioBase64}`);
-    await audio.play();
+    playCompanionSpeech(content);
   };
 
   const uploadImage = async (file: File) => {
@@ -919,8 +909,8 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   return (
     <>
       <AppShell active={state.currentView} onNavigate={navigate} onCall={openVoiceCall} companionName={state.companion.name} relationshipStage={state.relationship.stage} relationshipLevel={state.relationship.level} immersive={state.currentView === "home"}>{renderView()}</AppShell>
-      {voiceCallOpen ? <VoiceCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} onVoiceChange={(voiceId) => changeCompanion({ ...state.companion, voiceId })} onUserTurn={(content) => replyDuringCall(content, "voice")} onClose={(seconds) => finishCall("voice", seconds)} /> : null}
-      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} voiceId={state.companion.voiceId} onVoiceChange={(voiceId) => changeCompanion({ ...state.companion, voiceId })} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} onAnalyzeFrame={analyzeSharedCallFrame} onClose={(seconds) => finishCall("video", seconds)} /> : null}
+      {voiceCallOpen ? <VoiceCallModal companionName={state.companion.name} userName={state.user.name} onUserTurn={(content) => replyDuringCall(content, "voice")} onClose={(seconds) => finishCall("voice", seconds)} /> : null}
+      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} onAnalyzeFrame={analyzeSharedCallFrame} onClose={(seconds) => finishCall("video", seconds)} /> : null}
       {cameraOpen ? <CameraConversationModal companionName={state.companion.name} onSessionStart={liveMode ? companionApi.startCameraSession : async () => ({ mock: true })} onAnalyzeFrame={liveMode ? async (dataBase64: string, contentType: string) => (await companionApi.analyzeImage(dataBase64, contentType, "Discuss the visible object or surroundings naturally and safely.")).description : async () => { await pause(280); return "I can see the frame you chose to share. Tell me what matters about it to you, and I’ll stay with that rather than making assumptions."; }} onClose={() => setCameraOpen(false)} /> : null}
       {plansOpen ? <PlanModal current={state.subscription.planId} onSelect={(planId) => runAction(choosePlan(planId), "The plan could not be changed.")} onClose={() => setPlansOpen(false)} /> : null}
       {processingNoticeOpen ? <Modal title="AI processing is paused" description="Turn processing consent back on before starting chat, voice, video, camera, or image features." onClose={() => setProcessingNoticeOpen(false)}><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setProcessingNoticeOpen(false)}>Keep paused</button><button type="button" className="button button--primary" onClick={() => { setState((current) => ({ ...current, aiProcessingConsent: true })); setProcessingNoticeOpen(false); }}>Enable AI features</button></div></Modal> : null}

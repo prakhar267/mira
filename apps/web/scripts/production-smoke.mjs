@@ -72,6 +72,7 @@ await run("natural identity answer", async () => {
   const reply = await chat([{ role: "user", content: "What is your name and what do you do?" }]);
   expect(/\bMira\b/i.test(reply), `name absent: ${reply}`);
   expect(!/\b(?:Meta|Llama|OpenAI|ChatGPT|Claude)\b/i.test(reply), `provider identity leaked: ${reply}`);
+  expect(!/\p{Script=Devanagari}/u.test(reply), `reply was not Roman-script Hinglish: ${reply}`);
   return reply;
 });
 
@@ -82,7 +83,7 @@ await run("listen-only boundary", async () => {
   return reply;
 });
 
-await run("Hinglish language switching", async () => {
+await run("Hinglish-only conversation", async () => {
   const reply = await chat([
     { role: "user", content: "How are you?" },
     { role: "assistant", content: "Pretty good. A little curious about your day." },
@@ -92,9 +93,9 @@ await run("Hinglish language switching", async () => {
   return reply;
 });
 
-await run("Hindi language switching", async () => {
+await run("Hindi input becomes Roman Hinglish", async () => {
   const reply = await chat([{ role: "user", content: "आज पूरा दिन बहुत बोरिंग था" }]);
-  expect(/\p{Script=Devanagari}/u.test(reply), `reply was not Hindi: ${reply}`);
+  expect(!/\p{Script=Devanagari}/u.test(reply), `reply was not Roman-script Hinglish: ${reply}`);
   return reply;
 });
 
@@ -161,15 +162,18 @@ await run("voice upload validation", async () => {
   return "malformed/non-audio upload rejected";
 });
 
-await run("retired server speech endpoint", async () => {
-  const { response, body } = await json("/api/companion-speech", {
+await run("Hinglish speech audio generation", async () => {
+  const response = await fetch(`${baseUrl}/api/companion-speech`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text: "This must not call the removed hosted voices." }),
+    body: JSON.stringify({ text: "Hey yaar, aaj tumse baat karke accha laga." }),
   });
-  expect(response.status === 410, `expected retired endpoint status, received ${response.status}`);
-  expect(body.model === "onnx-community/Kokoro-82M-v1.0-ONNX", "local Kokoro model identity missing");
-  return "hosted Melo/Aura route removed; client-side Kokoro advertised";
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  expect(response.ok, `speech returned ${response.status}: ${new TextDecoder().decode(bytes).slice(0, 160)}`);
+  expect(response.headers.get("content-type")?.startsWith("audio/"), "speech response was not audio");
+  expect(bytes.length > 1_000, `speech audio was unexpectedly small: ${bytes.length}`);
+  expect(response.headers.get("x-companion-language") === "hinglish", "Hinglish voice identity missing");
+  return `${response.headers.get("x-companion-voice-model")}, ${bytes.length} bytes`;
 });
 
 await run("invalid login rejection", async () => {

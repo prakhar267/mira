@@ -20,11 +20,8 @@ import { LiveAvatar3D, type AvatarMouthPose } from "@/components/LiveAvatar3D";
 import {
   mouthPoseForText,
   playCompanionSpeech,
-  speechLanguageOptions,
   type CompanionSpeechPlayback,
-  type SpeechLanguage,
 } from "@/lib/speech";
-import { companionVoiceMode, companionVoiceModes } from "@/lib/voice-profiles";
 import { startCallListening, type CallListeningSession } from "@/lib/call-listening";
 
 const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
@@ -32,22 +29,18 @@ const callActivities = ["Would you rather", "Relationship cards", "Plan a date",
 export function VideoCallModal({
   companionName,
   userName,
-  voiceId,
   onUserTurn,
-  onVoiceChange,
   onAnalyzeFrame,
   onClose,
 }: {
   companionName: string;
   userName: string;
-  voiceId: string;
   initialEnvironment: string;
   onUserTurn: (content: string) => Promise<string>;
-  onVoiceChange?: (voiceId: string) => void;
   onAnalyzeFrame: (dataBase64: string, contentType: string) => Promise<string>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const greeting = `Hey ${userName}. You made it—what’s up?`;
+  const greeting = `Hey ${userName}, aa gaye. Batao, kya chal raha hai?`;
   const [seconds, setSeconds] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState(true);
@@ -67,9 +60,6 @@ export function VideoCallModal({
   const [blinking, setBlinking] = useState(false);
   const [companionLine, setCompanionLine] = useState(greeting);
   const [userLine, setUserLine] = useState("");
-  const [language, setLanguage] = useState<SpeechLanguage>("auto");
-  const [activeVoiceId, setActiveVoiceId] = useState(voiceId);
-  const [detectedLanguage, setDetectedLanguage] = useState<Exclude<SpeechLanguage, "auto">>("en");
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const greetingSpoken = useRef(false);
@@ -85,8 +75,6 @@ export function VideoCallModal({
   const lastMouthBoundaryRef = useRef(0);
   const mouthSequenceRef = useRef(0);
   const listeningAttemptRef = useRef(0);
-
-  useEffect(() => { setActiveVoiceId(companionVoiceMode(voiceId).id); }, [voiceId]);
 
   const changeSpeaking = useCallback((next: boolean) => {
     speakingRef.current = next;
@@ -121,7 +109,7 @@ export function VideoCallModal({
     }, delay);
   }, []);
 
-  const speak = useCallback((text: string, force = false, selectedVoiceId = activeVoiceId) => {
+  const speak = useCallback((text: string, force = false) => {
     if (!speaker && !force) {
       changeSpeaking(false);
       setListening(true);
@@ -140,8 +128,6 @@ export function VideoCallModal({
     changeSpeaking(false);
     setPreparingSpeech(true);
     playbackRef.current = playCompanionSpeech(text, {
-      voiceId: selectedVoiceId,
-      language,
       onStart: () => {
         if (speechTurn.current !== turn) return;
         setSpeechError("");
@@ -162,9 +148,16 @@ export function VideoCallModal({
         setListening(true);
         queueAutoListen();
       },
-      onError: (message) => { setPreparingSpeech(false); setSpeechError(message); },
+      onError: (message) => {
+        if (speechTurn.current !== turn || !activeRef.current) return;
+        setPreparingSpeech(false);
+        setSpeechError(message);
+        changeSpeaking(false);
+        setListening(true);
+        queueAutoListen(400);
+      },
     });
-  }, [activeVoiceId, changeSpeaking, language, queueAutoListen, speaker, stopRecognition]);
+  }, [changeSpeaking, queueAutoListen, speaker, stopRecognition]);
 
   useEffect(() => {
     activeRef.current = true;
@@ -282,7 +275,7 @@ export function VideoCallModal({
       setCompanionLine(reply);
       speak(reply);
     } catch {
-      const fallback = "I missed that for a second—say it once more?";
+      const fallback = "Reply miss ho gaya—ek baar phir bolo?";
       setCompanionLine(fallback);
       speak(fallback);
     } finally {
@@ -307,12 +300,10 @@ export function VideoCallModal({
     setListening(true);
     setUserLine("");
     void startCallListening({
-      language,
       onSpeechStart: () => { if (listeningAttemptRef.current === attempt) setUserLine("Hearing you…"); },
-      onTranscript: (transcript, detected) => {
+      onTranscript: (transcript) => {
         if (listeningAttemptRef.current !== attempt || !activeRef.current) return;
         recognitionRef.current = null;
-        setDetectedLanguage(detected);
         void submitContent(transcript);
       },
       onSilence: () => {
@@ -338,7 +329,7 @@ export function VideoCallModal({
       setListening(false);
       setSpeechError(cause instanceof Error ? cause.message : "Microphone access is unavailable.");
     });
-  }, [changeSpeaking, language, queueAutoListen, submitContent]);
+  }, [changeSpeaking, queueAutoListen, submitContent]);
   useEffect(() => { startListeningRef.current = beginListening; }, [beginListening]);
 
   const interrupt = useCallback(() => {
@@ -363,7 +354,7 @@ export function VideoCallModal({
           listening={listening}
           blinking={blinking}
           mouthPose={mouthPose}
-          emotion={companionVoiceMode(activeVoiceId).emotion}
+          emotion="natural"
         />
         <span className="video-call__feed-badge"><i className="status-dot" /> Live 3D avatar · expression synced</span>
       </div>
@@ -379,8 +370,7 @@ export function VideoCallModal({
 
       <div className="video-call__tools">
         <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Open-licensed anime avatar · stable live expressions</span>
-        <label>Language · {language === "auto" ? detectedLanguage === "hi" ? "हिन्दी detected" : detectedLanguage === "hinglish" ? "Hinglish detected" : "English detected" : "manual"}<select aria-label="Video call language" value={language} onChange={(event) => { const next = event.target.value as SpeechLanguage; stopRecognition(); playbackRef.current?.cancel(); setPreparingSpeech(false); changeSpeaking(false); setLanguage(next); if (next !== "auto") setDetectedLanguage(next); setListening(true); queueAutoListen(); }}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        <label>Mood<select aria-label="Video call voice mood" value={activeVoiceId} onChange={(event) => { const next = event.target.value; const mode = companionVoiceMode(next); setActiveVoiceId(next); onVoiceChange?.(next); setCompanionLine(`${mode.name} mood selected.`); speak(`Okay… I’ll sound ${mode.name.toLowerCase()} now.`, true, next); }}>{companionVoiceModes.map((mode) => <option key={mode.id} value={mode.id}>{mode.name}</option>)}</select></label>
+        <span className="video-call__avatar-label">Hinglish only · one natural voice</span>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
         <button type="button" disabled={!cameraOn || visionBusy} onClick={() => void shareCurrentFrame()}><Camera aria-hidden="true" /> {visionBusy ? "Looking…" : "Show frame"}</button>
       </div>
@@ -402,7 +392,7 @@ export function VideoCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End video call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.4, y: -110 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening resumes after every reply · private voice model downloads once, then stays cached · language automatically follows English, हिन्दी and Hinglish · no browser/system voice · camera stays local until Show frame · no call recording is saved</small>
+      <small className="live-call__disclosure">Hands-free listening resumes after every reply · one consistent Hinglish voice · camera stays local until Show frame · no call recording is saved</small>
     </motion.div>
   );
 }

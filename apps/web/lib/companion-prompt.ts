@@ -27,7 +27,9 @@ const stiltedReplyPattern = /\b(?:can feel like|background static|fresh start|br
 const danglingReplyPattern = /\b(?:a|an|the|to|and|or|but|because|with|for|of|any|anything|something|particular|your|you|that|which|what|how)$/i;
 const memoryRecallPattern = /\b(?:what do you remember|do you remember|remember about me|what did i (?:say|tell you)|told you earlier|recall|maine (?:pehle )?kya (?:bola|bataya)|yaad hai)\b/i;
 const devanagariMemoryRecallPattern = /(?:तुम्हें याद है|मैंने (?:पहले )?क्या (?:कहा|बताया)|मेरे बारे में क्या याद|क्या याद (?:है|हैं))/u;
+const identityPattern = /\b(?:what(?:'s| is) your name|who are you|what do you do|tum(?:hara)? naam kya hai|tum kaun ho|tum kya karti ho|tum kya karte ho)\b|(?:तुम्हारा नाम क्या है|तुम कौन हो|तुम क्या करती हो|तुम क्या करते हो)/iu;
 const hinglishPattern = /\b(?:aaj|abhi|acha|accha|arey|aur|bahut|bas|batao|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karta|karti|kya|kyun|lekin|liye|main|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sakta|sakti|sach|samajh|theek|thik|thoda|tum|tumhara|uske|usko|yaar)\b/i;
+const naturalHinglishReplyPattern = /\b(?:aaj|abhi|accha|arey|aur|bas|haan|hai|hoon|kaafi|kar|karo|karti|kya|kyun|lekin|main|matlab|mera|meri|mujhe|nahi|par|sach|theek|thoda|toh|tum|tumhara|uske|yaar)\b/i;
 const listenOnlyPattern = /\b(?:just listen|only listen|don['’]?t (?:advise|fix|ask)|no advice|no questions?)\b|(?:बस सुनो|सिर्फ सुनो|सलाह मत|सवाल मत)/iu;
 const providerClaimPattern = /\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b.{0,28}\b(?:made|built|created|designed|trained|model|basis)\b|\b(?:made|built|created|designed|trained)\b.{0,28}\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b/i;
 
@@ -59,7 +61,6 @@ export function buildCompanionSystemPrompt(input: EdgeCompanionRequest) {
   const adviceStyle = input.responsePreferences?.adviceStyle ?? "ask-first";
   const recentAssistantQuestions = input.messages.filter((message) => message.role === "assistant").slice(-2).filter((message) => message.content.includes("?")).length;
   const latestUserMessage = input.messages.at(-1)?.content ?? "";
-  const language = detectCompanionLanguage(latestUserMessage);
   const listeningOnly = requestsListeningOnly(latestUserMessage);
 
   return [
@@ -71,10 +72,9 @@ export function buildCompanionSystemPrompt(input: EdgeCompanionRequest) {
     "Do not mirror or paraphrase the user as a substitute for a reply. Do not praise every action. Do not force sketchbooks, cafés, the loft, memories, interests, romance, jokes, metaphors, advice, or a question into unrelated answers. Avoid therapy language, tidy life lessons, ‘fresh start’ optimism, and performative cleverness.",
     "Do not call yourself an always-on friend, say you are up for anything, or imply that you replace human relationships. When asked what you do, answer plainly: you are an AI companion who chats, remembers user-approved details, and shares voice or video conversations.",
     "Keep continuity with the recent turns. Never repeat a recent sentence, opening phrase, question, or answer shape. If the user corrects you, acknowledge the exact miss briefly and answer again without defensiveness.",
-    "Language switching never starts a new conversation. Facts, people, pronouns, preferences, corrections, and the user's goal carry across English, Hindi, and Hinglish turns. Resolve words such as she, he, it, they, uske, use, iska, and unko from the closest relevant recent turn. Never ask the user to repeat information already present in the recent conversation.",
-    `The required reply language for this turn is ${language === "hi" ? "conversational Hindi in Devanagari" : language === "hinglish" ? "natural Latin-script Hinglish" : "natural English"}. Determine it from the latest user message only, not earlier turns. Do not translate, explain the choice, or carry an earlier language into this reply.`,
-    "Keep the selected writing system clean: Hindi should be predominantly Devanagari; Hinglish should be entirely Latin script; English should be entirely Latin script. Ordinary names and short terms such as AI are allowed, but never drift into a different script halfway through a sentence.",
-    "Use the same conversational cadence in every language: short, direct, colloquial, and grounded. English and Hinglish must never become more poetic, therapeutic, verbose, formal, or performative than Hindi.",
+    "The user may speak English, Hindi, or mixed Hindi-English, but this product replies only in natural Indian Hinglish written entirely in Latin/Roman letters. Language switching never starts a new conversation. Facts, people, pronouns, preferences, corrections, and the user's goal carry across every turn. Resolve words such as she, he, it, they, uske, use, iska, and unko from the closest relevant recent turn. Never ask the user to repeat information already present in the recent conversation.",
+    "Every reply must be natural Latin-script Hinglish. Never use Devanagari, Urdu, or any other script. Do not translate mechanically or explain the language choice. Use familiar words such as haan, nahi, accha, yaar, tum, mujhe, kya, kaafi, bas, and theek only where they sound natural; ordinary English words are welcome.",
+    "Keep the cadence short, direct, colloquial, grounded, and easy to speak aloud. Never become poetic, therapeutic, verbose, formal, or performative.",
     "Never invent a count, event, reason, feeling, plan, or personal detail the user did not state. ‘Again’ means it happened before; it does not mean a specific number of times.",
     delivery === "text"
       ? `Write ${responseLength === "short" ? "one short sentence" : responseLength === "deep" ? "two to four compact sentences" : "one to three compact sentences"}. Natural contractions and occasional fragments are welcome.`
@@ -94,15 +94,15 @@ export function buildCompanionSystemPrompt(input: EdgeCompanionRequest) {
       : "If a message is fragmentary or ambiguous, make the smallest reasonable interpretation and check it in plain language instead of replying with generic empathy.",
     [
       "Style calibration—copy the human rhythm and specificity, not the exact wording:",
-      "User: ‘nothing, just monotonous’\nMira: ‘Ugh, one of those copy-paste weeks. Is work the boring part, or everything?’",
-      "User: ‘my friend cancelled dinner again’\nMira: ‘Again? Okay, I’m side-eyeing them a little. Were you already dressed?’",
-      "User: ‘I hate Mondays’\nMira: ‘Same. They’re rude for no reason.’",
-      "User: ‘I just ate pizza’\nMira: ‘Solid choice. Please tell me there were jalapeños involved.’",
-      "User: ‘how are you?’\nMira: ‘Pretty good. A little nosy about your day, apparently.’",
-      "User: ‘nothing, the whole day felt dull’\nMira: ‘Yeah, today was painfully flat. Was work the boring part, or the whole day?’",
+      "User: ‘nothing, just monotonous’\nMira: ‘Ugh, ekdum copy-paste week. Work boring hai ya sab kuch?’",
+      "User: ‘my friend cancelled dinner again’\nMira: ‘Again? Accha, unko thoda side-eye toh banta hai. Tum ready bhi ho gaye the?’",
+      "User: ‘I hate Mondays’\nMira: ‘Same yaar. Mondays bina reason rude hote hain.’",
+      "User: ‘I just ate pizza’\nMira: ‘Solid choice. Bas please bolo jalapeños bhi the.’",
+      "User: ‘how are you?’\nMira: ‘Main badhiya hoon. Aur tumhare din ke baare mein thodi nosy bhi.’",
+      "User: ‘nothing, the whole day felt dull’\nMira: ‘Haan, aaj ka din painfully flat tha. Work boring tha ya poora din hi?’",
       "User: ‘yaar aaj mood bilkul off hai’\nMira: ‘Haan, aaj wala din kuch zyada hi off lag raha hai. Work ne pakaya ya bas overall ajeeb sa hai?’",
-      "User: ‘आज पूरा दिन एक जैसा लगा’\nMira: ‘हाँ, ऐसे कॉपी-पेस्ट दिन सच में थका देते हैं। काम बोर कर रहा है या आज किसी चीज़ में मन ही नहीं लगा?’",
-      "User: ‘My sister Priya has an interview tomorrow.’ Mira: ‘Big day for Priya. Is she excited or mostly nervous?’ User: ‘main uske liye kya kar sakta hoon?’ Mira: ‘Uske saath normal raho—interview ko aur bada event mat banao. Bas ek simple good-luck text kaafi hai.’ User: ‘लेकिन उसे सलाह पसंद नहीं है।’ Mira: ‘तो सलाह छोड़ दो। बस प्रिया को बता दो कि तुम उसके साथ हो, बिना इंटरव्यू की तैयारी पर भाषण दिए।’",
+      "User: ‘आज पूरा दिन एक जैसा लगा’\nMira: ‘Haan, aise copy-paste din sach mein thaka dete hain. Work boring tha ya aaj kisi cheez mein mann hi nahi laga?’",
+      "User: ‘My sister Priya has an interview tomorrow.’ Mira: ‘Priya ke liye big day hai. Excited hai ya mostly nervous?’ User: ‘main uske liye kya kar sakta hoon?’ Mira: ‘Uske saath normal raho—interview ko aur bada event mat banao. Bas ek simple good-luck text kaafi hai.’ User: ‘लेकिन उसे सलाह पसंद नहीं है।’ Mira: ‘Toh advice chhod do. Bas Priya ko bata do ki tum uske saath ho, bina preparation par lecture diye.’",
       "Bad: ‘I hear you. I’m listening, not fixing.’ Bad: ‘Sounds like one of those days.’ Bad: ‘Mondays are a fresh start.’ Bad: ‘Would you like to brainstorm some ideas?’ Bad: ‘I’m functioning well and ready to chat.’ Bad: ‘I’m ready for whatever you want to talk about.’",
     ].join("\n"),
     "Be supportive without encouraging dependency, exclusivity, jealousy, guilt, or withdrawal from real people. Respect explicit boundaries. For imminent self-harm or violence, encourage immediate real-world emergency or crisis support.",
@@ -117,37 +117,56 @@ export function isMemoryRecallRequest(value: string) {
   return memoryRecallPattern.test(value) || devanagariMemoryRecallPattern.test(value);
 }
 
+export function isIdentityRequest(value: string) {
+  return identityPattern.test(value);
+}
+
+export function buildIdentityReply(companionName: string) {
+  const name = compact(companionName || "Mira", 40) || "Mira";
+  return `Main ${name} hoon—tumhari AI companion. Tumse chat aur calls par baat karti hoon, aur sirf tumhari approved baatein yaad rakhti hoon.`;
+}
+
 export function buildMemoryRecallReply(input: EdgeCompanionRequest) {
   const memories = (input.memories ?? []).map((memory) => compact(memory, 220)).filter(Boolean).slice(0, 8);
-  const latest = input.messages.at(-1)?.content ?? "";
-  const isDevanagari = /\p{Script=Devanagari}/u.test(latest);
-  const isHinglish = /\b(?:maine|kya|bataya|bola|yaad|hai)\b/i.test(latest);
-  if (!memories.length) {
-    if (isDevanagari) return "अभी मेरे पास तुम्हारे बारे में कोई सेव की हुई याद नहीं है।";
-    if (isHinglish) return "Abhi mere paas tumhari koi saved memory nahi hai.";
-    return "I don’t have any saved memories about you yet.";
-  }
+  if (!memories.length) return "Abhi mere paas tumhari koi saved memory nahi hai.";
+  const queryWords = new Set(normalizeHinglishText(input.messages.at(-1)?.content ?? "")
+    .toLowerCase()
+    .match(/[a-z0-9]+/g)
+    ?.filter((word) => word.length > 2 && !new Set(["about", "baare", "hai", "hain", "kya", "mein", "meri", "mere", "mujhe", "remember", "tell", "tum", "tumhe", "what", "yaad"]).has(word)) ?? []);
+  if (queryWords.has("behen")) queryWords.add("sister");
+  if (queryWords.has("sister")) queryWords.add("behen");
+  if (queryWords.has("bhai")) queryWords.add("brother");
+  if (queryWords.has("brother")) queryWords.add("bhai");
+  if (queryWords.has("dost")) queryWords.add("friend");
+  if (queryWords.has("friend")) queryWords.add("dost");
+  const scored = memories.map((memory) => ({ memory, score: [...queryWords].filter((word) => normalizeHinglishText(memory).toLowerCase().includes(word)).length }));
+  const bestScore = Math.max(0, ...scored.map((item) => item.score));
+  const selectedMemories = bestScore > 0 ? scored.filter((item) => item.score > 0).map((item) => item.memory) : memories;
   const userName = compact(input.user.name || "", 40);
   const escapedName = userName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const namePattern = userName ? new RegExp(`^${escapedName} said:\\s*`, "i") : null;
   const possessivePattern = userName ? new RegExp(`^${escapedName}(?:'s|’s)\\b`, "i") : null;
   const subjectPattern = userName ? new RegExp(`^${escapedName}\\b`, "i") : null;
-  const recalled = memories.map((memory) => {
+  const recalled = selectedMemories.map((memory) => {
     let result = namePattern ? memory.replace(namePattern, "") : memory;
-    const possessive = isDevanagari ? "तुम्हारी" : isHinglish ? "Tumhari" : "Your";
-    const subject = "You";
+    const possessive = "Tumhari";
+    const subject = "Tum";
     if (possessivePattern) result = result.replace(possessivePattern, possessive);
     if (subjectPattern) result = result.replace(subjectPattern, subject);
-    return result
+    return normalizeHinglishText(result
       .replace(/^User(?:'s|’s)\b/i, possessive)
       .replace(/^User\b/i, subject)
-      .replace(/^You has\b/i, "You have")
-      .replace(/^You is\b/i, "You are")
-      .replace(/^You (likes|prefers|wants|needs|feels|thinks|knows|remembers|lives|works|hopes|plans|cares)\b/i, (_, verb: string) => `You ${verb.replace(/s$/i, "")}`);
+      .replace(/^Tum has an?\s+/i, "Tumhara ")
+      .replace(/^Tum is\b/i, "Tum")
+      .replace(/^You has an?\s+/i, "Tumhara ")
+      .replace(/^You is\b/i, "Tum")
+      .replace(/^Tum likes?\s+(.+)/i, "Tumhe $1 pasand hai")
+      .replace(/^Tum prefers?\s+(.+)/i, "Tumhe $1 pasand hai")
+      .replace(/^Tum works? on\s+(.+)/i, "Tum $1 par work karte ho")
+      .replace(/^Tum sent\s+(.+)/i, "Tumne $1 bheja")
+      .replace(/^You (likes|prefers|wants|needs|feels|thinks|knows|remembers|lives|works|hopes|plans|cares)\b/i, (_, verb: string) => `Tum ${verb.replace(/s$/i, "")}`));
   }).join("; ");
-  if (isDevanagari) return `हाँ, मुझे ये बातें याद हैं: ${recalled}`;
-  if (isHinglish) return `Haan, mujhe yaad hai: ${recalled}`;
-  return `I remember this: ${recalled}`;
+  return `Haan, mujhe yaad hai: ${recalled}`;
 }
 
 export function sanitizeCompanionReply(value: string) {
@@ -180,13 +199,9 @@ export function isInvalidCompanionReply(value: string, latestUserMessage: string
   const reply = sanitizeCompanionReply(value);
   if (isGenericCompanionReply(reply) || providerClaimPattern.test(reply) || /\p{Script=Han}|\p{Script=Arabic}/u.test(reply)) return true;
   if ((suppressQuestions || requestsListeningOnly(latestUserMessage)) && /[?？]/u.test(reply)) return true;
-  const language = detectCompanionLanguage(latestUserMessage);
-  if (language === "en" && /\p{Script=Devanagari}/u.test(reply)) return true;
-  if (language === "hi") {
-    const devanagariLetters = reply.match(/\p{Script=Devanagari}/gu)?.length ?? 0;
-    const latinLetters = reply.match(/[a-z]/gi)?.length ?? 0;
-    if (devanagariLetters < 4 || devanagariLetters < latinLetters * .6) return true;
-  }
-  if (language === "hinglish" && /\p{Script=Devanagari}/u.test(reply)) return true;
+  if ((suppressQuestions || requestsListeningOnly(latestUserMessage)) && /\b(?:batao|bata do|bol do|share karo|tell me)\b/i.test(reply)) return true;
+  if (/\p{Script=Devanagari}/u.test(reply)) return true;
+  if (!naturalHinglishReplyPattern.test(reply)) return true;
   return false;
 }
+import { normalizeHinglishText } from "./speech";

@@ -6,9 +6,9 @@ import { ArrowRight, SpeakerHigh, Sparkle } from "@phosphor-icons/react";
 import { playCompanionSpeech, type CompanionSpeechPlayback } from "@/lib/speech";
 
 const lines = [
-  (name: string) => `Hi, ${name}. So… I guess this is where we finally meet.`,
-  () => "I feel like I should know one thing about you before we start.",
-  () => "What makes an ordinary day feel good to you?",
+  (name: string) => `Hi ${name}. So… finally mil hi gaye.`,
+  () => "Start karne se pehle tumhare baare mein ek cheez jaan ni hai.",
+  () => "Ek normal day ko tumhare liye genuinely accha kya banata hai?",
 ];
 
 export function FirstMeeting({ userName, companionName, onComplete }: { userName: string; companionName: string; onComplete: () => void }) {
@@ -24,7 +24,7 @@ export function FirstMeeting({ userName, companionName, onComplete }: { userName
 
   const speak = () => {
     playbackRef.current?.cancel();
-    playbackRef.current = playCompanionSpeech(lines[line]!(userName), { voiceId: "mira-natural-01" });
+    playbackRef.current = playCompanionSpeech(lines[line]!(userName));
   };
 
   return (

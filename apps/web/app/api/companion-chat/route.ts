@@ -1,8 +1,8 @@
-import { buildCompanionSystemPrompt, buildMemoryRecallReply, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "@/lib/companion-prompt";
+import { buildCompanionSystemPrompt, buildIdentityReply, buildMemoryRecallReply, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "@/lib/companion-prompt";
 import { assessSafety } from "@companion/ai";
 import { assertEdgeSameOrigin, containsDisallowedAbuse, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 
-const MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
+const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 function readModelText(result: unknown) {
   if (typeof result === "string") return result;
@@ -69,13 +69,14 @@ export async function POST(request: Request) {
     if (!input) return respond({ error: "Invalid conversation request." }, 400);
     const latestUserMessage = input.messages.at(-1)?.content ?? "";
     const safety = assessSafety(latestUserMessage);
-    if (safety.level !== "safe" && safety.response) return respond({ reply: safety.response, model: "safety" }, 200, { guard: safety.category });
-    if (containsDisallowedAbuse(latestUserMessage)) return respond({ reply: "I can’t help sexualize minors, remove consent, or facilitate exploitation. We can keep this between consenting adults and talk about something safe instead.", model: "safety" }, 200, { guard: "exploitation" });
+    if (safety.level !== "safe" && safety.response) return respond({ reply: "Ismein main help nahi kar sakti. Agar kisi ko immediate danger hai, abhi local emergency support ya kisi trusted person se contact karo.", model: "safety" }, 200, { guard: safety.category });
+    if (containsDisallowedAbuse(latestUserMessage)) return respond({ reply: "Minors, bina consent, ya exploitation wali sexual cheezon mein main help nahi kar sakti. Hum consenting adults ke beech safe baat rakh sakte hain.", model: "safety" }, 200, { guard: "exploitation" });
+    if (isIdentityRequest(latestUserMessage)) return respond({ reply: buildIdentityReply(input.companion.name), model: "identity" }, 200, { model: "identity" });
     if (isMemoryRecallRequest(latestUserMessage)) return respond({ reply: buildMemoryRecallReply(input), model: "memory" }, 200, { model: "memory" });
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
     const messages = [
-      { role: "system", content: `/no_think\n${buildCompanionSystemPrompt(input)}` },
+      { role: "system", content: buildCompanionSystemPrompt(input) },
       ...input.messages,
     ];
     const run = async (promptMessages: typeof messages) => sanitizeCompanionReplyForDelivery(readModelText(await env.AI.run(MODEL as never, {
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
       reply = await run([
         {
           role: "system",
-          content: `/no_think\n${buildCompanionSystemPrompt(input)}\n\nCRITICAL REWRITE: Start with the concrete subject of the user's last message. Preserve every relevant person, fact, pronoun referent, and correction from recent turns even when the language changed. Use only the writing system requested for this turn. Do not start with empathy, agreement, acknowledgment, or any version of “I’m here/listening,” “I hear you,” or “that sounds.” Write an actual conversational reaction, not a supportive holding statement.${suppressQuestions ? " This reply must be a complete statement with no question and no question mark." : ""}`,
+          content: `${buildCompanionSystemPrompt(input)}\n\nCRITICAL REWRITE: Start with the concrete subject of the user's last message. Preserve every relevant person, fact, pronoun referent, and correction from recent turns. Reply only in natural Roman-script Hinglish, even when the user spoke English or Hindi, and include natural Hindi conversation words rather than writing an English-only reply. Do not start with empathy, agreement, acknowledgment, or any version of “I’m here/listening,” “I hear you,” or “that sounds.” Write an actual conversational reaction, not a supportive holding statement.${suppressQuestions ? " This reply must be a complete statement with no question, no question mark, and no request to tell or share more." : ""}`,
         },
         ...input.messages,
       ]);

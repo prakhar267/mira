@@ -1,13 +1,10 @@
-import type { SpeechLanguage } from "./speech";
-
 export interface CallListeningSession {
   cancel(): void;
 }
 
 export interface CallListeningOptions {
-  language: SpeechLanguage;
   onSpeechStart?: () => void;
-  onTranscript: (text: string, detectedLanguage: Exclude<SpeechLanguage, "auto">) => void;
+  onTranscript: (text: string) => void;
   onSilence: () => void;
   onError: (message: string) => void;
 }
@@ -41,7 +38,7 @@ async function blobBase64(blob: Blob) {
 
 export async function startCallListening(options: CallListeningOptions): Promise<CallListeningSession> {
   if (!navigator.mediaDevices?.getUserMedia || !("MediaRecorder" in window)) {
-    throw new Error("Automatic multilingual voice input needs a browser with microphone recording support.");
+    throw new Error("Hands-free Hinglish voice input needs microphone recording support.");
   }
 
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -125,15 +122,12 @@ export async function startCallListening(options: CallListeningOptions): Promise
         const response = await fetch("/api/companion-transcribe", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ audioBase64, contentType: blob.type, language: options.language }),
+          body: JSON.stringify({ audioBase64, contentType: blob.type }),
           signal: transcriptionController.signal,
         });
-        const body = await response.json().catch(() => null) as { text?: string; language?: SpeechLanguage; error?: string } | null;
+        const body = await response.json().catch(() => null) as { text?: string; error?: string } | null;
         if (!response.ok || !body?.text?.trim()) throw new Error(body?.error ?? "I couldn’t hear that clearly.");
-        const detectedLanguage = body.language === "hi" || body.language === "hinglish" || body.language === "en"
-          ? body.language
-          : "en";
-        if (!canceled) options.onTranscript(body.text.trim(), detectedLanguage);
+        if (!canceled) options.onTranscript(body.text.trim());
       })
       .catch((cause) => {
         if (!canceled) options.onError(cause instanceof Error ? cause.message : "Voice transcription is temporarily unavailable.");

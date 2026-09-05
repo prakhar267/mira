@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Camera, ImagePlus, Languages, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Send, Sparkles, ThumbsDown, ThumbsUp, Trash2, Video, Volume2 } from "lucide-react";
+import { ArrowLeft, Camera, ImagePlus, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Send, Sparkles, ThumbsDown, ThumbsUp, Trash2, Video, Volume2 } from "lucide-react";
 import type { ChatMessage } from "@companion/shared";
 import type { DemoState, FeedbackReason } from "@/lib/state";
-import { playCompanionSpeech, recognitionLocale, speechLanguageOptions, type SpeechLanguage } from "@/lib/speech";
+import { playCompanionSpeech } from "@/lib/speech";
 import { Modal } from "./Modal";
 
 interface ChatSpeechRecognition {
@@ -57,7 +57,6 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
   const [online, setOnline] = useState(true);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceError, setVoiceError] = useState("");
-  const [voiceLanguage, setVoiceLanguage] = useState<SpeechLanguage>("auto");
   const textarea = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const messagesViewport = useRef<HTMLDivElement>(null);
@@ -130,7 +129,7 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
     const recognition = new Recognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = recognitionLocale(voiceLanguage, navigator.language);
+    recognition.lang = "en-IN";
     let transcript = "";
     recognition.onresult = (event) => {
       transcript = Array.from(event.results).map((result) => result[0]?.transcript ?? "").join(" ").trim();
@@ -177,11 +176,11 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
 
       <div className="chat__composer-wrap">
         {!processingEnabled ? <div className="voice-note-error" role="status">AI processing is paused in Privacy settings. Your existing history remains available.</div> : null}
-        <div className="suggestion-row"><label className="voice-language-inline"><Languages aria-hidden="true" /><span>Voice</span><select aria-label="Voice note language" value={voiceLanguage} onChange={(event) => setVoiceLanguage(event.target.value as SpeechLanguage)}>{speechLanguageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{["Just listen", "Help me make a plan", "Remember something"].map((suggestion) => <button type="button" key={suggestion} disabled={!processingEnabled} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
+        <div className="suggestion-row"><span className="voice-language-inline">Hinglish chat + voice</span>{["Bas meri baat suno", "Plan banane mein help karo", "Ek baat yaad rakhna"].map((suggestion) => <button type="button" key={suggestion} disabled={!processingEnabled} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
         <div className="chat__composer">
           <button type="button" className="icon-button" aria-label="Attach image" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><Plus aria-hidden="true" /></button>
           <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setVoiceError(""); void onImageUpload(file).catch((cause) => setVoiceError(cause instanceof Error ? cause.message : "The image could not be shared.")); } event.target.value = ""; }} />
-          <textarea ref={textarea} value={draft} disabled={!processingEnabled} maxLength={8_000} rows={1} aria-label={`Message ${state.companion.name}`} placeholder={processingEnabled ? "Write what’s on your mind…" : "AI processing is paused"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
+          <textarea ref={textarea} value={draft} disabled={!processingEnabled} maxLength={8_000} rows={1} aria-label={`Message ${state.companion.name}`} placeholder={processingEnabled ? "Jo mann mein hai, Hinglish mein bolo…" : "AI processing is paused"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
           <button type="button" className="icon-button" aria-label="Upload a photo" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><ImagePlus aria-hidden="true" /></button>
           {draft.trim() ? <button type="button" className="send-button" aria-label="Send message" disabled={streaming || !processingEnabled} onClick={() => void submit()}><Send aria-hidden="true" /></button> : <button type="button" disabled={!processingEnabled} className={voiceActive ? "icon-button icon-button--active" : "icon-button"} aria-label={voiceActive ? "Stop recording voice note" : "Record voice note"} onClick={() => { if (voiceActive) stopVoice(); else void startVoice(); }}><Mic aria-hidden="true" /></button>}
         </div>

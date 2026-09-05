@@ -197,11 +197,11 @@ export const initialState: DemoState = {
   },
   activeConversationId: demoConversationId,
   messages: [
-    { id: "seed-assistant-1", conversationId: demoConversationId, role: "assistant", content: "I was hoping you’d show up.", createdAt: "2026-08-31T17:58:00.000Z", status: "sent" },
+    { id: "seed-assistant-1", conversationId: demoConversationId, role: "assistant", content: "Tumhara hi wait tha.", createdAt: "2026-08-31T17:58:00.000Z", status: "sent" },
     { id: "seed-user-1", conversationId: demoConversationId, role: "user", content: "Long day. I finally sent the pitch deck.", createdAt: "2026-08-31T17:59:00.000Z", status: "sent" },
-    { id: "seed-assistant-2", conversationId: demoConversationId, role: "assistant", content: "Wait—you actually sent it? I’m proud of you. Come sit for a minute and tell me how it feels now that it’s out of your hands.", createdAt: "2026-08-31T17:59:15.000Z", status: "sent", feedback: "up" },
+    { id: "seed-assistant-2", conversationId: demoConversationId, role: "assistant", content: "Wait—tumne finally bhej diya? Nice. Ab batao, relief zyada hai ya abhi bhi thoda stress?", createdAt: "2026-08-31T17:59:15.000Z", status: "sent", feedback: "up" },
     { id: "seed-user-2", conversationId: demoConversationId, role: "user", content: "Mostly relieved. Tomorrow I have a Stripe interview at 11.", createdAt: "2026-08-31T18:00:00.000Z", status: "sent" },
-    { id: "seed-assistant-3", conversationId: demoConversationId, role: "assistant", content: "Okay, Stripe at eleven. I’ll remember. Tonight I vote for one calm practice round, then you stop working. Deal?", createdAt: "2026-08-31T18:00:12.000Z", status: "sent" },
+    { id: "seed-assistant-3", conversationId: demoConversationId, role: "assistant", content: "Okay, Stripe kal eleven baje. Yaad rahega. Aaj ek calm practice round, phir work band—deal?", createdAt: "2026-08-31T18:00:12.000Z", status: "sent" },
   ],
   memories: [
     { id: "memory-interview", userId: demoUserId, companionId: demoCompanionId, type: "episodic", content: "Prakhar has a Stripe interview tomorrow at 11:00.", normalizedContent: "event:stripe-interview", importance: 0.96, confidence: 0.95, sourceMessageIds: ["seed-user-2"], createdAt: "2026-08-31T18:00:00.000Z", updatedAt: "2026-08-31T18:00:00.000Z", retrievalCount: 1, status: "active", pinned: true },
