@@ -29,7 +29,10 @@ export function createInworldTranscriptionRequest(audioBase64: string, contentTy
 export function isUsableInworldTranscript(value: string) {
   const normalized = value.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
   if (!normalized) return false;
+  if (normalized.split(" ").length < 2) return false;
   if (normalized.startsWith("expected terms")) return false;
+  if (/^i (?:m|am) not sure what you(?: re| are) talking about$/.test(normalized)) return false;
+  if (/^(?:thank you|thanks for watching|please subscribe)$/.test(normalized)) return false;
   const leakedHints = ["natural indian hinglish conversation", "hindi and english code switching", "mira", "priya"]
     .filter((hint) => normalized.includes(hint));
   return leakedHints.length < 2;

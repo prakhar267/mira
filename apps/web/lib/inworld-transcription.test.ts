@@ -21,6 +21,8 @@ describe("Inworld transcription", () => {
   it("rejects leaked recognition hints while keeping real Hinglish", () => {
     expect(isUsableInworldTranscript("Expected terms: Natural Indian Hinglish conversation, Mira, Priya.")).toBe(false);
     expect(isUsableInworldTranscript("Hindi and English code switching, Mira")).toBe(false);
+    expect(isUsableInworldTranscript("I'm not sure what you're talking about.")).toBe(false);
+    expect(isUsableInworldTranscript("Ah.")).toBe(false);
     expect(isUsableInworldTranscript("Yaar aaj work bahut hectic tha")).toBe(true);
   });
 });
