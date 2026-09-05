@@ -27,7 +27,7 @@ export function createInworldSpeechRequest(text: string, apiKey: string): Reques
     body: JSON.stringify({
       text: `${PRIYA_DIRECTION} ${text}`,
       voiceId: "Priya",
-      modelId: "inworld-tts-2",
+      modelId: "inworld-tts-2-flash",
       audioConfig: {
         audioEncoding: "MP3",
         sampleRateHertz: 48_000,

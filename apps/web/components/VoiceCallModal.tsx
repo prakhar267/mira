@@ -31,7 +31,7 @@ export function VoiceCallModal({
   onUserTurn: (content: string) => Promise<string>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const greeting = `Hey ${userName}, aa gaye. Batao, kya chal raha hai?`;
+  const greeting = `Hey ${userName}, you made it. What’s going on?`;
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState(true);
   const [captions, setCaptions] = useState(true);
@@ -65,7 +65,7 @@ export function VoiceCallModal({
     recognition.cancel();
   }, []);
 
-  const queueAutoListen = useCallback((delay = 650) => {
+  const queueAutoListen = useCallback((delay = 280) => {
     if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
     listenTimerRef.current = window.setTimeout(() => {
       listenTimerRef.current = null;
@@ -223,7 +223,7 @@ export function VoiceCallModal({
 
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   const phaseCopy: Record<CallPhase, string> = {
-    connecting: "Mira ki voice aa rahi hai…",
+    connecting: "Connecting Mira’s voice…",
     listening: "Listening to you",
     thinking: "Thinking about that",
     speaking: "Talking with you",
@@ -245,7 +245,7 @@ export function VoiceCallModal({
       {speechError ? <p className="call-speech-error" role="status">{speechError}</p> : null}
 
       <div className="call-pickers">
-        <div className="call-language-picker"><span>Hindi · Hinglish · English · Priya</span></div>
+        <div className="call-language-picker"><span>English · Hindi · Hinglish · Priya</span></div>
       </div>
 
       <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking" || phase === "connecting"}>
@@ -260,7 +260,7 @@ export function VoiceCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.3, y: -90 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening resumes after every reply · voice input uses Inworld, browser recognition when available, and Cloudflare backup · replies use Inworld Priya · no call recording is saved</small>
+      <small className="live-call__disclosure">Hands-free listening resumes after every reply · voice input uses Inworld STT with browser and Cloudflare fallback · conversation replies use free hosted inference with a local fallback · speech uses Inworld Priya · no call recording is saved</small>
     </motion.div>
   );
 }

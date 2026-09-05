@@ -46,7 +46,7 @@ export function hasUsableCallSpeech({ peakLevel, voicedFrames, voicedSpanMs }: C
 }
 
 export function preferredCallTranscript(browserTranscript: string, serverTranscript = "") {
-  return (browserTranscript.trim() || serverTranscript.trim()).replace(/\s+/g, " ");
+  return (serverTranscript.trim() || browserTranscript.trim()).replace(/\s+/g, " ");
 }
 
 export function isCallSilenceResponse(status: number) {
@@ -203,24 +203,28 @@ export async function startCallListening(options: CallListeningOptions): Promise
     const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
     void blobBase64(blob)
       .then(async (audioBase64) => {
-        const nativeTranscript = await finishBrowserRecognition();
-        if (nativeTranscript) {
-          if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
-          return;
-        }
-        const response = await fetch("/api/companion-transcribe", {
+        const nativeTranscriptPromise = finishBrowserRecognition();
+        const responsePromise = fetch("/api/companion-transcribe", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ audioBase64, contentType: blob.type }),
           signal: transcriptionController.signal,
         });
+        const [nativeTranscript, response] = await Promise.all([nativeTranscriptPromise, responsePromise]);
         const body = await response.json().catch(() => null) as { text?: string; error?: string } | null;
         if (isCallSilenceResponse(response.status)) {
-          if (!canceled) options.onSilence();
+          if (!canceled && nativeTranscript) options.onTranscript(preferredCallTranscript(nativeTranscript));
+          else if (!canceled) options.onSilence();
           return;
         }
-        if (!response.ok || !body?.text?.trim()) throw new Error(body?.error ?? "I couldn’t hear that clearly.");
-        if (!canceled) options.onTranscript(preferredCallTranscript("", body.text));
+        if (!response.ok || !body?.text?.trim()) {
+          if (nativeTranscript) {
+            if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
+            return;
+          }
+          throw new Error(body?.error ?? "I couldn’t hear that clearly.");
+        }
+        if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript, body.text));
       })
       .catch((cause) => {
         if (!canceled) options.onError(cause instanceof Error ? cause.message : "Voice transcription is temporarily unavailable.");
@@ -236,7 +240,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
     const now = performance.now();
 
     if (!heardSpeech) noiseFloor = noiseFloor * .985 + Math.min(level, .03) * .015;
-    if (now - startedAt < 400) {
+    if (now - startedAt < 250) {
       frame = window.requestAnimationFrame(detect);
       return;
     }
@@ -260,11 +264,11 @@ export async function startCallListening(options: CallListeningOptions): Promise
       else quietSince = 0;
     }
 
-    if ((heardSpeech && quietSince && now - quietSince >= 1_350) || now - startedAt >= 30_000) {
+    if ((heardSpeech && quietSince && now - quietSince >= 850) || now - startedAt >= 30_000) {
       stop();
       return;
     }
-    if (!heardSpeech && now - startedAt >= 12_000) {
+    if (!heardSpeech && now - startedAt >= 10_000) {
       stop();
       return;
     }

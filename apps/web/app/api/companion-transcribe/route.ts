@@ -1,6 +1,6 @@
-import { normalizeHinglishText } from "@/lib/speech";
+import { detectCompanionLanguage } from "@/lib/companion-prompt";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
-import { createInworldTranscriptionRequest, INWORLD_STT_ENDPOINT, INWORLD_STT_MODEL, isUsableInworldTranscript, readInworldTranscript } from "@/lib/inworld-transcription";
+import { createInworldTranscriptionRequest, INWORLD_STT_ENDPOINT, INWORLD_STT_MODEL, isUsableInworldTranscript, preserveSpokenLanguage, readInworldTranscript } from "@/lib/inworld-transcription";
 
 const CLOUDFLARE_MODEL = "@cf/openai/whisper-large-v3-turbo";
 
@@ -43,8 +43,11 @@ export async function POST(request: Request) {
           signal: AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]),
         });
         if (!response.ok) throw new Error(`Inworld transcription returned ${response.status}.`);
-        const text = normalizeHinglishText(readInworldTranscript(await response.json()));
-        if (isUsableInworldTranscript(text)) return respond({ text, language: "hinglish" }, 200, { provider: "inworld", model: INWORLD_STT_MODEL, language: "hinglish" });
+        const text = preserveSpokenLanguage(readInworldTranscript(await response.json()));
+        if (isUsableInworldTranscript(text)) {
+          const language = detectCompanionLanguage(text);
+          return respond({ text, language }, 200, { provider: "inworld", model: INWORLD_STT_MODEL, language });
+        }
         return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "inworld", model: INWORLD_STT_MODEL, filtered: text ? "hallucination" : "no-speech" });
       } catch (cause) {
         console.warn("Inworld transcription unavailable; trying Cloudflare", cause instanceof Error ? cause.message : "unknown");
@@ -57,11 +60,12 @@ export async function POST(request: Request) {
       vad_filter: true,
       condition_on_previous_text: false,
       no_speech_threshold: .62,
-      initial_prompt: "Natural Indian Hinglish conversation in Roman letters. Preserve English words and names exactly. Examples: yaar aaj work bahut hectic tha; kal Priya ke saath dinner hai; I am feeling better abhi.",
+      initial_prompt: "Natural Indian conversation that may switch between English, Hindi in Devanagari, and Roman-script Hinglish. Preserve the speaker's actual language, English words, and names.",
     } as never);
-    const text = normalizeHinglishText(readTranscript(result));
+    const text = preserveSpokenLanguage(readTranscript(result));
     if (!text) return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "cloudflare", model: CLOUDFLARE_MODEL });
-    return respond({ text, language: "hinglish" }, 200, { provider: "cloudflare", model: CLOUDFLARE_MODEL, language: "hinglish" });
+    const language = detectCompanionLanguage(text);
+    return respond({ text, language }, 200, { provider: "cloudflare", model: CLOUDFLARE_MODEL, language });
   } catch (cause) {
     console.error("Hinglish transcription failed", cause instanceof Error ? cause.message : "unknown");
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-transcribe", startedAt, cause);

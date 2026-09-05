@@ -17,6 +17,7 @@ import type {
 } from "@companion/shared";
 import type { EdgeCompanionRequest } from "@/lib/companion-prompt";
 import type { SemanticMemoryMatch } from "@/lib/semantic-memory";
+import { requestFreeCompanionReply } from "@/lib/free-chat";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://127.0.0.1:4000";
 const TOKEN_KEY = "luma.production-session.v1";
@@ -102,14 +103,7 @@ export const companionApi = {
   clearSession: () => saveTokens(null),
 
   async demoReply(input: EdgeCompanionRequest) {
-    const response = await fetch("/api/companion-chat", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    const body = await response.json().catch(() => null) as { reply?: string; error?: string } | null;
-    if (!response.ok || !body?.reply) throw new Error(body?.error ?? "Mira could not respond just now.");
-    return body.reply;
+    return requestFreeCompanionReply(input);
   },
 
   async semanticMemories(query: string, memories: MemoryRecord[], limit = 8) {

@@ -271,6 +271,40 @@ describe("companion turn planning", () => {
     expect(hinglish.text).toContain("Main tumhari AI companion hoon");
   });
 
+  it("repairs the exact Hinglish context miss instead of returning generic English", () => {
+    const prior: ChatMessage[] = [
+      { id: "u1", conversationId: "conversation", role: "user", content: "yaar aaj kaafi hectic tha", createdAt: now.toISOString(), status: "sent" },
+      { id: "a1", conversationId: "conversation", role: "assistant", content: "That could mean a few different things.", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("kya yaar kya bol rahi ho", prior, "video");
+    expect(planned.intent).toBe("repair");
+    expect(planned.text).toContain("pichhla reply bilkul off tha");
+    expect(planned.text).toContain("context");
+    expect(planned.text).not.toContain("That could mean");
+  });
+
+  it("keeps a Hindi follow-up tied to the manager conflict", () => {
+    const prior: ChatMessage[] = [
+      { id: "u1", conversationId: "conversation", role: "user", content: "My manager blamed me for her mistake.", createdAt: now.toISOString(), status: "sent" },
+      { id: "a1", conversationId: "conversation", role: "assistant", content: "That was unfair.", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("लेकिन मैं उससे लड़ना नहीं चाहता, बस अपनी बात साफ़ कहना चाहता हूँ।", prior, "voice");
+    expect(planned.intent).toBe("planning");
+    expect(planned.text).toContain("लड़ाई वाली tone");
+    expect(planned.text).toContain("meeting");
+  });
+
+  it("resolves a Hinglish pronoun to the manager from the previous English turn", () => {
+    const prior: ChatMessage[] = [
+      { id: "u1", conversationId: "conversation", role: "user", content: "My manager blamed me for her mistake in today's meeting.", createdAt: now.toISOString(), status: "sent" },
+      { id: "a1", conversationId: "conversation", role: "assistant", content: "That was unfair of her.", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("yaar woh hamesha aisa hi karti hai, main usko kya bolun?", prior, "video");
+    expect(planned.intent).toBe("planning");
+    expect(planned.text).toContain("meeting mein jo hua");
+    expect(planned.adaptations).toContain("contextual-direct-answer");
+  });
+
   it("keeps English and Hinglish as concise and direct as Hindi", () => {
     const english = turn("What do you do?");
     const hinglish = turn("tum kya karti ho?");

@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
-  "connect-src 'self' blob: https://api.openai.com https://huggingface.co https://*.huggingface.co https://*.hf.co",
+  "connect-src 'self' blob: https://api.openai.com https://api.llm7.io https://huggingface.co https://*.huggingface.co https://*.hf.co",
   "font-src 'self' data:",
   "form-action 'self'",
   "frame-ancestors 'none'",

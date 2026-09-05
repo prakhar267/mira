@@ -2,7 +2,7 @@ import { createInworldSpeechRequest, decodeInworldAudio, fitInworldSpeechPrompt,
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 
 const VOICE = {
-  model: "inworld-tts-2",
+  model: "inworld-tts-2-flash",
   name: "Priya",
   provider: "inworld",
   language: "hinglish",

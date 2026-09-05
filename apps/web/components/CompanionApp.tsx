@@ -29,7 +29,7 @@ import { currentMemoryRecords, relevantMemoryContents } from "@/lib/memory-relev
 import { playCompanionSpeech } from "@/lib/speech";
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-const chooseTypingDelay = (content: string) => Math.min(680, 320 + content.trim().length * 3);
+const chooseTypingDelay = (content: string) => Math.min(280, 120 + content.trim().length * 2);
 const optional = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => promise.catch(() => fallback);
 const livePreferencesKey = (userId: string) => `mira-live-preferences-v1:${userId}`;
 const personalizeMemory = (content: string, name: string) => {
@@ -441,31 +441,13 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   };
 
   const generateDemoReply = async (messages: ChatMessage[], delivery: "text" | "voice" | "video", fallback: CompanionTurn) => {
-    if (fallback.adaptations.includes("safety-support")) return fallback.text;
+    if (fallback.adaptations.includes("safety-support") || fallback.adaptations.includes("contextual-direct-answer") || fallback.intent === "repair") return fallback.text;
     try {
-      const latestUserText = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
       const currentMemories = state.memoryEnabled ? currentMemoryRecords(activeMemories) : [];
       const lexicalMemories = state.memoryEnabled ? relevantMemoryContents(currentMemories, messages) : [];
-      let recalledMemories = lexicalMemories;
-      if (state.memoryEnabled && latestUserText && currentMemories.length) {
-        const semantic = await optional(companionApi.semanticMemories(latestUserText, currentMemories), { matches: [], model: "fallback" });
-        const byId = new Map(currentMemories.map((memory) => [memory.id, memory]));
-        const semanticMemories = semantic.matches.flatMap((match) => {
-          const memory = byId.get(match.id);
-          return memory ? [memory] : [];
-        });
-        recalledMemories = [...new Set([...semanticMemories.map((memory) => memory.content), ...lexicalMemories])].slice(0, 10);
-        if (semanticMemories.length) {
-          const retrievedIds = new Set(semanticMemories.map((memory) => memory.id));
-          const retrievedAt = new Date().toISOString();
-          setState((current) => ({
-            ...current,
-            memories: current.memories.map((memory) => retrievedIds.has(memory.id)
-              ? { ...memory, lastRetrievedAt: retrievedAt, retrievalCount: memory.retrievalCount + 1 }
-              : memory),
-          }));
-        }
-      }
+      // Demo calls must not wait on a second remote model before chat inference.
+      // The deterministic lexical retriever already selects relevant approved memories.
+      const recalledMemories = lexicalMemories;
       return await companionApi.demoReply({
         messages: messagesForConversation(messages, state.activeConversationId)
           .filter((message) => message.role === "user" || message.role === "assistant")
@@ -537,7 +519,7 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
         explanation: turn.explanation,
       }] }));
       for (const token of beat.split(/(\s+)/).filter(Boolean)) {
-        await pause(14);
+        await pause(6);
         setState((current) => ({
           ...current,
           messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: `${message.content}${token}` } : message),

@@ -1,5 +1,9 @@
+import { romanizeHindiForEnglishTts } from "./speech";
+
 export const INWORLD_STT_ENDPOINT = "https://api.inworld.ai/stt/v1/transcribe";
 export const INWORLD_STT_MODEL = "inworld/inworld-stt-1";
+
+const devanagariCodeMixPattern = /(?:ऑफिस|वर्क|जॉब|बॉस|मैनेजर|मीटिंग|इंटरव्यू|डिनर|मैसेज|टेक्स्ट|कॉल|वीडियो|ब्लेम|मूड|वीकेंड|प्रोजेक्ट|डेडलाइन|प्रेज़ेंटेशन|ईमेल|रिप्लाई|कॉन्टेक्स्ट)/u;
 
 function audioEncoding(contentType: string) {
   if (/audio\/(?:mpeg|mp3)/i.test(contentType)) return "MP3";
@@ -19,7 +23,6 @@ export function createInworldTranscriptionRequest(audioBase64: string, contentTy
       transcribeConfig: {
         modelId: INWORLD_STT_MODEL,
         audioEncoding: audioEncoding(contentType),
-        language: "en",
       },
       audioData: { content: audioBase64 },
     }),
@@ -27,7 +30,7 @@ export function createInworldTranscriptionRequest(audioBase64: string, contentTy
 }
 
 export function isUsableInworldTranscript(value: string) {
-  const normalized = value.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  const normalized = value.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
   if (!normalized) return false;
   if (normalized.split(" ").length < 2) return false;
   if (normalized.startsWith("expected terms")) return false;
@@ -44,4 +47,11 @@ export function readInworldTranscript(result: unknown) {
   if (!transcription || typeof transcription !== "object") return "";
   const transcript = (transcription as Record<string, unknown>).transcript;
   return typeof transcript === "string" ? transcript.trim() : "";
+}
+
+/** Speech has no script; romanize auto-detected Hindi only when the transcript contains clear English code-mixing. */
+export function preserveSpokenLanguage(value: string) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (/\p{Script=Devanagari}/u.test(clean) && devanagariCodeMixPattern.test(clean)) return romanizeHindiForEnglishTts(clean);
+  return clean;
 }

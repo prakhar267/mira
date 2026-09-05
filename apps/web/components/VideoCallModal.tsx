@@ -40,7 +40,7 @@ export function VideoCallModal({
   onAnalyzeFrame: (dataBase64: string, contentType: string) => Promise<string>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const greeting = `Hey ${userName}, aa gaye. Batao, kya chal raha hai?`;
+  const greeting = `Hey ${userName}, you made it. What’s going on?`;
   const [seconds, setSeconds] = useState(0);
   const [muted, setMuted] = useState(false);
   const [speaker, setSpeaker] = useState(true);
@@ -95,7 +95,7 @@ export function VideoCallModal({
     recognition.cancel();
   }, []);
 
-  const queueAutoListen = useCallback((delay = 650) => {
+  const queueAutoListen = useCallback((delay = 280) => {
     if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
     listenTimerRef.current = window.setTimeout(() => {
       listenTimerRef.current = null;
@@ -370,7 +370,7 @@ export function VideoCallModal({
 
       <div className="video-call__tools">
         <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Open-licensed anime avatar · stable live expressions</span>
-        <span className="video-call__avatar-label">Hindi · Hinglish · English · Priya</span>
+        <span className="video-call__avatar-label">English · Hindi · Hinglish · Priya</span>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
         <button type="button" disabled={!cameraOn || visionBusy} onClick={() => void shareCurrentFrame()}><Camera aria-hidden="true" /> {visionBusy ? "Looking…" : "Show frame"}</button>
       </div>
@@ -392,7 +392,7 @@ export function VideoCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End video call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.4, y: -110 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening resumes after every reply · voice input uses Inworld, browser recognition when available, and Cloudflare backup · replies use Inworld Priya · camera stays local until Show frame · no call recording is saved</small>
+      <small className="live-call__disclosure">Hands-free listening resumes after every reply · voice input uses Inworld STT with browser and Cloudflare fallback · conversation replies use free hosted inference with a local fallback · speech uses Inworld Priya · camera stays local until Show frame · no call recording is saved</small>
     </motion.div>
   );
 }

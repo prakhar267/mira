@@ -12,9 +12,10 @@ describe("call speech evidence", () => {
     expect(hasUsableCallSpeech({ peakLevel: .045, voicedFrames: 14, voicedSpanMs: 320 })).toBe(true);
   });
 
-  it("prefers free browser recognition and falls back to the server transcript", () => {
-    expect(preferredCallTranscript("  aaj   kaafi tired hoon ", "wrong server text")).toBe("aaj kaafi tired hoon");
+  it("prefers multilingual server recognition and falls back to the browser transcript", () => {
+    expect(preferredCallTranscript("  wrong browser text ", "aaj   kaafi tired hoon")).toBe("aaj kaafi tired hoon");
     expect(preferredCallTranscript("", "  meri sister Aisha hai ")).toBe("meri sister Aisha hai");
+    expect(preferredCallTranscript("  browser fallback ", "")).toBe("browser fallback");
   });
 
   it("treats no-speech transcription as silence instead of a call error", () => {

@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { createInworldTranscriptionRequest, INWORLD_STT_MODEL, isUsableInworldTranscript, readInworldTranscript } from "./inworld-transcription";
+import { createInworldTranscriptionRequest, INWORLD_STT_MODEL, isUsableInworldTranscript, preserveSpokenLanguage, readInworldTranscript } from "./inworld-transcription";
 
 describe("Inworld transcription", () => {
-  it("creates an auto-detected Latin-script Hinglish request", () => {
+  it("lets the model auto-detect English, Hindi, or Hinglish", () => {
     const request = createInworldTranscriptionRequest("YWJj", "audio/webm;codecs=opus", "Basic secret");
     expect(request.headers).toEqual({ authorization: "Basic secret", "content-type": "application/json" });
     expect(JSON.parse(String(request.body))).toMatchObject({
-      transcribeConfig: { modelId: INWORLD_STT_MODEL, audioEncoding: "AUTO_DETECT", language: "en" },
+      transcribeConfig: { modelId: INWORLD_STT_MODEL, audioEncoding: "AUTO_DETECT" },
       audioData: { content: "YWJj" },
     });
     expect(JSON.parse(String(request.body)).transcribeConfig).not.toHaveProperty("prompts");
+    expect(JSON.parse(String(request.body)).transcribeConfig).not.toHaveProperty("language");
   });
 
   it("uses explicit encodings and safely reads transcripts", () => {
@@ -24,5 +25,11 @@ describe("Inworld transcription", () => {
     expect(isUsableInworldTranscript("I'm not sure what you're talking about.")).toBe(false);
     expect(isUsableInworldTranscript("Ah.")).toBe(false);
     expect(isUsableInworldTranscript("Yaar aaj work bahut hectic tha")).toBe(true);
+    expect(isUsableInworldTranscript("आज काम बहुत मुश्किल था")).toBe(true);
+  });
+
+  it("keeps Hindi script but romanizes clearly code-mixed speech", () => {
+    expect(preserveSpokenLanguage("आज काम बहुत मुश्किल था।")).toBe("आज काम बहुत मुश्किल था।");
+    expect(preserveSpokenLanguage("यार मेरे मैनेजर ने मुझे ब्लेम कर दिया।")).toMatch(/^yaar mere mainejar ne mujhe blem/);
   });
 });

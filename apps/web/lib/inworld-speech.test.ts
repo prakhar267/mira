@@ -20,7 +20,7 @@ describe("Inworld Priya speech adapter", () => {
     expect(request.headers).toEqual({ authorization: "Basic secret", "content-type": "application/json" });
     expect(JSON.parse(String(request.body))).toMatchObject({
       voiceId: "Priya",
-      modelId: "inworld-tts-2",
+      modelId: "inworld-tts-2-flash",
       deliveryMode: "BALANCED",
       audioConfig: { audioEncoding: "MP3", sampleRateHertz: 48_000, bitRate: 128_000 },
     });
