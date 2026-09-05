@@ -14,6 +14,19 @@ type WorkerResponse =
   | { type: "generated"; id: number; blob: Blob }
   | { type: "error"; id: number; message: string };
 
+// Rolldown currently folds Transformers.js' `typeof window` worker guard into
+// a direct `window.document` lookup in production builds. Give that lookup a
+// harmless worker-local value before the dynamically imported model executes.
+// `document` intentionally remains absent, so Transformers.js still selects
+// its Web Worker runtime rather than its browser-window runtime.
+const workerScope = self as typeof self & { window?: { document?: undefined } };
+if (!("window" in workerScope)) {
+  Object.defineProperty(workerScope, "window", {
+    configurable: true,
+    value: {},
+  });
+}
+
 type AudioResult = { toBlob(): Promise<Blob> };
 type TokenizerResult = { input_ids: unknown };
 type KokoroInstance = {
