@@ -160,12 +160,17 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
     <section className="workspace chat" aria-labelledby="chat-title">
       <header className="workspace-header chat__header">
         <button type="button" className="icon-button desktop-hidden" aria-label="Back to home" onClick={onBack}><ArrowLeft aria-hidden="true" /></button>
-        <img src="/assets/mira/portrait.png" alt="" />
-        <div><h1 id="chat-title">{state.companion.name}</h1><span><i className={online ? "status-dot" : "status-dot status-dot--offline"} /> {online ? "AI companion · here with you" : "Offline · messages stay on this device"}</span></div>
-        <div className="chat__header-actions"><button type="button" className="icon-button" aria-label={`Start voice call with ${state.companion.name}`} onClick={onCall}><Phone aria-hidden="true" /></button><button type="button" className="icon-button" aria-label={`Start video call with ${state.companion.name}`} onClick={onVideoCall}><Video aria-hidden="true" /></button><button type="button" className="icon-button" aria-label="Conversation tools" aria-expanded={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><MoreHorizontal aria-hidden="true" /></button></div>
+        <div className="chat__portrait"><img src="/assets/mira/portrait.png" alt="" /><i className={online ? "status-dot" : "status-dot status-dot--offline"} /></div>
+        <div className="chat__identity"><span>Your companion</span><h1 id="chat-title">{state.companion.name}</h1><small>{online ? "Here with you" : "Offline · messages stay on this device"}</small></div>
+        <div className="chat__header-actions">
+          <button type="button" className="chat__new-button" onClick={onNewConversation}><Plus aria-hidden="true" /><span>New chat</span></button>
+          <button type="button" className="chat__call-button" aria-label={`Start voice call with ${state.companion.name}`} onClick={onCall}><Phone aria-hidden="true" /><span>Voice call</span></button>
+          <button type="button" className="chat__call-button chat__call-button--video" aria-label={`Start video call with ${state.companion.name}`} onClick={onVideoCall}><Video aria-hidden="true" /><span>Video call</span></button>
+          <button type="button" className="icon-button chat__more-button" aria-label="Conversation tools" aria-expanded={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><MoreHorizontal aria-hidden="true" /></button>
+        </div>
       </header>
 
-      <div className="chat__safety"><Sparkles aria-hidden="true" /> {state.companion.name} is AI and may make mistakes. Not therapy or emergency support.</div>
+      <div className="chat__safety"><span><Sparkles aria-hidden="true" /><strong>{state.companion.name} is an AI companion</strong><i aria-hidden="true" /><span className="chat__safety-detail">Replies may be imperfect and are not therapy or emergency support.</span></span></div>
       {toolsOpen ? <div className="chat-tools"><button type="button" onClick={() => { onNewConversation(); setToolsOpen(false); }}><Plus aria-hidden="true" /> New conversation</button><button type="button" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><ImagePlus aria-hidden="true" /> Share a photo</button><button type="button" disabled={!processingEnabled} onClick={() => { setImagePromptOpen(true); setToolsOpen(false); }}><Sparkles aria-hidden="true" /> Create an image</button><button type="button" disabled={!processingEnabled} onClick={() => { onCamera(); setToolsOpen(false); }}><Camera aria-hidden="true" /> Camera conversation</button><button type="button" onClick={() => { setDeleteConversationOpen(true); setToolsOpen(false); }}><Trash2 aria-hidden="true" /> Delete this conversation</button></div> : null}
 
       <div ref={messagesViewport} className="chat__messages" aria-live="polite">
@@ -176,7 +181,7 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
 
       <div className="chat__composer-wrap">
         {!processingEnabled ? <div className="voice-note-error" role="status">AI processing is paused in Privacy settings. Your existing history remains available.</div> : null}
-        <div className="suggestion-row"><span className="voice-language-inline">English · Hindi · Hinglish</span>{["Just listen to me", "Plan banane mein help karo", "एक बात याद रखना"].map((suggestion) => <button type="button" key={suggestion} disabled={!processingEnabled} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
+        <div className="suggestion-row"><span className="suggestion-row__label">Try asking</span>{["Just listen to me", "Plan banane mein help karo", "एक बात याद रखना"].map((suggestion) => <button type="button" key={suggestion} disabled={!processingEnabled} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
         <div className="chat__composer">
           <button type="button" className="icon-button" aria-label="Attach image" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><Plus aria-hidden="true" /></button>
           <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setVoiceError(""); void onImageUpload(file).catch((cause) => setVoiceError(cause instanceof Error ? cause.message : "The image could not be shared.")); } event.target.value = ""; }} />
@@ -184,10 +189,10 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
           <button type="button" className="icon-button" aria-label="Upload a photo" disabled={!processingEnabled} onClick={() => fileInput.current?.click()}><ImagePlus aria-hidden="true" /></button>
           {draft.trim() ? <button type="button" className="send-button" aria-label="Send message" disabled={streaming || !processingEnabled} onClick={() => void submit()}><Send aria-hidden="true" /></button> : <button type="button" disabled={!processingEnabled} className={voiceActive ? "icon-button icon-button--active" : "icon-button"} aria-label={voiceActive ? "Stop recording voice note" : "Record voice note"} onClick={() => { if (voiceActive) stopVoice(); else void startVoice(); }}><Mic aria-hidden="true" /></button>}
         </div>
+        <div className="chat__composer-meta"><span className="voice-language-inline">English · Hindi · Hinglish</span><span>Enter to send · Shift + Enter for a new line</span></div>
         {voiceActive ? <div className="voice-note-state"><span className="voice-bars" aria-hidden="true"><i /><i /><i /><i /><i /></span>{voiceTranscript || (onVoiceRecording ? "Recording… tap the microphone when you’re done" : "Listening… tap the microphone when you’re done")}</div> : null}
         {voiceError ? <div className="voice-note-error" role="status">{voiceError}</div> : null}
       </div>
-      <button type="button" className="new-conversation" onClick={onNewConversation}><Plus aria-hidden="true" /> New conversation</button>
 
       {whyMessage ? <Modal title={`Why did ${state.companion.name} say this?`} description={state.subscription.planId === "platinum" ? "A transparent summary of the context used for this response." : "Response explanations are included with Platinum."} onClose={() => setWhyMessage(null)}>{state.subscription.planId === "platinum" ? <ul className="reason-list">{(whyMessage.explanation?.length ? whyMessage.explanation : [
         `Matched ${state.companion.name}’s warm, playful personality settings.`,
