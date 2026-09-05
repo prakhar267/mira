@@ -46,7 +46,24 @@ export function hasUsableCallSpeech({ peakLevel, voicedFrames, voicedSpanMs }: C
 }
 
 export function preferredCallTranscript(browserTranscript: string, serverTranscript = "") {
-  return (serverTranscript.trim() || browserTranscript.trim()).replace(/\s+/g, " ");
+  const browser = browserTranscript.trim().replace(/\s+/g, " ");
+  const server = serverTranscript.trim().replace(/\s+/g, " ");
+  if (!server) return browser;
+  if (!browser) return server;
+  if (/\p{Script=Devanagari}/u.test(server)) return server;
+  const browserWords = browser.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
+  const serverWords = server.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
+  return browserWords >= serverWords + 2 ? browser : server;
+}
+
+/** Browser recognition is useful as a fast path only for a complete conversational phrase. */
+export function isConfidentBrowserTranscript(value: string) {
+  const clean = value.trim().replace(/\s+/g, " ");
+  const words = clean.match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (clean.length < 14 || words.length < 4) return false;
+  if (/^(?:thank you|thanks for watching|please subscribe|hmm+|uh+)[.!?\s]*$/i.test(clean)) return false;
+  const uniqueWords = new Set(words.map((word) => word.toLowerCase()));
+  return uniqueWords.size >= Math.min(3, words.length);
 }
 
 export function isCallSilenceResponse(status: number) {
@@ -146,10 +163,10 @@ export async function startCallListening(options: CallListeningOptions): Promise
     }
   }
 
-  const finishBrowserRecognition = async () => {
+  const finishBrowserRecognition = async (maximumWaitMs = 900) => {
     if (!recognitionEnded) {
       await new Promise<void>((resolve) => {
-        const timer = window.setTimeout(resolve, 900);
+        const timer = window.setTimeout(resolve, maximumWaitMs);
         recognitionEndResolver = () => {
           window.clearTimeout(timer);
           resolve();
@@ -203,15 +220,37 @@ export async function startCallListening(options: CallListeningOptions): Promise
     const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
     void blobBase64(blob)
       .then(async (audioBase64) => {
-        const nativeTranscriptPromise = finishBrowserRecognition();
         const responsePromise = fetch("/api/companion-transcribe", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ audioBase64, contentType: blob.type }),
           signal: transcriptionController.signal,
-        });
-        const [nativeTranscript, response] = await Promise.all([nativeTranscriptPromise, responsePromise]);
-        const body = await response.json().catch(() => null) as { text?: string; error?: string } | null;
+        }).then(async (response) => ({
+          response,
+          body: await response.json().catch(() => null) as { text?: string; error?: string } | null,
+        })).catch(() => null);
+        const nativeTranscript = await finishBrowserRecognition(260);
+        let serverResult: Awaited<typeof responsePromise> | "pending" = "pending";
+        if (isConfidentBrowserTranscript(nativeTranscript)) {
+          serverResult = await Promise.race([
+            responsePromise,
+            new Promise<"pending">((resolve) => window.setTimeout(() => resolve("pending"), 420)),
+          ]);
+          if (serverResult === "pending") {
+            transcriptionController.abort();
+            if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
+            return;
+          }
+        }
+        if (serverResult === "pending") serverResult = await responsePromise;
+        if (!serverResult) {
+          if (nativeTranscript) {
+            if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
+            return;
+          }
+          throw new Error("I couldn’t hear that clearly.");
+        }
+        const { response, body } = serverResult;
         if (isCallSilenceResponse(response.status)) {
           if (!canceled && nativeTranscript) options.onTranscript(preferredCallTranscript(nativeTranscript));
           else if (!canceled) options.onSilence();
@@ -264,7 +303,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
       else quietSince = 0;
     }
 
-    if ((heardSpeech && quietSince && now - quietSince >= 850) || now - startedAt >= 30_000) {
+    if ((heardSpeech && quietSince && now - quietSince >= 700) || now - startedAt >= 30_000) {
       stop();
       return;
     }

@@ -44,6 +44,24 @@ const monotonyPattern = /\b(?:monotonous|monotony|same (?:old )?(?:routine|thing
 const devanagariPattern = /[\u0900-\u097f]/;
 const hinglishPattern = /\b(?:aaj|accha|acha|arey|aur|bahut|bas|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karti|karte|kya|kyun|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sach|samajh|theek|thik|thoda|tum|tumhara|yaar)\b/i;
 
+function explicitlyRequestedLanguage(value: string): "en" | "hi" | "hinglish" | null {
+  if (!/(?:speak|talk|reply|answer|chat|language|baat|bolo|बात|बोल|जवाब|भाषा|mein|में)/iu.test(value)) return null;
+  const mentions = [
+    ...[...value.matchAll(/(?:hinglish|हिंग्लिश)/giu)].map((match) => ({ language: "hinglish" as const, index: match.index, value: match[0] })),
+    ...[...value.matchAll(/(?:english|इंग्लिश|अंग्रेज़ी|अंग्रेजी)/giu)].map((match) => ({ language: "en" as const, index: match.index, value: match[0] })),
+    ...[...value.matchAll(/(?:hindi|हिंदी|हिन्दी)/giu)].map((match) => ({ language: "hi" as const, index: match.index, value: match[0] })),
+  ].sort((left, right) => left.index - right.index);
+  const requested = mentions.filter((mention) => {
+    const before = value.slice(Math.max(0, mention.index - 24), mention.index);
+    const after = value.slice(mention.index + mention.value.length, mention.index + mention.value.length + 24);
+    const negatedBefore = /(?:not|nahi|नहीं|मत)\s*$/iu.test(before)
+      || /(?:don['’]?t|do not|mat)\s+(?:speak|talk|reply|answer|बोल\p{L}*)\s*$/iu.test(before);
+    const negatedAfter = /^\s*(?:(?:mein|me|में)\s*)?(?:not|nahi|नहीं)\b/iu.test(after);
+    return !negatedBefore && !negatedAfter;
+  });
+  return requested.at(-1)?.language ?? null;
+}
+
 function stableIndex(seed: string, size: number) {
   let value = 2166136261;
   for (let index = 0; index < seed.length; index += 1) {
@@ -215,6 +233,17 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   const listeningFirst = context.responsePreferences?.listeningFirst ?? true;
   const hindiScript = devanagariPattern.test(clean);
   const hinglish = !hindiScript && hinglishPattern.test(clean);
+  const requestedLanguage = explicitlyRequestedLanguage(clean);
+
+  if (requestedLanguage === "en") {
+    return result({ text: "Done—we’ll speak in English from here.", intent: "preference", context, adaptations: [...adaptations, "contextual-direct-answer"], prohibitQuestions: true });
+  }
+  if (requestedLanguage === "hinglish") {
+    return result({ text: "Done—ab Hinglish mein hi baat karte hain.", intent: "preference", context, adaptations: [...adaptations, "contextual-direct-answer"], prohibitQuestions: true });
+  }
+  if (requestedLanguage === "hi") {
+    return result({ text: "ठीक है—अब हिंदी में ही बात करते हैं।", intent: "preference", context, adaptations: [...adaptations, "contextual-direct-answer"], prohibitQuestions: true });
+  }
 
   if (hindiScript) {
     if (/(?:क्या बोल रही|क्या कह रही|समझ नहीं|बात समझो|जवाब गलत)/u.test(clean)) {
@@ -237,6 +266,9 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   }
 
   if (hinglish) {
+    const priorUserTurns = context.recentMessages
+      .filter((message) => message.role === "user" && message.content.trim() !== clean)
+      .slice(-4);
     const recentManagerConflict = context.recentMessages
       .filter((message) => message.role === "user")
       .slice(-4)
@@ -244,14 +276,15 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     if (/\b(?:kya\s+(?:yaar|yah)?\s*kya\s+(?:bol|keh)|kya\s+(?:bol|keh)\s+rahi|samajh\s+nahi|context\s+samjho|reply\s+(?:galat|off))\b/i.test(clean)) {
       return result({ text: "Haan, mera pichhla reply bilkul off tha. Tum meri baat ka matlab pooch rahe the aur main context pakadne ke bajaye generic jawab de gayi.", intent: "repair", context, adaptations, prohibitQuestions: true });
     }
-    if (/\b(?:usko|usse|unko)\b.{0,40}\b(?:message|text|msg)\b/i.test(clean)) {
-      const priorUserTurn = [...context.recentMessages]
-        .reverse()
-        .find((message) => message.role === "user" && message.content.trim() !== clean);
-      const priorSisterInterview = priorUserTurn?.content.match(/\b(?:meri|my)\s+sister\s+([\p{L}][\p{L}'-]{1,40}).{0,80}\binterview\b/iu);
+    if (/\b(?:uske\s+liye|usko|usse|unko)\b.{0,48}\b(?:kya\s+(?:kar|bol|kah)|message|text|msg)\w*\b/i.test(clean)) {
+      const priorSisterTurn = [...priorUserTurns].reverse().find((message) => /\b(?:meri|my)\s+sister\b.{0,120}\binterview\b/iu.test(message.content));
+      const priorSisterInterview = priorSisterTurn?.content.match(/\b(?:meri|my)\s+sister\s+([\p{L}][\p{L}'-]{1,40}).{0,120}\binterview\b/iu);
       if (priorSisterInterview?.[1]) {
+        const dislikesAdvice = priorUserTurns.some((message) => /\b(?:hates?|doesn['’]?t like|pasand nahi)\b.{0,30}\b(?:advice|salaah)\b/i.test(message.content));
         return result({
-          text: `${priorSisterInterview[1]} ko bas itna bhejo: “Kal ke liye all the best. Tu ready hai—bas calmly jaana, main tere saath hoon.” Simple, warm, aur bina extra pressure ke.`,
+          text: dislikesAdvice
+            ? `${priorSisterInterview[1]} ko bas simple good-luck bolo aur normal raho—advice mat do. Usko support chahiye, extra pressure nahi.`
+            : `${priorSisterInterview[1]} ko bas itna bhejo: “Kal ke liye all the best. Tu ready hai—bas calmly jaana, main tere saath hoon.” Simple, warm, aur bina extra pressure ke.`,
           intent: "planning",
           context,
           adaptations: [...adaptations, "contextual-direct-answer"],
@@ -259,7 +292,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
         });
       }
     }
-    if ((/\bmanager\b/i.test(clean) || recentManagerConflict) && /\b(?:kya bolun|kya kahun|kaise bolun|kaise kahun)\b/i.test(clean)) {
+    if ((/\bmanager\b/i.test(clean) || recentManagerConflict) && /\b(?:(?:kya|kaise)(?:\s+hi)?\s+(?:bol|kah)\w*|kya\s+kar\w*)\b/i.test(clean)) {
       return result({ text: "Usko calmly bolo: “Main blame nahi kar raha, bas meeting mein jo hua woh clear karna chahta hoon, taaki yeh repeat na ho.” Seedha hai, defensive bhi nahi lagta.", intent: "planning", context, adaptations: [...adaptations, "contextual-direct-answer"], prohibitQuestions: true });
     }
     const sisterInterview = clean.match(/\b(?:meri|my)\s+sister\s+([\p{L}][\p{L}'-]{1,40}).{0,80}\binterview\b/iu);
@@ -600,5 +633,5 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
         : prohibitQuestions
           ? choose(seed, ["I might be missing the important part, so I won’t pretend I caught more than that.", "That could mean a few different things. I’ll leave it there until there’s more to go on.", "Okay. I won’t fill in the blanks for you."])
           : choose(seed, ["Wait—say a little more. I don’t want to guess what you meant.", "I’m not sure I got the important part. Say it to me another way?", "Hold on, I might be reading that wrong. What did you mean?"]);
-  return result({ text: openText, intent: "open", context, adaptations, prohibitQuestions });
+  return result({ text: openText, intent: "open", context, adaptations: uncertainSpeech ? [...adaptations, "speech-clarification"] : adaptations, prohibitQuestions });
 }

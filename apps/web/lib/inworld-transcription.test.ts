@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInworldTranscriptionRequest, INWORLD_STT_MODEL, isUsableInworldTranscript, preserveSpokenLanguage, readInworldTranscript } from "./inworld-transcription";
+import { createInworldTranscriptionRequest, INWORLD_STT_MODEL, isUsableInworldTranscript, normalizeSpokenHinglish, preserveSpokenLanguage, readInworldTranscript } from "./inworld-transcription";
 
 describe("Inworld transcription", () => {
   it("lets the model auto-detect English, Hindi, or Hinglish", () => {
@@ -30,6 +30,7 @@ describe("Inworld transcription", () => {
 
   it("keeps Hindi script but romanizes clearly code-mixed speech", () => {
     expect(preserveSpokenLanguage("आज काम बहुत मुश्किल था।")).toBe("आज काम बहुत मुश्किल था।");
-    expect(preserveSpokenLanguage("यार मेरे मैनेजर ने मुझे ब्लेम कर दिया।")).toMatch(/^yaar mere mainejar ne mujhe blem/);
+    expect(preserveSpokenLanguage("यार मेरी मैनेजर ने अपनी मिस्टेक के लिए मुझे ब्लेम कर दिया।")).toBe("yaar meri manager ne apni mistake ke liye mujhe blame kar diya.");
+    expect(normalizeSpokenHinglish("kyaa main usane yah boloon")).toBe("kya main usne yah bolun");
   });
 });

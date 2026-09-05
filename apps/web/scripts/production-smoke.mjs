@@ -93,9 +93,9 @@ await run("Hinglish-only conversation", async () => {
   return reply;
 });
 
-await run("Hindi input becomes Roman Hinglish", async () => {
+await run("Hindi input stays conversational Hindi", async () => {
   const reply = await chat([{ role: "user", content: "आज पूरा दिन बहुत बोरिंग था" }]);
-  expect(!/\p{Script=Devanagari}/u.test(reply), `reply was not Roman-script Hinglish: ${reply}`);
+  expect(/\p{Script=Devanagari}/u.test(reply), `reply was not Hindi in Devanagari: ${reply}`);
   return reply;
 });
 

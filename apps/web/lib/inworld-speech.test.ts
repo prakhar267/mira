@@ -22,6 +22,7 @@ describe("Inworld Priya speech adapter", () => {
       voiceId: "Priya",
       modelId: "inworld-tts-2-flash",
       deliveryMode: "BALANCED",
+      applyTextNormalization: "OFF",
       audioConfig: { audioEncoding: "MP3", sampleRateHertz: 48_000, bitRate: 128_000 },
     });
   });

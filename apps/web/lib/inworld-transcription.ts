@@ -4,6 +4,31 @@ export const INWORLD_STT_ENDPOINT = "https://api.inworld.ai/stt/v1/transcribe";
 export const INWORLD_STT_MODEL = "inworld/inworld-stt-1";
 
 const devanagariCodeMixPattern = /(?:ऑफिस|वर्क|जॉब|बॉस|मैनेजर|मीटिंग|इंटरव्यू|डिनर|मैसेज|टेक्स्ट|कॉल|वीडियो|ब्लेम|मूड|वीकेंड|प्रोजेक्ट|डेडलाइन|प्रेज़ेंटेशन|ईमेल|रिप्लाई|कॉन्टेक्स्ट)/u;
+const spokenHinglishCorrections: Record<string, string> = {
+  apanee: "apni",
+  apane: "apne",
+  apanaa: "apna",
+  blem: "blame",
+  boloon: "bolun",
+  diyaa: "diya",
+  galatee: "galti",
+  kyaa: "kya",
+  kahe: "keh",
+  karoon: "karun",
+  lie: "liye",
+  mainejar: "manager",
+  mainne: "maine",
+  meree: "meri",
+  mistek: "mistake",
+  mujhee: "mujhe",
+  rahee: "rahi",
+  saamane: "saamne",
+  usane: "usne",
+};
+
+export function normalizeSpokenHinglish(value: string) {
+  return value.replace(/[\p{L}]+/gu, (word) => spokenHinglishCorrections[word.toLowerCase()] ?? word);
+}
 
 function audioEncoding(contentType: string) {
   if (/audio\/(?:mpeg|mp3)/i.test(contentType)) return "MP3";
@@ -52,6 +77,6 @@ export function readInworldTranscript(result: unknown) {
 /** Speech has no script; romanize auto-detected Hindi only when the transcript contains clear English code-mixing. */
 export function preserveSpokenLanguage(value: string) {
   const clean = value.replace(/\s+/g, " ").trim();
-  if (/\p{Script=Devanagari}/u.test(clean) && devanagariCodeMixPattern.test(clean)) return romanizeHindiForEnglishTts(clean);
+  if (/\p{Script=Devanagari}/u.test(clean) && devanagariCodeMixPattern.test(clean)) return normalizeSpokenHinglish(romanizeHindiForEnglishTts(clean));
   return clean;
 }

@@ -42,6 +42,12 @@ function turn(content: string, prior: ChatMessage[] = [], delivery: "text" | "vo
 }
 
 describe("companion turn planning", () => {
+  it("obeys explicit language switches even when transcription mixes scripts", () => {
+    expect(turn("English में बात करें। Hindi में नहीं, English.", [], "voice").text).toBe("Done—we’ll speak in English from here.");
+    expect(turn("मैं बोल रहा हूँ English नहीं, Hinglish में बोलो", [], "video").text).toBe("Done—ab Hinglish mein hi baat karte hain.");
+    expect(turn("अब हिंदी में बात करो", [], "voice").text).toBe("ठीक है—अब हिंदी में ही बात करते हैं।");
+  });
+
   it("repairs the conversation and obeys a no-questions boundary", () => {
     const prior: ChatMessage[] = [
       { id: "assistant-1", conversationId: "conversation", role: "assistant", content: "What feeling is underneath it?", createdAt: now.toISOString(), status: "sent" },
@@ -303,6 +309,25 @@ describe("companion turn planning", () => {
     expect(planned.intent).toBe("planning");
     expect(planned.text).toContain("meeting mein jo hua");
     expect(planned.adaptations).toContain("contextual-direct-answer");
+  });
+
+  it("uses a sister's stated advice boundary when a Hinglish follow-up asks what to do", () => {
+    const prior: ChatMessage[] = [
+      { id: "u1", conversationId: "conversation", role: "user", content: "My sister Priya has an interview tomorrow. She hates unsolicited advice.", createdAt: now.toISOString(), status: "sent" },
+      { id: "a1", conversationId: "conversation", role: "assistant", content: "Priya needs calm support, not a lecture.", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("haan toh main uske liye abhi kya karu", prior, "voice");
+    expect(planned.intent).toBe("planning");
+    expect(planned.text).toContain("Priya");
+    expect(planned.text).toContain("advice mat do");
+    expect(planned.adaptations).toContain("contextual-direct-answer");
+  });
+
+  it("asks to confirm a short, uncertain spoken fragment instead of inventing meaning", () => {
+    const planned = turn("maybe that thing", [], "voice");
+    expect(planned.intent).toBe("open");
+    expect(planned.text).toContain("caught that wrong");
+    expect(planned.adaptations).toContain("speech-clarification");
   });
 
   it("keeps English and Hinglish as concise and direct as Hindi", () => {

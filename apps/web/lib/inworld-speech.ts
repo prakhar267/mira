@@ -35,7 +35,7 @@ export function createInworldSpeechRequest(text: string, apiKey: string): Reques
       },
       deliveryMode: "BALANCED",
       timestampType: "TIMESTAMP_TYPE_UNSPECIFIED",
-      applyTextNormalization: "ON",
+      applyTextNormalization: "OFF",
     }),
   };
 }

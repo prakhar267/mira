@@ -441,7 +441,8 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   };
 
   const generateDemoReply = async (messages: ChatMessage[], delivery: "text" | "voice" | "video", fallback: CompanionTurn) => {
-    if (fallback.adaptations.includes("safety-support") || fallback.adaptations.includes("contextual-direct-answer") || fallback.intent === "repair") return fallback.text;
+    const immediateCallIntent = delivery !== "text" && ["greeting", "self", "memory", "choice"].includes(fallback.intent);
+    if (immediateCallIntent || fallback.adaptations.includes("safety-support") || fallback.adaptations.includes("contextual-direct-answer") || fallback.adaptations.includes("speech-clarification") || fallback.intent === "repair") return fallback.text;
     try {
       const currentMemories = state.memoryEnabled ? currentMemoryRecords(activeMemories) : [];
       const lexicalMemories = state.memoryEnabled ? relevantMemoryContents(currentMemories, messages) : [];
