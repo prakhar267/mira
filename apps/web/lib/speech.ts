@@ -122,7 +122,7 @@ export function playCompanionSpeech(text: string, options: {
       response = await fetch("/api/companion-speech", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: normalizeHinglishText(text) }),
+        body: JSON.stringify({ text: text.replace(/\s+/g, " ").trim() }),
         signal: abortController.signal,
       });
       if (response.ok || ![429, 502, 503, 504].includes(response.status) || attempt === 2) break;

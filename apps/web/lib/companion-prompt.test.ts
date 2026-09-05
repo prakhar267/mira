@@ -66,6 +66,13 @@ describe("edge companion prompting", () => {
     expect(sanitizeCompanionReplyForDelivery("You've got this. 😎", "text")).toBe("You've got this. 😎");
   });
 
+  it("keeps generated call replies concise for low-latency speech", () => {
+    const longReply = `${"Yaar aaj ka din kaafi long tha, but tumne phir bhi handle kar liya. ".repeat(8)}Bas ab thoda breathe karo.`;
+    expect(sanitizeCompanionReplyForDelivery(longReply, "voice").length).toBeLessThanOrEqual(290);
+    expect(sanitizeCompanionReplyForDelivery(longReply, "video").length).toBeLessThanOrEqual(290);
+    expect(sanitizeCompanionReplyForDelivery(longReply, "text").length).toBeGreaterThan(290);
+  });
+
   it("answers every memory request in Roman Hinglish", () => {
     expect(isMemoryRecallRequest("maine pehle kya bataya tha?")).toBe(true);
     expect(isMemoryRecallRequest("मैंने पहले क्या बताया था?" )).toBe(true);

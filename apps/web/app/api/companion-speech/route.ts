@@ -1,58 +1,63 @@
-import { normalizeHinglishText } from "@/lib/speech";
+import { createVeenaRequest, detectVeenaAudioContentType, fitVeenaSpeechPrompt, VEENA_ENDPOINT } from "@/lib/veena-speech";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 
 const VOICE = {
-  model: "@cf/myshell-ai/melotts",
-  name: "Mira",
-  provider: "cloudflare-melotts",
-  contentType: "audio/wav",
+  model: "maya-research/Veena",
+  name: "Kavya",
+  provider: "segmind",
+  speaker: "kavya",
+  language: "hinglish",
 } as const;
 
-function decodeBase64(value: string) {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
+async function fetchWithDeadline(input: string, init: RequestInit, timeoutMs: number, requestSignal: AbortSignal) {
+  const controller = new AbortController();
+  const abortFromRequest = () => controller.abort(requestSignal.reason);
+  requestSignal.addEventListener("abort", abortFromRequest, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error("Voice generation timed out.")), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+    requestSignal.removeEventListener("abort", abortFromRequest);
+  }
 }
 
-function detectedAudioType(bytes: Uint8Array, declared: string) {
-  if (bytes.length >= 4 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return "audio/wav";
-  if (bytes.length >= 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return "audio/mpeg";
-  return declared;
+async function generateVeenaSpeech(prompt: string, apiKey: string, requestSignal: AbortSignal) {
+  const response = await fetchWithDeadline(VEENA_ENDPOINT, createVeenaRequest(prompt, apiKey), 90_000, requestSignal);
+
+  if (!response.ok) throw new Error(`Veena generation returned ${response.status}.`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const contentType = detectVeenaAudioContentType(bytes);
+  if (!contentType || bytes.length > 8_000_000) {
+    throw new Error("Veena returned invalid audio data.");
+  }
+  return { bytes, contentType };
 }
 
-function audioResponse(audio: BodyInit, contentType: string, requestId: string, startedAt: number) {
-  console.log(JSON.stringify({ event: "edge_request", requestId, route: "companion-speech", status: 200, latencyMs: Date.now() - startedAt, provider: VOICE.provider, model: VOICE.model, language: "hinglish" }));
-  return new Response(audio, {
+function audioResponse(audio: Uint8Array, contentType: string, requestId: string, startedAt: number) {
+  console.log(JSON.stringify({
+    event: "edge_request",
+    requestId,
+    route: "companion-speech",
+    status: 200,
+    latencyMs: Date.now() - startedAt,
+    provider: VOICE.provider,
+    model: VOICE.model,
+    voice: VOICE.name,
+    language: VOICE.language,
+  }));
+  return new Response(audio as unknown as BodyInit, {
     headers: {
       "cache-control": "no-store",
-      "content-type": /^audio\//i.test(contentType) ? contentType : VOICE.contentType,
+      "content-type": contentType,
       "x-companion-voice": VOICE.name,
       "x-companion-voice-model": VOICE.model,
-      "x-companion-language": "hinglish",
+      "x-companion-voice-provider": VOICE.provider,
+      "x-companion-language": VOICE.language,
       "x-content-type-options": "nosniff",
       "x-request-id": requestId,
     },
   });
-}
-
-async function normalizeSpeechResult(result: unknown, requestId: string, startedAt: number) {
-  if (result instanceof Response) {
-    if (!result.ok || !result.body) throw new Error(`Voice model returned ${result.status}.`);
-    return audioResponse(result.body, result.headers.get("content-type") ?? VOICE.contentType, requestId, startedAt);
-  }
-  if (result instanceof ReadableStream) return audioResponse(result, VOICE.contentType, requestId, startedAt);
-  if (result instanceof ArrayBuffer) return audioResponse(result, VOICE.contentType, requestId, startedAt);
-  if (ArrayBuffer.isView(result)) return audioResponse(result as unknown as BodyInit, VOICE.contentType, requestId, startedAt);
-
-  const payload = result && typeof result === "object" ? result as Record<string, unknown> : {};
-  const nested = payload.result && typeof payload.result === "object" ? payload.result as Record<string, unknown> : {};
-  const audio = typeof nested.audio === "string" ? nested.audio : typeof payload.audio === "string" ? payload.audio : "";
-  const contentType = typeof nested.content_type === "string" ? nested.content_type : typeof payload.content_type === "string" ? payload.content_type : VOICE.contentType;
-  if (!audio) throw new Error("Voice model returned no audio.");
-  const dataMatch = audio.match(/^data:([^;,]+);base64,(.+)$/s);
-  const bytes = decodeBase64(dataMatch?.[2] ?? audio);
-  return audioResponse(bytes, detectedAudioType(bytes, dataMatch?.[1] ?? contentType), requestId, startedAt);
 }
 
 export async function POST(request: Request) {
@@ -61,26 +66,29 @@ export async function POST(request: Request) {
   const respond = (body: unknown, status = 200, details: Record<string, unknown> = {}) => edgeJson(requestId, "companion-speech", startedAt, body, status, details);
   try {
     assertEdgeSameOrigin(request);
-    if (await edgeRateLimited(request, "companion-speech", 45)) return respond({ error: "Voice thoda cool down kar raha hai. Ek moment mein try karo." }, 429, { limited: true });
+    if (await edgeRateLimited(request, "companion-speech", 36)) return respond({ error: "Voice thoda cool down kar raha hai. Ek moment mein try karo." }, 429, { limited: true });
     const body = await readEdgeJson(request, 5_000) as { text?: unknown } | null;
-    const prompt = normalizeHinglishText(typeof body?.text === "string" ? body.text.slice(0, 900) : "");
+    const prompt = fitVeenaSpeechPrompt(typeof body?.text === "string" ? body.text : "");
     if (!prompt) return respond({ error: "Speech text is required." }, 400);
 
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    let result: unknown;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
+    const apiKey = (env as typeof env & { SEGMIND_API_KEY?: string }).SEGMIND_API_KEY?.trim();
+    if (!apiKey) return respond({ error: "Mira's selected Kavya voice is not configured yet." }, 503, { provider: VOICE.provider, model: VOICE.model, configuration: "missing" });
+
+    let audio: Awaited<ReturnType<typeof generateVeenaSpeech>> | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        result = await env.AI.run(VOICE.model as never, { prompt, lang: "en" } as never);
+        audio = await generateVeenaSpeech(prompt, apiKey, request.signal);
         break;
       } catch (cause) {
-        if (attempt === 3) throw cause;
-        await new Promise((resolve) => setTimeout(resolve, 120 * (attempt + 1)));
+        if (attempt === 1 || request.signal.aborted) throw cause;
+        await new Promise((resolve) => setTimeout(resolve, 250));
       }
     }
-    if (result === undefined) throw new Error("Voice model returned no result.");
-    return await normalizeSpeechResult(result, requestId, startedAt);
+    if (!audio) throw new Error("Veena returned no audio.");
+    return audioResponse(audio.bytes, audio.contentType, requestId, startedAt);
   } catch (cause) {
-    console.error("Mira Hinglish speech failed", cause instanceof Error ? cause.message : "unknown");
+    console.error("Mira Veena speech failed", cause instanceof Error ? cause.message : "unknown");
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-speech", startedAt, cause);
     return respond({ error: "Mira ki voice abhi connect nahi ho paayi. Please phir try karo." }, 503, { provider: VOICE.provider, model: VOICE.model });
   }

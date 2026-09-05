@@ -361,7 +361,7 @@ export function VideoCallModal({
       <div className="live-call__veil live-call__veil--video" />
       <header className="live-call__header"><span><i className="status-dot" /> Live together</span><strong>{companionName}</strong><time>{time}</time></header>
 
-      <div className="video-call__status"><Waveform aria-hidden="true" /><span>{thinking ? "Thinking about that" : preparingSpeech ? "Preparing private voice" : speaking ? `${companionName} is speaking` : listening ? "Listening to you" : "Here with you"}</span></div>
+      <div className="video-call__status"><Waveform aria-hidden="true" /><span>{thinking ? "Thinking about that" : preparingSpeech ? "Preparing voice" : speaking ? `${companionName} is speaking` : listening ? "Listening to you" : "Here with you"}</span></div>
 
       <div className="video-call__camera">
         <video ref={videoRef} muted playsInline aria-label="Your local camera preview" />
@@ -370,7 +370,7 @@ export function VideoCallModal({
 
       <div className="video-call__tools">
         <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Open-licensed anime avatar · stable live expressions</span>
-        <span className="video-call__avatar-label">Hinglish only · one natural voice</span>
+        <span className="video-call__avatar-label">Hinglish · Veena Kavya</span>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
         <button type="button" disabled={!cameraOn || visionBusy} onClick={() => void shareCurrentFrame()}><Camera aria-hidden="true" /> {visionBusy ? "Looking…" : "Show frame"}</button>
       </div>
@@ -392,7 +392,7 @@ export function VideoCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End video call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.4, y: -110 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening resumes after every reply · one consistent Hinglish voice · camera stays local until Show frame · no call recording is saved</small>
+      <small className="live-call__disclosure">Hands-free listening resumes after every reply · Veena Kavya voice · camera stays local until Show frame · no call recording is saved</small>
     </motion.div>
   );
 }

@@ -183,11 +183,17 @@ export function sanitizeCompanionReply(value: string) {
 export function sanitizeCompanionReplyForDelivery(value: string, delivery: EdgeCompanionRequest["delivery"] = "text") {
   const reply = sanitizeCompanionReply(value);
   if (delivery === "text") return reply;
-  return reply
+  const spoken = reply
     .replace(/\p{Extended_Pictographic}\uFE0F?/gu, "")
     .replace(/\s+([,.;!?…।])/g, "$1")
     .replace(/\s{2,}/g, " ")
     .trim();
+  if (spoken.length <= 290) return spoken;
+  const clipped = spoken.slice(0, 290);
+  const sentenceEnd = Math.max(clipped.lastIndexOf("."), clipped.lastIndexOf("!"), clipped.lastIndexOf("?"));
+  const wordEnd = clipped.lastIndexOf(" ");
+  const end = sentenceEnd >= 180 ? sentenceEnd + 1 : wordEnd >= 180 ? wordEnd : 290;
+  return clipped.slice(0, end).replace(/[,:;\s]+$/, "").trim();
 }
 
 export function isGenericCompanionReply(value: string) {
