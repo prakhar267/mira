@@ -45,8 +45,7 @@ export async function POST(request: Request) {
         if (!response.ok) throw new Error(`Inworld transcription returned ${response.status}.`);
         const text = normalizeHinglishText(readInworldTranscript(await response.json()));
         if (isUsableInworldTranscript(text)) return respond({ text, language: "hinglish" }, 200, { provider: "inworld", model: INWORLD_STT_MODEL, language: "hinglish" });
-        if (text) return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "inworld", model: INWORLD_STT_MODEL, filtered: "prompt-leak" });
-        throw new Error("Inworld returned no transcript.");
+        return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "inworld", model: INWORLD_STT_MODEL, filtered: text ? "hallucination" : "no-speech" });
       } catch (cause) {
         console.warn("Inworld transcription unavailable; trying Cloudflare", cause instanceof Error ? cause.message : "unknown");
       }

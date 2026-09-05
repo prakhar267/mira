@@ -49,6 +49,10 @@ export function preferredCallTranscript(browserTranscript: string, serverTranscr
   return (browserTranscript.trim() || serverTranscript.trim()).replace(/\s+/g, " ");
 }
 
+export function isCallSilenceResponse(status: number) {
+  return status === 422;
+}
+
 function recorderMimeType() {
   for (const type of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]) {
     if (MediaRecorder.isTypeSupported(type)) return type;
@@ -211,6 +215,10 @@ export async function startCallListening(options: CallListeningOptions): Promise
           signal: transcriptionController.signal,
         });
         const body = await response.json().catch(() => null) as { text?: string; error?: string } | null;
+        if (isCallSilenceResponse(response.status)) {
+          if (!canceled) options.onSilence();
+          return;
+        }
         if (!response.ok || !body?.text?.trim()) throw new Error(body?.error ?? "I couldn’t hear that clearly.");
         if (!canceled) options.onTranscript(preferredCallTranscript("", body.text));
       })
