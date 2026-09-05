@@ -229,6 +229,21 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   }
 
   if (hinglish) {
+    if (/\b(?:usko|usse|unko)\b.{0,40}\b(?:message|text|msg)\b/i.test(clean)) {
+      const priorUserTurn = [...context.recentMessages]
+        .reverse()
+        .find((message) => message.role === "user" && message.content.trim() !== clean);
+      const priorSisterInterview = priorUserTurn?.content.match(/\b(?:meri|my)\s+sister\s+([\p{L}][\p{L}'-]{1,40}).{0,80}\binterview\b/iu);
+      if (priorSisterInterview?.[1]) {
+        return result({
+          text: `${priorSisterInterview[1]} ko bas itna bhejo: “Kal ke liye all the best. Tu ready hai—bas calmly jaana, main tere saath hoon.” Simple, warm, aur bina extra pressure ke.`,
+          intent: "planning",
+          context,
+          adaptations,
+          prohibitQuestions: true,
+        });
+      }
+    }
     const sisterInterview = clean.match(/\b(?:meri|my)\s+sister\s+([\p{L}][\p{L}'-]{1,40}).{0,80}\binterview\b/iu);
     if (sisterInterview?.[1] && /\b(?:worried|worry|tension|nervous|dar|fikar)\b/i.test(clean)) {
       return result({

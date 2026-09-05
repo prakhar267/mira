@@ -135,6 +135,18 @@ describe("companion turn planning", () => {
     expect(planned.text).not.toContain("?");
   });
 
+  it("resolves a Hinglish follow-up pronoun from the recent conversation", () => {
+    const prior: ChatMessage[] = [
+      { id: "u-aisha", conversationId: "conversation", role: "user", content: "Meri sister Aisha ka kal morning interview hai aur main worried hoon.", createdAt: now.toISOString(), status: "sent" },
+      { id: "a-aisha", conversationId: "conversation", role: "assistant", content: "I hope Aisha ka interview smooth jaaye.", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("Usko kya message bheju?", prior);
+    expect(planned.intent).toBe("planning");
+    expect(planned.text).toContain("Aisha ko");
+    expect(planned.text).toContain("all the best");
+    expect(planned.text).not.toContain("?");
+  });
+
   it("recalls a relevant personal memory in conversational language", () => {
     const momo: MemoryRecord = { ...memories[0]!, id: "momo", type: "relationship", content: "Prakhar's dog Momo died last year, and Prakhar misses him most on 2 September.", normalizedContent: "momo", pinned: false };
     const content = "Do you remember what today means for me and Momo?";
