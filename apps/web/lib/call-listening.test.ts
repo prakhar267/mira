@@ -18,6 +18,7 @@ describe("call speech evidence", () => {
     expect(preferredCallTranscript("  browser fallback ", "")).toBe("browser fallback");
     expect(preferredCallTranscript("my manager blamed me in front of the whole team", "manager blamed me")).toBe("my manager blamed me in front of the whole team");
     expect(preferredCallTranscript("mera dost kal aa raha hai", "मेरा दोस्त कल आ रहा है")).toBe("मेरा दोस्त कल आ रहा है");
+    expect(preferredCallTranscript("my sister Priya has an interview tomorrow and she is nervous", "बहन का इंटरव्यू है")).toBe("my sister Priya has an interview tomorrow and she is nervous");
   });
 
   it("uses browser recognition early only for complete phrases", () => {

@@ -32,6 +32,7 @@ const hinglishPattern = /\b(?:aaj|abhi|acha|accha|arey|aur|bahut|bas|batao|bolo|
 const naturalHinglishReplyPattern = /\b(?:aaj|abhi|accha|arey|aur|bas|haan|hai|hoon|kaafi|kar|karo|karti|kya|kyun|lekin|main|matlab|mera|meri|mujhe|nahi|par|sach|theek|thoda|toh|tum|tumhara|uske|yaar)\b/i;
 const listenOnlyPattern = /\b(?:just listen|only listen|don['’]?t (?:advise|fix|ask)|no advice|no questions?)\b|(?:बस सुनो|सिर्फ सुनो|सलाह मत|सवाल मत)/iu;
 const providerClaimPattern = /\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b.{0,28}\b(?:made|built|created|designed|trained|model|basis)\b|\b(?:made|built|created|designed|trained)\b.{0,28}\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b/i;
+const roboticSelfDescriptionPattern = /\b(?:large language model|language model|as an ai|i (?:do not|don['’]?t) have feelings|working properly|functioning (?:normally|properly|well)|ready to chat)\b/i;
 
 export type CompanionLanguage = "en" | "hi" | "hinglish";
 
@@ -146,7 +147,7 @@ export function buildCompanionSystemPrompt(input: EdgeCompanionRequest) {
         ? "When the user asks for advice, be specific and direct."
         : "When the user asks for advice, offer one gentle, concrete idea.",
     delivery !== "text"
-      ? "Speech recognition can be imperfect. If a transcript is fragmentary, strange, or ambiguous, do not invent a deep emotional meaning. Mention the useful words you caught and ask a natural clarification, for example: ‘I caught “monotonous”—do you mean your days have started feeling the same?’"
+      ? "Speech recognition can be imperfect. Treat rough grammar and phonetic spellings as noisy everyday speech: use recent context to infer the closest ordinary meaning and answer it directly. Never announce that you heard the user wrong merely because a turn is short, informal, or imperfectly transcribed. Ask for clarification only when the sentence is visibly cut off or two materially different readings would require different answers."
       : "If a message is fragmentary or ambiguous, make the smallest reasonable interpretation and check it in plain language instead of replying with generic empathy.",
     [
       "Style calibration—copy the human rhythm and specificity, not the exact wording:",
@@ -269,7 +270,7 @@ export function isGenericCompanionReply(value: string) {
 
 export function isInvalidCompanionReply(value: string, latestUserMessage: string, suppressQuestions = false, expectedLanguage = detectCompanionLanguage(latestUserMessage)) {
   const reply = sanitizeCompanionReply(value);
-  if (isGenericCompanionReply(reply) || providerClaimPattern.test(reply) || /\p{Script=Han}|\p{Script=Arabic}/u.test(reply)) return true;
+  if (isGenericCompanionReply(reply) || providerClaimPattern.test(reply) || roboticSelfDescriptionPattern.test(reply) || /\p{Script=Han}|\p{Script=Arabic}/u.test(reply)) return true;
   if ((suppressQuestions || requestsListeningOnly(latestUserMessage)) && /[?？]/u.test(reply)) return true;
   if ((suppressQuestions || requestsListeningOnly(latestUserMessage)) && /\b(?:batao|bata do|bol do|share karo|tell me)\b/i.test(reply)) return true;
   if (expectedLanguage === "hi" && !/\p{Script=Devanagari}/u.test(reply)) return true;

@@ -17,6 +17,7 @@ describe("edge companion prompting", () => {
     expect(prompt).toContain("Ordinary statements deserve ordinary conversation");
     expect(prompt).toContain("Do not announce that you are listening or not fixing");
     expect(prompt).toContain("Speech recognition can be imperfect");
+    expect(prompt).toContain("Never announce that you heard the user wrong");
     expect(prompt).toContain("natural conversational English");
     expect(prompt).toContain("Match the language of the latest user turn");
     expect(prompt).toContain("Facts, people, pronouns, preferences, corrections");
@@ -61,6 +62,7 @@ describe("edge companion prompting", () => {
     expect(isInvalidCompanionReply("That meeting really drained you. What happened next?", "Please just listen, no advice and no questions.")).toBe(true);
     expect(isInvalidCompanionReply("Aaj ka din tough tha. Bas bata do kya hua.", "Please just listen, no advice and no questions.")).toBe(true);
     expect(isInvalidCompanionReply("Meta designed me and Llama is my basis.", "Who made you?")).toBe(true);
+    expect(isInvalidCompanionReply("I'm a large language model, so I don't have feelings like humans do, but I'm working properly and ready to chat.", "What about you?")).toBe(true);
   });
 
   it("answers identity questions in the user's current language", () => {

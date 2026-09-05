@@ -21,6 +21,8 @@ describe("free chat inference", () => {
     });
     expect(prompt).toContain("natural Indian Hinglish");
     expect(prompt).toContain("does not reset the conversation");
+    expect(prompt).toContain("Answer short turns normally");
+    expect(prompt).toContain("Never say you heard it wrong");
     expect(prompt.length).toBeLessThan(2_500);
   });
 

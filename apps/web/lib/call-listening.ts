@@ -50,10 +50,11 @@ export function preferredCallTranscript(browserTranscript: string, serverTranscr
   const server = serverTranscript.trim().replace(/\s+/g, " ");
   if (!server) return browser;
   if (!browser) return server;
-  if (/\p{Script=Devanagari}/u.test(server)) return server;
   const browserWords = browser.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
   const serverWords = server.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
-  return browserWords >= serverWords + 2 ? browser : server;
+  if (browserWords >= serverWords + 2) return browser;
+  if (/\p{Script=Devanagari}/u.test(server)) return server;
+  return server;
 }
 
 /** Browser recognition is useful as a fast path only for a complete conversational phrase. */

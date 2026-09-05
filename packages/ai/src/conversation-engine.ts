@@ -78,6 +78,12 @@ function choose(seed: string, options: string[]) {
   return options[(stableIndex(stableSeed, options.length) + turnOffset) % options.length] ?? options[0] ?? "I’m here.";
 }
 
+function isLikelyClippedSpeech(value: string) {
+  const withoutPunctuation = value.replace(/[.!?…।\s]+$/gu, "").trim();
+  if (!withoutPunctuation) return false;
+  return /(?:\b(?:a|an|the|to|for|with|about|because|but|and|or|my|your|his|her|their)|(?:कि|का|की|के|को|से|में|पर|और|लेकिन|क्योंकि))$/iu.test(withoutPunctuation);
+}
+
 function firstName(value: unknown) {
   return typeof value === "string" ? value.trim().split(/\s+/)[0] ?? "" : "";
 }
@@ -259,6 +265,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     if (/नाम.*(?:क्या|बताओ)|तुम(?:्हारा|्हारी)?.*नाम/u.test(clean)) return result({ text: `मैं ${companionName} हूँ—तुम्हारी AI companion.`, intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:क्या करती|क्या करते|काम क्या|कर सकती)/u.test(clean)) return result({ text: "मैं तुम्हारी AI companion हूँ—बात करती हूँ, तुम्हारी मंज़ूरी वाली बातें याद रखती हूँ, और calls पर साथ देती हूँ।", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:कैसी हो|कैसे हो|क्या हाल)/u.test(clean)) return result({ text: "मैं बढ़िया हूँ। आज तुम्हारे दिन को लेकर थोड़ी curious हूँ।", intent: "self", context, adaptations, prohibitQuestions });
+    if (/(?:तुम|आप)\s+बताओ|और\s+(?:तुम|आप)/u.test(clean)) return result({ text: "मैं बढ़िया हूँ—बस आराम से तुम्हारे साथ बात कर रही हूँ।", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/^(?:हाय|हेलो|नमस्ते|नमस्कार)[!.।\s]*$/u.test(clean)) return result({ text: `हाय ${userName}। अच्छा लगा तुम आ गए।`, intent: "greeting", context, adaptations, prohibitQuestions });
     if (/(?:एक जैसा|बोर|उबाऊ|रोज वही|मन नहीं)/u.test(clean)) return result({ text: "हाँ, रोज़ का वही loop सच में दिमाग़ सुन्न कर देता है। काम सबसे ज़्यादा बोर कर रहा है या पूरा दिन ही फीका लग रहा है?", intent: "everyday", context, adaptations, prohibitQuestions });
     if (/(?:थक|थकान|बहुत काम)/u.test(clean)) return result({ text: "तुम सच में थके हुए लग रहे हो। आज productivity की बात छोड़ो—थोड़ा दिमाग़ को भी आराम चाहिए।", intent: "tired", context, adaptations: [...adaptations, "no-advice"], prohibitQuestions: true });
@@ -312,6 +319,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     if (/(?:tumhara|aapka) naam kya|naam batao/i.test(clean)) return result({ text: `Main ${companionName} hoon—tumhari AI companion.`, intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:tum|aap) kya kart(?:i|e) ho|kya kar sakti/i.test(clean)) return result({ text: "Main tumhari AI companion hoon—baat karti hoon, tumhari approved memories yaad rakhti hoon, aur calls par company deti hoon.", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:kaisi ho|kaise ho|kya haal)/i.test(clean)) return result({ text: "Main badhiya hoon. Aaj tumhare din ko lekar thodi curious hoon.", intent: "self", context, adaptations, prohibitQuestions });
+    if (/\b(?:(?:tum|aap)\s+batao|aur\s+(?:tum|aap))\b/i.test(clean)) return result({ text: "Main badhiya hoon—bas tumhare saath chill karke baat kar rahi hoon.", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/^(?:hi|hello|hey|namaste|arey)(?:\s+yaar)?[!.\s]*$/i.test(clean)) return result({ text: `Hi ${userName}. Accha laga tum aa gaye.`, intent: "greeting", context, adaptations, prohibitQuestions });
     if (/(?:same|roz wahi|boring|bore|mood off)/i.test(clean)) return result({ text: "Haan, roz ka same loop kaafi paka deta hai. Work sabse zyada boring lag raha hai ya overall mood hi off hai?", intent: "everyday", context, adaptations, prohibitQuestions });
     if (/\b(?:tired|thak|thaka|thaki|exhausted|drained)\b/i.test(clean)) return result({ text: "Tum genuinely drained lag rahe ho. Aaj productivity speech bilkul nahi—thoda brain ko off-duty rehne do.", intent: "tired", context, adaptations: [...adaptations, "no-advice"], prohibitQuestions: true });
@@ -405,7 +413,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text, intent: "self", context, adaptations, prohibitQuestions: true });
   }
 
-  if (/\b(?:what are you doing|what(?:'| i)s up with you)\b/i.test(clean)) {
+  if (/\b(?:what are you doing|what(?:'| i)s up with you|what about you|how about you)\b/i.test(clean)) {
     return result({ text: choose(seed, ["Nothing dramatic. I was having a quiet minute; now I’m talking with you.", "Just taking it easy. You caught me at a good time.", "Not much. I’m curious what you’ve been up to, though."]), intent: "self", context, adaptations, prohibitQuestions });
   }
 
@@ -614,24 +622,23 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text, intent: "everyday", context, adaptations, prohibitQuestions });
   }
 
-  const wordCount = clean.split(/\s+/).filter(Boolean).length;
-  const uncertainSpeech = delivery !== "text" && (wordCount <= 4 || !/[.!?]$/.test(clean) && /\b(?:a|the|just|like|thing)\b/i.test(clean));
+  const uncertainSpeech = delivery !== "text" && isLikelyClippedSpeech(clean);
   const openText = hindiScript
     ? uncertainSpeech
-      ? `शायद मैंने गलत सुना। तुमने “${compactDetail(clean, 54)}” कहा था?`
+      ? `बात “${compactDetail(clean, 54)}” पर कट गई। उसके आगे क्या कहा था?`
       : prohibitQuestions
         ? "मैं शायद main point miss कर रही हूँ, इसलिए अपनी तरफ़ से कुछ नहीं जोड़ूँगी।"
-        : "रुको—मैं main point miss कर रही हूँ। इसे एक बार सीधे तरीके से कहो?"
+        : "हाँ, समझ रही हूँ। आगे बोलो।"
     : hinglish
       ? uncertainSpeech
-        ? `Shayad maine galat suna. Tumne “${compactDetail(clean, 54)}” bola tha?`
+        ? `Sentence “${compactDetail(clean, 54)}” par cut ho gaya. Uske aage kya bola tha?`
         : prohibitQuestions
           ? "Main shayad important point miss kar rahi hoon, isliye apni taraf se kuch add nahi karungi."
-          : "Ruko—main main point miss kar rahi hoon. Ek baar seedhe words mein bolo?"
+          : "Haan, samajh rahi hoon. Aage bolo."
       : uncertainSpeech
-        ? `I may have caught that wrong. Did you say “${compactDetail(clean, 54)}”?`
+        ? `The sentence cut off after “${compactDetail(clean, 54)}.” What came next?`
         : prohibitQuestions
           ? choose(seed, ["I might be missing the important part, so I won’t pretend I caught more than that.", "That could mean a few different things. I’ll leave it there until there’s more to go on.", "Okay. I won’t fill in the blanks for you."])
-          : choose(seed, ["Wait—say a little more. I don’t want to guess what you meant.", "I’m not sure I got the important part. Say it to me another way?", "Hold on, I might be reading that wrong. What did you mean?"]);
+          : "Okay, I’m following. Go on.";
   return result({ text: openText, intent: "open", context, adaptations: uncertainSpeech ? [...adaptations, "speech-clarification"] : adaptations, prohibitQuestions });
 }

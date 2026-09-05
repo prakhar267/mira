@@ -225,9 +225,10 @@ describe("companion turn planning", () => {
     expect(planned.usedMemoryIds).toEqual([]);
   });
 
-  it("checks a fragmentary voice transcript instead of inventing an emotion", () => {
+  it("lets the conversational model interpret short informal speech", () => {
     const planned = turn("nothing just a thing", [], "voice");
-    expect(planned.text).toMatch(/caught that wrong|did you say/i);
+    expect(planned.text).not.toMatch(/caught that wrong|did you say|heard.*wrong/i);
+    expect(planned.adaptations).not.toContain("speech-clarification");
     expect(planned.text.toLowerCase()).not.toMatch(/i(?:'| a)m listening|i hear you|not fixing/);
   });
 
@@ -256,6 +257,16 @@ describe("companion turn planning", () => {
     expect(planned.intent).toBe("self");
     expect(planned.text.toLowerCase()).toMatch(/quiet|taking it easy|curious/);
     expect(planned.text.toLowerCase()).not.toContain("how can i help");
+  });
+
+  it.each([
+    "what about you?",
+    "aur tum batao",
+    "और तुम बताओ",
+  ])("answers a reciprocal question in character: %s", (content) => {
+    const planned = turn(content, [], "voice");
+    expect(planned.intent).toBe("self");
+    expect(planned.text.toLowerCase()).not.toMatch(/language model|don['’]?t have feelings|working properly|ready to chat/);
   });
 
   it("answers basic identity questions directly and transparently", () => {
@@ -323,11 +334,33 @@ describe("companion turn planning", () => {
     expect(planned.adaptations).toContain("contextual-direct-answer");
   });
 
-  it("asks to confirm a short, uncertain spoken fragment instead of inventing meaning", () => {
+  it("does not treat a valid short spoken turn as a transcription failure", () => {
     const planned = turn("maybe that thing", [], "voice");
     expect(planned.intent).toBe("open");
-    expect(planned.text).toContain("caught that wrong");
+    expect(planned.text).toBe("Okay, I’m following. Go on.");
+    expect(planned.adaptations).not.toContain("speech-clarification");
+  });
+
+  it.each([
+    "I am okay",
+    "nothing much, you?",
+    "maybe later",
+    "haan theek hai",
+    "pata nahi yaar",
+    "मैं ठीक हूँ",
+    "अच्छा फिर?",
+    "what about you?",
+  ])("accepts a natural short call turn without a false hearing warning: %s", (content) => {
+    const planned = turn(content, [], "video");
+    expect(planned.text).not.toMatch(/caught that wrong|गलत सुना|galat suna|heard.*wrong/i);
+    expect(planned.adaptations).not.toContain("speech-clarification");
+  });
+
+  it("clarifies only when a spoken sentence is visibly cut off", () => {
+    const planned = turn("I wanted to ask about the", [], "voice");
+    expect(planned.text).toContain("sentence cut off");
     expect(planned.adaptations).toContain("speech-clarification");
+    expect(planned.text).not.toMatch(/caught that wrong|heard.*wrong/i);
   });
 
   it("keeps English and Hinglish as concise and direct as Hindi", () => {
