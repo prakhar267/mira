@@ -20,11 +20,19 @@ export function createInworldTranscriptionRequest(audioBase64: string, contentTy
         modelId: INWORLD_STT_MODEL,
         audioEncoding: audioEncoding(contentType),
         language: "en",
-        prompts: ["Natural Indian Hinglish conversation", "Hindi and English code switching", "Mira", "Priya"],
       },
       audioData: { content: audioBase64 },
     }),
   };
+}
+
+export function isUsableInworldTranscript(value: string) {
+  const normalized = value.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  if (normalized.startsWith("expected terms")) return false;
+  const leakedHints = ["natural indian hinglish conversation", "hindi and english code switching", "mira", "priya"]
+    .filter((hint) => normalized.includes(hint));
+  return leakedHints.length < 2;
 }
 
 export function readInworldTranscript(result: unknown) {
