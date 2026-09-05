@@ -260,7 +260,7 @@ export function VoiceCallModal({
         <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.3, y: -90 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening resumes after every reply · Inworld Priya synthetic voice · speech text is processed by Inworld · no call recording is saved</small>
+      <small className="live-call__disclosure">Hands-free listening resumes after every reply · voice input may use Cloudflare or your browser speech service · replies use Inworld Priya · no call recording is saved</small>
     </motion.div>
   );
 }

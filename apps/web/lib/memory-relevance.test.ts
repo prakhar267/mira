@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage, MemoryRecord } from "@companion/shared";
-import { relevantMemoryContents } from "./memory-relevance";
+import { currentMemoryRecords, relevantMemoryContents } from "./memory-relevance";
 
 const messages = (content: string): ChatMessage[] => [{
   id: "message-1",
@@ -53,5 +53,16 @@ describe("relevantMemoryContents", () => {
     ];
     expect(relevantMemoryContents(conversationMemories, messages("maine pehle kya bataya tha?"))[0]).toContain("Rohan");
     expect(relevantMemoryContents(conversationMemories, messages("तुम्हें याद है मैंने क्या बताया?"))).toHaveLength(2);
+  });
+
+  it("keeps the newest casually mentioned relationship name", () => {
+    const conflictingMemories = [
+      { ...memories[0]!, id: "riya", type: "relationship", content: "Prakhar's sister is named Riya.", normalizedContent: "sister:riya", createdAt: "2026-09-01T10:00:00.000Z", updatedAt: "2026-09-01T10:00:00.000Z" },
+      { ...memories[1]!, id: "aisha", type: "emotional", content: "Prakhar said: ‘Meri sister Aisha ka kal morning interview hai.’", normalizedContent: "conversation:meri sister aisha ka kal morning interview hai", createdAt: "2026-09-02T10:00:00.000Z", updatedAt: "2026-09-02T10:00:00.000Z" },
+    ] as MemoryRecord[];
+    expect(relevantMemoryContents(conflictingMemories, messages("meri sister ke baare mein kya yaad hai?"))).toEqual([
+      "Prakhar said: ‘Meri sister Aisha ka kal morning interview hai.’",
+    ]);
+    expect(currentMemoryRecords(conflictingMemories).map((memory) => memory.id)).toEqual(["aisha"]);
   });
 });

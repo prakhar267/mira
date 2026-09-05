@@ -15,9 +15,38 @@ export interface CallSpeechEvidence {
   voicedSpanMs: number;
 }
 
+interface BrowserSpeechRecognitionResult {
+  0?: { transcript?: string };
+}
+
+interface BrowserSpeechRecognitionEvent {
+  results: ArrayLike<BrowserSpeechRecognitionResult>;
+}
+
+interface BrowserSpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+}
+
+type BrowserSpeechWindow = Window & typeof globalThis & {
+  SpeechRecognition?: new () => BrowserSpeechRecognition;
+  webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+};
+
 /** Rejects fan noise, clicks and other tiny bursts before paying for STT. */
 export function hasUsableCallSpeech({ peakLevel, voicedFrames, voicedSpanMs }: CallSpeechEvidence) {
   return peakLevel >= .022 && voicedFrames >= 8 && voicedSpanMs >= 140;
+}
+
+export function preferredCallTranscript(browserTranscript: string, serverTranscript = "") {
+  return (browserTranscript.trim() || serverTranscript.trim()).replace(/\s+/g, " ");
 }
 
 function recorderMimeType() {
@@ -76,7 +105,55 @@ export async function startCallListening(options: CallListeningOptions): Promise
   let peakLevel = 0;
   let quietSince = 0;
   let noiseFloor = .007;
+  let browserTranscript = "";
+  let recognitionEnded = true;
+  let recognitionEndResolver: (() => void) | null = null;
   const transcriptionController = new AbortController();
+  const speechWindow = window as BrowserSpeechWindow;
+  const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+  let browserRecognition: BrowserSpeechRecognition | null = null;
+
+  const settleRecognition = () => {
+    recognitionEnded = true;
+    recognitionEndResolver?.();
+    recognitionEndResolver = null;
+  };
+
+  if (Recognition) {
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-IN";
+    recognition.onresult = (event) => {
+      browserTranscript = Array.from(event.results)
+        .map((result) => result[0]?.transcript ?? "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+    recognition.onerror = settleRecognition;
+    recognition.onend = settleRecognition;
+    try {
+      recognition.start();
+      recognitionEnded = false;
+      browserRecognition = recognition;
+    } catch {
+      recognitionEnded = true;
+    }
+  }
+
+  const finishBrowserRecognition = async () => {
+    if (!recognitionEnded) {
+      await new Promise<void>((resolve) => {
+        const timer = window.setTimeout(resolve, 900);
+        recognitionEndResolver = () => {
+          window.clearTimeout(timer);
+          resolve();
+        };
+      });
+    }
+    return browserTranscript.trim();
+  };
 
   const cleanup = () => {
     if (cleaned) return;
@@ -91,6 +168,9 @@ export async function startCallListening(options: CallListeningOptions): Promise
   const stop = () => {
     if (stopped) return;
     stopped = true;
+    if (browserRecognition && !recognitionEnded) {
+      try { browserRecognition.stop(); } catch { settleRecognition(); }
+    }
     if (recorder.state === "recording") recorder.stop();
     else cleanup();
   };
@@ -119,6 +199,11 @@ export async function startCallListening(options: CallListeningOptions): Promise
     const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
     void blobBase64(blob)
       .then(async (audioBase64) => {
+        const nativeTranscript = await finishBrowserRecognition();
+        if (nativeTranscript) {
+          if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
+          return;
+        }
         const response = await fetch("/api/companion-transcribe", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -127,7 +212,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
         });
         const body = await response.json().catch(() => null) as { text?: string; error?: string } | null;
         if (!response.ok || !body?.text?.trim()) throw new Error(body?.error ?? "I couldn’t hear that clearly.");
-        if (!canceled) options.onTranscript(body.text.trim());
+        if (!canceled) options.onTranscript(preferredCallTranscript("", body.text));
       })
       .catch((cause) => {
         if (!canceled) options.onError(cause instanceof Error ? cause.message : "Voice transcription is temporarily unavailable.");
@@ -186,6 +271,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
       if (canceled) return;
       canceled = true;
       transcriptionController.abort();
+      try { browserRecognition?.abort(); } catch { /* recognition already ended */ }
       stop();
     },
   };

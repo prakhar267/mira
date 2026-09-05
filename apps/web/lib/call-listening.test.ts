@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasUsableCallSpeech } from "./call-listening";
+import { hasUsableCallSpeech, preferredCallTranscript } from "./call-listening";
 
 describe("call speech evidence", () => {
   it("rejects clicks, fan noise, and very short bursts", () => {
@@ -10,5 +10,10 @@ describe("call speech evidence", () => {
 
   it("accepts sustained conversational speech", () => {
     expect(hasUsableCallSpeech({ peakLevel: .045, voicedFrames: 14, voicedSpanMs: 320 })).toBe(true);
+  });
+
+  it("prefers free browser recognition and falls back to the server transcript", () => {
+    expect(preferredCallTranscript("  aaj   kaafi tired hoon ", "wrong server text")).toBe("aaj kaafi tired hoon");
+    expect(preferredCallTranscript("", "  meri sister Aisha hai ")).toBe("meri sister Aisha hai");
   });
 });

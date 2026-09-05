@@ -25,7 +25,7 @@ import { canAccessItem, currencyBalance, environmentForItem } from "@/lib/produc
 import { companionApi } from "@/lib/api-client";
 import { accountClient } from "@/lib/account-client";
 import { messagesForConversation, previousUserMessage } from "@/lib/conversation-state";
-import { relevantMemoryContents } from "@/lib/memory-relevance";
+import { currentMemoryRecords, relevantMemoryContents } from "@/lib/memory-relevance";
 import { playCompanionSpeech } from "@/lib/speech";
 
 const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -419,11 +419,13 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
 
   const createCompanionTurn = (content: string, messages: ChatMessage[], now: Date, delivery: "text" | "voice" | "video" = "text"): CompanionTurn => {
     const conversationMessages = messagesForConversation(messages, state.activeConversationId);
+    const currentMemories = state.memoryEnabled ? currentMemoryRecords(activeMemories) : [];
+    const relevantContents = new Set(relevantMemoryContents(currentMemories, messages));
     const context = buildCompanionContext({
       user: state.user,
       companion: state.companion,
       relationship: { mode: state.companion.relationshipMode, startedAt: state.companion.createdAt, interactionCount: conversationMessages.length, sharedExperiences: state.moments.map((moment) => moment.title) },
-      memories: state.memoryEnabled ? activeMemories : [],
+      memories: currentMemories.filter((memory) => relevantContents.has(memory.content)),
       messages: conversationMessages,
       timezone: state.user.timezone,
       now,
@@ -438,11 +440,12 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     if (fallback.adaptations.includes("safety-support")) return fallback.text;
     try {
       const latestUserText = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
-      const lexicalMemories = state.memoryEnabled ? relevantMemoryContents(activeMemories, messages) : [];
+      const currentMemories = state.memoryEnabled ? currentMemoryRecords(activeMemories) : [];
+      const lexicalMemories = state.memoryEnabled ? relevantMemoryContents(currentMemories, messages) : [];
       let recalledMemories = lexicalMemories;
-      if (state.memoryEnabled && latestUserText && activeMemories.length) {
-        const semantic = await optional(companionApi.semanticMemories(latestUserText, activeMemories), { matches: [], model: "fallback" });
-        const byId = new Map(activeMemories.map((memory) => [memory.id, memory]));
+      if (state.memoryEnabled && latestUserText && currentMemories.length) {
+        const semantic = await optional(companionApi.semanticMemories(latestUserText, currentMemories), { matches: [], model: "fallback" });
+        const byId = new Map(currentMemories.map((memory) => [memory.id, memory]));
         const semanticMemories = semantic.matches.flatMap((match) => {
           const memory = byId.get(match.id);
           return memory ? [memory] : [];
@@ -472,7 +475,7 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
         delivery,
       });
     } catch {
-      return "Mera reply abhi atak gaya. Jo bola tha ek baar phir bol do?";
+      return fallback.text;
     }
   };
 

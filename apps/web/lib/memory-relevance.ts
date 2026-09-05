@@ -8,12 +8,47 @@ const stopWords = new Set([
 const recallWords = new Set(["do", "did", "know", "memory", "memories", "remember", "said", "tell", "told", "what"]);
 const genericSingleTokens = new Set(["feel", "friend", "heavy", "home", "life", "time", "week", "work"]);
 
+const relationshipAliases: Record<string, string> = {
+  behen: "sister",
+  bhai: "brother",
+  dost: "friend",
+  mummy: "mother",
+  maa: "mother",
+  papa: "father",
+};
+
 function tokens(value: string) {
   return new Set(
     (value.toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) ?? [])
       .map((token) => token.length > 5 ? token.replace(/(?:ing|ed|es|s)$/i, "") : token)
       .filter((token) => token.length >= 4 && !stopWords.has(token)),
   );
+}
+
+function namedRelationship(memory: MemoryRecord) {
+  const normalized = memory.normalizedContent?.toLowerCase().match(/^(sister|brother|mother|father|friend|partner|wife|husband|behen|bhai|dost|mummy|maa|papa):([\p{L}][\p{L}'-]{1,40})$/u);
+  const content = memory.content.match(/\b(?:my|meri|mere|mera|user(?:'s|’s)|[\p{L}'-]+(?:'s|’s))\s+(sister|brother|mother|father|friend|partner|wife|husband|behen|bhai|dost|mummy|maa|papa)\s+(?:(?:is\s+)?(?:named|called)\s+|is\s+|ka\s+naam\s+)?([\p{L}][\p{L}'-]{1,40})/iu);
+  const match = normalized ?? content;
+  if (!match?.[1] || !match[2]) return null;
+  const rawSubject = match[1].toLowerCase();
+  return { subject: relationshipAliases[rawSubject] ?? rawSubject, name: match[2].toLowerCase() };
+}
+
+function removeSupersededRelationshipFacts(memories: MemoryRecord[]) {
+  const chronological = [...memories].sort((left, right) => (Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0) - (Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0));
+  const authoritativeNames = new Map<string, string>();
+  for (const memory of chronological) {
+    const relationship = namedRelationship(memory);
+    if (relationship && !authoritativeNames.has(relationship.subject)) authoritativeNames.set(relationship.subject, relationship.name);
+  }
+  return memories.filter((memory) => {
+    const relationship = namedRelationship(memory);
+    return !relationship || authoritativeNames.get(relationship.subject) === relationship.name;
+  });
+}
+
+export function currentMemoryRecords(memories: MemoryRecord[]) {
+  return removeSupersededRelationshipFacts(memories.filter((memory) => memory.status !== "superseded"));
 }
 
 export function relevantMemoryContents(memories: MemoryRecord[], messages: ChatMessage[]) {
@@ -23,7 +58,7 @@ export function relevantMemoryContents(memories: MemoryRecord[], messages: ChatM
     .map((message) => message.content)
     .join(" ");
 
-  const recentFirst = [...memories].sort((left, right) => {
+  const recentFirst = currentMemoryRecords(memories).sort((left, right) => {
     if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
     return (Date.parse(right.updatedAt ?? "") || 0) - (Date.parse(left.updatedAt ?? "") || 0);
   });
