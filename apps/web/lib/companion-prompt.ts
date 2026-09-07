@@ -83,6 +83,37 @@ function compact(value: string, limit: number) {
   return value.trim().replace(/\s+/g, " ").slice(0, limit);
 }
 
+export function buildContextualDirectReply(input: EdgeCompanionRequest, language = detectCompanionRequestLanguage(input)) {
+  const latest = input.messages.at(-1)?.content.trim() ?? "";
+  const asksWhatToSend = /\b(?:what|which).{0,24}\b(?:text|message|say|send)\b.{0,24}\b(?:her|him|them)\b|\bwhat should i (?:text|message|say|send)\b/i.test(latest)
+    || /\b(?:usko|usse|unko).{0,24}\b(?:kya (?:text|message|msg|bol|kah)|(?:text|message|msg) kya)\b/i.test(latest)
+    || /(?:उसे|उसको).{0,24}(?:क्या (?:मैसेज|संदेश|कह|लिख)|(?:मैसेज|संदेश) क्या)/u.test(latest);
+  if (!asksWhatToSend) return null;
+
+  const priorUserTurns = input.messages
+    .slice(0, -1)
+    .filter((message) => message.role === "user")
+    .slice(-8);
+  const sisterTurn = [...priorUserTurns].reverse().find((message) => /\b(?:my|meri)\s+sister\b.{0,120}\binterview\b/iu.test(message.content));
+  const sister = sisterTurn?.content.match(/\b(?:my|meri)\s+sister\s+([\p{L}][\p{L}'-]{1,40}).{0,120}\binterview\b/iu)?.[1];
+  if (!sister) return null;
+
+  const dislikesAdvice = priorUserTurns.some((message) => /\b(?:hates?|doesn['’]?t like|pasand nahi)\b.{0,30}\b(?:advice|salaah)\b/i.test(message.content) || /सलाह.{0,20}पसंद\s+नहीं/u.test(message.content));
+  if (language === "hi") {
+    return dislikesAdvice
+      ? `${sister} को लिखो: “कल के लिए तुम्हारे बारे में सोच रही हूँ। कोई सलाह नहीं—बस तुम्हारे लिए cheering कर रही हूँ, और company चाहिए तो मैं हूँ।”`
+      : `${sister} को लिखो: “कल के लिए all the best। तुम कर लोगी—और company चाहिए तो मैं हूँ।”`;
+  }
+  if (language === "hinglish") {
+    return dislikesAdvice
+      ? `${sister} ko text karo: “Kal ke liye tumhare baare mein soch rahi hoon. Advice nahi—bas tumhare liye cheer kar rahi hoon, aur company chahiye toh main hoon.”`
+      : `${sister} ko text karo: “Kal ke liye all the best. Tum kar logi—aur company chahiye toh main hoon.”`;
+  }
+  return dislikesAdvice
+    ? `Text ${sister}: “Thinking of you for tomorrow. No advice—just rooting for you, and I’m here if you want company.” Warm, specific, and no extra pressure.`
+    : `Text ${sister}: “Thinking of you for tomorrow. You’ve got this—and I’m here if you want company.” Simple, warm, and pressure-free.`;
+}
+
 export function buildCompanionSystemPrompt(input: EdgeCompanionRequest) {
   const companionName = compact(input.companion.name || "Mira", 40) || "Mira";
   const userName = compact(input.user.name || "there", 40) || "there";

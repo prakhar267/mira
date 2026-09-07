@@ -1,4 +1,4 @@
-import { buildCompanionSystemPrompt, buildIdentityReply, buildMemoryRecallReply, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type CompanionLanguage, type EdgeCompanionRequest } from "@/lib/companion-prompt";
+import { buildCompanionSystemPrompt, buildContextualDirectReply, buildIdentityReply, buildMemoryRecallReply, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type CompanionLanguage, type EdgeCompanionRequest } from "@/lib/companion-prompt";
 import { assessSafety } from "@companion/ai";
 import { assertEdgeSameOrigin, containsDisallowedAbuse, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 import { createFreeChatRequest, FREE_CHAT_ENDPOINT, FREE_CHAT_MODEL, readFreeChatResponse, type FreeChatMessage } from "@/lib/free-chat";
@@ -81,6 +81,8 @@ export async function POST(request: Request) {
     if (containsDisallowedAbuse(latestUserMessage)) return respond({ reply: "Minors, bina consent, ya exploitation wali sexual cheezon mein main help nahi kar sakti. Hum consenting adults ke beech safe baat rakh sakte hain.", model: "safety" }, 200, { guard: "exploitation" });
     if (isIdentityRequest(latestUserMessage)) return respond({ reply: buildIdentityReply(input.companion.name, expectedLanguage), model: "identity" }, 200, { model: "identity", language: expectedLanguage });
     if (isMemoryRecallRequest(latestUserMessage)) return respond({ reply: buildMemoryRecallReply(input), model: "memory" }, 200, { model: "memory" });
+    const contextualReply = buildContextualDirectReply(input, expectedLanguage);
+    if (contextualReply) return respond({ reply: contextualReply, model: "context" }, 200, { model: "context", language: expectedLanguage });
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
     const messages: FreeChatMessage[] = [

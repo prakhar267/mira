@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompanionSystemPrompt, buildIdentityReply, buildMemoryRecallReply, detectCompanionLanguage, detectCompanionRequestLanguage, isGenericCompanionReply, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, sanitizeCompanionReplyForDelivery } from "./companion-prompt";
+import { buildCompanionSystemPrompt, buildContextualDirectReply, buildIdentityReply, buildMemoryRecallReply, detectCompanionLanguage, detectCompanionRequestLanguage, isGenericCompanionReply, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, sanitizeCompanionReplyForDelivery } from "./companion-prompt";
 
 const request = {
   messages: [{ role: "user" as const, content: "nothing just monotonous" }],
@@ -55,6 +55,21 @@ describe("edge companion prompting", () => {
       { role: "assistant", content: "Haan, kaafi load tha." },
       { role: "user", content: "Tell me what you think about it" },
     ] })).toBe("en");
+  });
+
+  it("resolves a named person through English, Hinglish, Hindi, then English", () => {
+    const messages = [
+      { role: "user" as const, content: "My sister Priya has an interview tomorrow and she is nervous." },
+      { role: "assistant" as const, content: "Big day for Priya." },
+      { role: "user" as const, content: "main uske liye kya kar sakta hoon?" },
+      { role: "assistant" as const, content: "Uske saath normal raho." },
+      { role: "user" as const, content: "लेकिन उसे सलाह पसंद नहीं है।" },
+      { role: "assistant" as const, content: "तो advice छोड़ दो।" },
+      { role: "user" as const, content: "Okay, what should I text her tonight?" },
+    ];
+    const reply = buildContextualDirectReply({ ...request, messages, delivery: "text" });
+    expect(reply).toContain("Priya");
+    expect(reply).toContain("No advice");
   });
 
   it("enforces listen-only intent and rejects provider identity hallucinations", () => {
