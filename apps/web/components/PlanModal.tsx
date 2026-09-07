@@ -1,12 +1,11 @@
 "use client";
 
-import { Check, Crown, Sparkles, Zap } from "lucide-react";
-import { plans, type PlanId } from "@companion/config";
+import { Check, Sparkles } from "lucide-react";
+import type { PlanId } from "@companion/config";
 import { Modal } from "./Modal";
 
-const prices: Record<PlanId, string> = { free: "₹0", plus: "₹499", ultra: "₹999", platinum: "₹1,999" };
-const icons = { free: Sparkles, plus: Zap, ultra: Crown, platinum: Crown } as const;
+const betaFeatures = ["English and Hinglish chat", "Hands-free voice", "Avatar calls", "Inspectable memory", "Activities and shared moments"];
 
-export function PlanModal({ current, onSelect, onClose }: { current: PlanId; onSelect: (planId: PlanId) => void; onClose: () => void }) {
-  return <Modal title="Choose the experience that fits" description="Test mode changes entitlements instantly and never charges a real payment method." onClose={onClose}><div className="plan-grid">{(Object.keys(plans) as PlanId[]).map((planId) => { const plan = plans[planId]; const Icon = icons[planId]; return <article key={planId} className={planId === current ? "plan-card plan-card--current" : "plan-card"}><Icon aria-hidden="true" /><span>{plan.name}</span><h3>{prices[planId]}<small>/month</small></h3><ul>{plan.features.map((feature) => <li key={feature}><Check aria-hidden="true" /> {feature.replace(/([A-Z])/g, " $1").toLowerCase()}</li>)}</ul><button type="button" className={planId === "platinum" ? "button button--primary" : "button button--ghost"} disabled={planId === current} onClick={() => onSelect(planId)}>{planId === current ? "Current plan" : planId === "free" ? "Switch to Free" : `Choose ${plan.name}`}</button></article>; })}</div><p className="settings-note">Subscriptions do not alter safety rules, memory controls, or your ability to export and delete data.</p></Modal>;
+export function PlanModal({ onClose }: { current: PlanId; onSelect: (planId: PlanId) => void; onClose: () => void }) {
+  return <Modal title="Free public beta" description="Mira does not ask for payment details during this beta." onClose={onClose}><div className="plan-grid"><article className="plan-card plan-card--current"><Sparkles aria-hidden="true" /><span>Available now</span><h3>₹0</h3><ul>{betaFeatures.map((feature) => <li key={feature}><Check aria-hidden="true" /> {feature}</li>)}</ul><button type="button" className="button button--primary" onClick={onClose}>Continue with Mira</button></article></div><p className="settings-note">Beta availability and provider capacity can change. Safety rules, memory controls, export, and account deletion remain available to every user.</p></Modal>;
 }

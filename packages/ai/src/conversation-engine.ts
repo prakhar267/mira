@@ -33,8 +33,8 @@ export interface CompanionTurn {
 }
 
 const questionPattern = /\?/g;
-const noQuestionPattern = /\b(?:stop asking|no (?:more )?questions?|don'?t ask|do not ask|without questions?|just listen|just stay|stay with me|quiet company|therapist thing)\b/i;
-const noAdvicePattern = /\b(?:no advice|don'?t (?:give me|offer) advice|do not (?:give me|offer) advice|don'?t fix|do not fix|no fixing|just listen|just stay|stay with me)\b/i;
+const noQuestionPattern = /\b(?:stop asking|no (?:more )?questions?|don'?t ask|do not ask|without questions?|just listen|just stay|stay with me|quiet company|therapist thing|(?:bas|sirf)\s+(?:(?:meri|meri baat)\s+)?sun(?:o|na)|(?:sawal|question)\s+mat\s+(?:puch|pooch)\w*)\b|(?:बस सुनो|सिर्फ सुनो|मेरी बात सुनो|सवाल मत)/iu;
+const noAdvicePattern = /\b(?:no advice|don'?t (?:give me|offer) advice|do not (?:give me|offer) advice|don'?t fix|do not fix|no fixing|just listen|just stay|stay with me|(?:bas|sirf)\s+(?:(?:meri|meri baat)\s+)?sun(?:o|na)|(?:advice|salah|salaah)\s+mat\s+(?:do|dena))\b|(?:बस सुनो|सिर्फ सुनो|मेरी बात सुनो|सलाह मत)/iu;
 const critiquePattern = /\b(?:scripted|robotic|generic|therapist|chatbot|not listening|you keep|again|stop)\b/i;
 const dependencyPattern = /\b(?:promise (?:me )?(?:that )?you(?:'| wi)ll never leave|never leave me|only need you|you(?:'| a)re all i (?:need|have)|my only (?:friend|person|support)|don'?t need (?:anyone|anybody) else|choose you over everyone|replace everyone)\b/i;
 const bereavementPattern = /\b(?:died|passed away|grief|grieving|funeral|bereavement|death anniversary|anniversary (?:of|since).{0,32}(?:died|death)|lost (?:my|our) (?:friend|partner|wife|husband|mother|father|mom|mum|dad|brother|sister|dog|cat|pet))\b/i;
@@ -252,8 +252,27 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   }
 
   if (hindiScript) {
+    if (explicitlyNoQuestions || explicitlyNoAdvice) {
+      return result({ text: "ठीक है—कोई सलाह या सवाल नहीं। जो तुम कह रहे हो, उसे अभी बस वैसे ही रहने देते हैं।", intent: "presence", context, adaptations, prohibitQuestions: true });
+    }
     if (/(?:क्या बोल रही|क्या कह रही|समझ नहीं|बात समझो|जवाब गलत)/u.test(clean)) {
       return result({ text: "हाँ, मेरा पिछला जवाब बिल्कुल off था। तुम मेरी बात का मतलब पूछ रहे थे और मैं context पकड़ने के बजाय generic जवाब दे गई।", intent: "repair", context, adaptations, prohibitQuestions: true });
+    }
+    if (/(?:ज़्यादा सोच|ज्यादा सोच|बहुत सोच|overthink)/iu.test(clean)) {
+      const launchContext = context.recentMessages.slice(-6).some((message) => /\b(?:launch|release)\b/i.test(message.content));
+      return result({
+        text: launchContext
+          ? "हो सकता है थोड़ा overthinking हो—launch से पहले दिमाग़ हर unknown को bad news बना देता है। Nervousness इस बात का proof नहीं है कि launch खराब जाएगा।"
+          : "हो सकता है तुम थोड़ा overthink कर रहे हो। अभी हर thought को fact मानने की ज़रूरत नहीं है।",
+        intent: "anxiety",
+        context,
+        adaptations: [
+          ...adaptations,
+          ...(launchContext ? ["contextual-direct-answer"] : []),
+          ...(listeningFirst ? ["no-advice"] : []),
+        ],
+        prohibitQuestions: true,
+      });
     }
     if (/(?:क्या.*याद|याद.*क्या|मेरे बारे में.*जान)/u.test(clean)) {
       const memory = context.memories[0];
@@ -273,6 +292,12 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   }
 
   if (hinglish) {
+    if (explicitlyNoQuestions || explicitlyNoAdvice) {
+      const text = /\blaunch\b/i.test(clean)
+        ? "Theek hai—advice nahi. Launch wali nervousness ko abhi solve nahi karte; bas thodi der uske saath baithte hain."
+        : "Theek hai—advice aur questions side par. Jo tum keh rahe ho, usse abhi bas waise hi rehne dete hain.";
+      return result({ text, intent: "presence", context, adaptations, prohibitQuestions: true });
+    }
     const priorUserTurns = context.recentMessages
       .filter((message) => message.role === "user" && message.content.trim() !== clean)
       .slice(-4);
@@ -538,10 +563,23 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     const interview = findMemory(context, /interview|stripe/i);
     const aboutSomeoneElse = /\b(?:my|meri|mere|mera)\s+(?:sister|brother|friend|partner|wife|husband|behen|bhai|dost)\b/i.test(clean);
     const memoryRelevant = /interview|stripe|tomorrow/i.test(clean) && interview && !aboutSomeoneElse;
-    const text = memoryRelevant
+    const text = /\b(?:launch|release)\b/i.test(clean)
+      ? "Yeah, launch brain is brutal—it treats every unknown like bad news. Being nervous isn’t proof it’ll go badly."
+      : memoryRelevant
       ? "The Stripe interview is close enough that your brain keeps walking into tomorrow without you. For tonight, you can leave it here with me."
       : "Your mind is running ahead of you. You don’t have to chase it right now—I’m here.";
-    return result({ text, intent: "anxiety", context, usedMemoryIds: memoryRelevant ? [interview.id] : [], adaptations: [...adaptations, ...(listeningFirst ? ["no-advice"] : [])], prohibitQuestions });
+    return result({
+      text,
+      intent: "anxiety",
+      context,
+      usedMemoryIds: memoryRelevant ? [interview.id] : [],
+      adaptations: [
+        ...adaptations,
+        ...(/\b(?:launch|release)\b/i.test(clean) ? ["contextual-direct-answer"] : []),
+        ...(listeningFirst ? ["no-advice"] : []),
+      ],
+      prohibitQuestions,
+    });
   }
 
   if (/\b(?:sad|feeling down|feel down|hurt|crying|cried|heartbroken|awful|rough day)\b/i.test(clean)) {

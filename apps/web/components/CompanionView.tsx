@@ -61,7 +61,7 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
       <div className="companion-editor">
         <div className="companion-preview">
           <img className="companion-preview__image" src={preview} alt={`${companion.name} appearance preview`} />
-          <div className="companion-preview__label"><span><i className="status-dot" /> {companion.mood}</span><strong>{companion.name}</strong><small>{subscription.planId.toUpperCase()} · live avatar renderer</small></div>
+          <div className="companion-preview__label"><span><i className="status-dot" /> {companion.mood}</span><strong>{companion.name}</strong><small>{subscription.testMode ? "BETA" : subscription.planId.toUpperCase()} · live avatar renderer</small></div>
         </div>
 
         <div className="companion-controls">

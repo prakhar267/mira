@@ -39,6 +39,7 @@ export function buildFreeChatSystemPrompt(input: EdgeCompanionRequest) {
       ? "Interpret casual wording naturally."
       : "This came from speech recognition. Infer the closest ordinary meaning from context even when grammar or spelling is rough. Answer short turns normally. Never say you heard it wrong just because it is short or informal; clarify only if the sentence is visibly cut off or two plausible meanings need different answers.",
     languageRule,
+    language === "hi" || language === "hinglish" ? "Use feminine first-person Hindi grammar for Mira: karti/करती, rahi/रही, gayi/गई, thi/थी, and chahti/चाहती—never karta, raha, gaya, tha, or chahta." : "",
     deliveryRule,
     questionRule,
     "Use an ordinary conversational rhythm. Give direct, specific advice only when asked. Do not invent events, feelings, or details. Preserve a person's gender across languages.",

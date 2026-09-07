@@ -1,15 +1,15 @@
-# Luma
+# Mira
 
 **An original adults-only AI companion built around presence, voice, memory, and shared moments.**
 
-Luma is the product direction for this repository. It is a production-oriented, fully testable mock implementation of an avatar-led AI companion platform—not a copy of Replika or another product. Luma, the visual system, copy, prompts, and generated artwork are original prototype assets.
+Mira is the product direction for this repository. It is an original avatar-led AI companion platform—not a copy of Replika or another product. The public website currently runs as a free adults-only beta; the visual system, copy, prompts, and character artwork are original assets.
 
 ## Try the website
 
 With the development server running, open:
 
-- [Luma populated demo](http://127.0.0.1:3001/demo)
-- [Luma app](http://127.0.0.1:3001/app?preview=home)
+- [Mira populated demo](http://127.0.0.1:3001/demo)
+- [Mira app](http://127.0.0.1:3001/app?preview=home)
 - [Public landing page](http://127.0.0.1:3001/)
 - [Ten-step signup](http://127.0.0.1:3001/signup)
 - [Operations console](http://127.0.0.1:3001/admin) — local key: `local-admin-key-change-me`
@@ -33,7 +33,7 @@ The defining tested loop is:
 conversation → candidate memory → user-visible memory → relevant recall
 ```
 
-Every acceptance flow is usable in deterministic mock mode. Live mode is production-capable but still requires operator-supplied infrastructure/provider credentials, a transactional notification webhook, legal/privacy approval, monitoring ownership, and independent security/safety review. Payment and a public production domain are intentionally excluded.
+Every acceptance flow is usable in deterministic mock mode. The Cloudflare deployment is suitable for a non-sensitive public beta and has live AI, speech, account storage, export, deletion, health reporting, logs, and traces. Paid plans, regulated or highly sensitive data, transactional notifications, and claims of independently audited production security remain outside the beta boundary.
 
 ## Run locally
 
@@ -107,4 +107,4 @@ app/                Legacy Saathkind implementation retained for rollback only
 - [Companion-depth before/after audit](audit/luma-companion-depth-2026-09-01/AUDIT.md)
 - [Human acceptance audit](docs/HUMAN_ACCEPTANCE_AUDIT_2026-09-01.md)
 
-The remaining lowercase historical documents describe the retained Saathkind beta and are not the target Luma architecture.
+The remaining lowercase historical documents describe the retained Saathkind beta and are not the target Mira architecture. Some architecture filenames still use the former internal codename, Luma.

@@ -59,7 +59,10 @@ describe("edge companion prompting", () => {
 
   it("enforces listen-only intent and rejects provider identity hallucinations", () => {
     expect(requestsListeningOnly("Please just listen, no advice and no questions.")).toBe(true);
+    expect(requestsListeningOnly("yaar bas suno, advice mat dena aur sawal mat poochna")).toBe(true);
     expect(isInvalidCompanionReply("That meeting really drained you. What happened next?", "Please just listen, no advice and no questions.")).toBe(true);
+    expect(isInvalidCompanionReply("Haan, samajh raha hoon. Kya hua?", "yaar bas suno advice mat dena")).toBe(true);
+    expect(isInvalidCompanionReply("Haan, samajh rahi hoon. Launch wali nervousness ko abhi bas yahin rehne dete hain.", "yaar bas suno advice mat dena")).toBe(false);
     expect(isInvalidCompanionReply("Aaj ka din tough tha. Bas bata do kya hua.", "Please just listen, no advice and no questions.")).toBe(true);
     expect(isInvalidCompanionReply("Meta designed me and Llama is my basis.", "Who made you?")).toBe(true);
     expect(isInvalidCompanionReply("I'm a large language model, so I don't have feelings like humans do, but I'm working properly and ready to chat.", "What about you?")).toBe(true);

@@ -31,6 +31,32 @@ await run("public site and security headers", async () => {
   return `${response.status}, CSP/HSTS/frame protection present`;
 });
 
+await run("launch metadata and indexing", async () => {
+  const response = await fetch(baseUrl);
+  const html = await response.text();
+  expect(!/name="robots" content="noindex/i.test(html), "homepage is still marked noindex");
+  expect(html.includes('rel="canonical"'), "canonical URL missing");
+  expect(html.includes('property="og:image"'), "Open Graph image missing");
+  expect(html.includes('name="twitter:card"'), "Twitter card metadata missing");
+  const sitemap = await fetch(`${baseUrl}/sitemap.xml`);
+  const sitemapBody = await sitemap.text();
+  expect(sitemap.ok && sitemapBody.includes(`${baseUrl}/support`), `sitemap returned ${sitemap.status}`);
+  const robots = await fetch(`${baseUrl}/robots.txt`);
+  const robotsBody = await robots.text();
+  expect(robots.ok && robotsBody.includes(`${baseUrl}/sitemap.xml`), `robots returned ${robots.status}`);
+  return "indexable canonical, social previews, sitemap and robots present";
+});
+
+await run("public beta and support boundary", async () => {
+  const [pricing, support] = await Promise.all([fetch(`${baseUrl}/pricing`), fetch(`${baseUrl}/support`)]);
+  const [pricingHtml, supportHtml] = await Promise.all([pricing.text(), support.text()]);
+  expect(pricing.ok && /free public beta/i.test(pricingHtml), `pricing returned ${pricing.status}`);
+  expect(!/₹499|₹999/.test(pricingHtml), "prototype paid prices are still public");
+  expect(support.ok && /Submit report/i.test(supportHtml), `support returned ${support.status}`);
+  expect(!/support@example\.invalid/i.test(supportHtml), "invalid support contact is still public");
+  return "free-beta copy and working support route present";
+});
+
 await run("authenticated app gate", async () => {
   const response = await fetch(`${baseUrl}/app`, { redirect: "manual" });
   expect(response.status >= 300 && response.status < 400, `expected redirect, received ${response.status}`);

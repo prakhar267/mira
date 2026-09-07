@@ -194,7 +194,7 @@ export function ChatView({ state, streaming, processingEnabled, liveMode = false
         {voiceError ? <div className="voice-note-error" role="status">{voiceError}</div> : null}
       </div>
 
-      {whyMessage ? <Modal title={`Why did ${state.companion.name} say this?`} description={state.subscription.planId === "platinum" ? "A transparent summary of the context used for this response." : "Response explanations are included with Platinum."} onClose={() => setWhyMessage(null)}>{state.subscription.planId === "platinum" ? <ul className="reason-list">{(whyMessage.explanation?.length ? whyMessage.explanation : [
+      {whyMessage ? <Modal title={`Why did ${state.companion.name} say this?`} description={state.subscription.testMode || state.subscription.planId === "platinum" ? "A transparent summary of the context used for this response." : "Response explanations are included with Platinum."} onClose={() => setWhyMessage(null)}>{state.subscription.testMode || state.subscription.planId === "platinum" ? <ul className="reason-list">{(whyMessage.explanation?.length ? whyMessage.explanation : [
         `Matched ${state.companion.name}’s warm, playful personality settings.`,
         "Used the recent conversation without forcing an unrelated memory.",
         "Passed the local safety check.",

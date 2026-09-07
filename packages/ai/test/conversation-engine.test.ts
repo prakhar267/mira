@@ -66,6 +66,35 @@ describe("companion turn planning", () => {
     expect(planned.text.toLowerCase()).toMatch(/here|staying|quiet/);
   });
 
+  it("understands a listen-only boundary in natural Hinglish", () => {
+    const planned = turn("yaar aaj launch ko lekar thoda nervous hoon, bas suno advice mat dena");
+    expect(planned.intent).toBe("presence");
+    expect(planned.text).toContain("Launch wali nervousness");
+    expect(planned.text).not.toContain("?");
+    expect(planned.adaptations).toEqual(expect.arrayContaining(["no-questions", "no-advice"]));
+  });
+
+  it("keeps launch context when the user switches to Hindi", () => {
+    const prior: ChatMessage[] = [
+      { id: "u-launch", conversationId: "conversation", role: "user", content: "I think the launch might go badly, and that is making me nervous.", createdAt: now.toISOString(), status: "sent" },
+      { id: "a-launch", conversationId: "conversation", role: "assistant", content: "Being nervous isn’t proof it’ll go badly.", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("लेकिन शायद मैं बस ज़्यादा सोच रहा हूँ।", prior);
+    expect(planned.intent).toBe("anxiety");
+    expect(planned.text).toContain("launch");
+    expect(planned.text).toContain("Nervousness");
+    expect(planned.adaptations).toContain("contextual-direct-answer");
+    expect(planned.text).not.toContain("?");
+  });
+
+  it("answers launch anxiety specifically instead of using generic reassurance", () => {
+    const planned = turn("I think the launch might go badly, and that is making me nervous.");
+    expect(planned.intent).toBe("anxiety");
+    expect(planned.text).toContain("launch brain");
+    expect(planned.adaptations).toContain("contextual-direct-answer");
+    expect(planned.text).not.toContain("I’m here");
+  });
+
   it("carries a no-questions boundary into the next emotional turn", () => {
     const prior: ChatMessage[] = [
       { id: "u1", conversationId: "conversation", role: "user", content: "I don't want advice or questions. Please just stay with me.", createdAt: now.toISOString(), status: "sent" },

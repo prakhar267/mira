@@ -8,11 +8,37 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { brand } from "@companion/config";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { siteDescription, siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: `${brand.displayName} — ${brand.promise}`,
-  description: "An original adults-only AI companion centered on memory, continuity, voice, and user control.",
-  robots: { index: false, follow: false },
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: `${brand.displayName} — ${brand.promise}`,
+    template: `%s · ${brand.displayName}`,
+  },
+  description: siteDescription,
+  applicationName: brand.displayName,
+  category: "lifestyle",
+  keywords: ["AI companion", "Hinglish AI", "voice companion", "AI memory", "Mira"],
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    siteName: brand.displayName,
+    title: `${brand.displayName} — ${brand.promise}`,
+    description: siteDescription,
+    images: [{ url: "/assets/launch/mira-product-hunt-og.png", width: 1200, height: 630, alt: "Mira, an original AI companion" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${brand.displayName} — ${brand.promise}`,
+    description: siteDescription,
+    images: ["/assets/launch/mira-product-hunt-og.png"],
+  },
 };
 
 export const viewport: Viewport = {
