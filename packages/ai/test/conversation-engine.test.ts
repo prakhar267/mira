@@ -95,6 +95,21 @@ describe("companion turn planning", () => {
     expect(planned.text).not.toContain("I’m here");
   });
 
+  it("keeps a sister and interview across English, Hinglish, Hindi, then English", () => {
+    const prior: ChatMessage[] = [
+      { id: "u1", conversationId: "conversation", role: "user", content: "My sister Priya has an interview tomorrow and she is nervous.", createdAt: now.toISOString(), status: "sent" },
+      { id: "a1", conversationId: "conversation", role: "assistant", content: "Big day for Priya. Is she excited or mostly nervous?", createdAt: now.toISOString(), status: "sent" },
+      { id: "u2", conversationId: "conversation", role: "user", content: "main uske liye kya kar sakta hoon?", createdAt: now.toISOString(), status: "sent" },
+      { id: "a2", conversationId: "conversation", role: "assistant", content: "Uske saath normal raho. Ek simple good-luck text kaafi hai.", createdAt: now.toISOString(), status: "sent" },
+      { id: "u3", conversationId: "conversation", role: "user", content: "लेकिन उसे सलाह पसंद नहीं है।", createdAt: now.toISOString(), status: "sent" },
+      { id: "a3", conversationId: "conversation", role: "assistant", content: "तो सलाह छोड़ दो। बस उसे बता दो कि तुम उसके साथ हो।", createdAt: now.toISOString(), status: "sent" },
+    ];
+    const planned = turn("Okay, what should I text her tonight?", prior);
+    expect(planned.text).toContain("Priya");
+    expect(planned.text).toContain("No advice");
+    expect(planned.adaptations).toContain("contextual-direct-answer");
+  });
+
   it("carries a no-questions boundary into the next emotional turn", () => {
     const prior: ChatMessage[] = [
       { id: "u1", conversationId: "conversation", role: "user", content: "I don't want advice or questions. Please just stay with me.", createdAt: now.toISOString(), status: "sent" },

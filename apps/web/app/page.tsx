@@ -4,7 +4,10 @@ import { siteDescription, siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
-  openGraph: { url: "/" },
+  openGraph: {
+    url: "/",
+    images: [{ url: "/assets/launch/mira-product-hunt-og.png", width: 1200, height: 630, alt: "Mira, an original AI companion" }],
+  },
 };
 
 export default function HomePage() {

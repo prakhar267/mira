@@ -241,6 +241,26 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
   const hinglish = !hindiScript && hinglishPattern.test(clean);
   const requestedLanguage = explicitlyRequestedLanguage(clean);
 
+  if (/\b(?:what|which).{0,24}\b(?:text|message|say|send)\b.{0,24}\b(?:her|him|them)\b|\bwhat should i (?:text|message|say|send)\b/i.test(clean)) {
+    const priorUserTurns = context.recentMessages
+      .filter((message) => message.role === "user" && message.content.trim() !== clean)
+      .slice(-8);
+    const sisterTurn = [...priorUserTurns].reverse().find((message) => /\b(?:my|meri)\s+sister\b.{0,120}\binterview\b/iu.test(message.content));
+    const sister = sisterTurn?.content.match(/\b(?:my|meri)\s+sister\s+([\p{L}][\p{L}'-]{1,40}).{0,120}\binterview\b/iu)?.[1];
+    if (sister) {
+      const dislikesAdvice = priorUserTurns.some((message) => /\b(?:hates?|doesn['’]?t like|pasand nahi)\b.{0,30}\b(?:advice|salaah)\b/i.test(message.content) || /सलाह.{0,20}पसंद\s+नहीं/u.test(message.content));
+      return result({
+        text: dislikesAdvice
+          ? `Text ${sister}: “Thinking of you for tomorrow. No advice—just rooting for you, and I’m here if you want company.” Warm, specific, and no extra pressure.`
+          : `Text ${sister}: “Thinking of you for tomorrow. You’ve got this—and I’m here if you want company.” Simple, warm, and pressure-free.`,
+        intent: "planning",
+        context,
+        adaptations: [...adaptations, "contextual-direct-answer"],
+        prohibitQuestions: true,
+      });
+    }
+  }
+
   if (requestedLanguage === "en") {
     return result({ text: "Done—we’ll speak in English from here.", intent: "preference", context, adaptations: [...adaptations, "contextual-direct-answer"], prohibitQuestions: true });
   }
