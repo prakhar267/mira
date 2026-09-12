@@ -1,6 +1,6 @@
 # Mira launch operations — 12 September 2026
 
-This file describes the actual `apps/web` Cloudflare deployment. Older Saathkind, PostgreSQL/Fastify and mobile architecture documents are not evidence that those systems serve the public Mira site.
+This file describes the actual `apps/web` Cloudflare deployment. Archived prototype, PostgreSQL/Fastify and mobile architecture documents are not evidence that those systems serve the public Mira site.
 
 ## Ownership and access
 

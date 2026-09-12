@@ -1,13 +1,13 @@
 # Security policy
 
-Saathkind may process highly personal conversation content. Please report suspected vulnerabilities privately and do not include real user data in a report.
+Mira may process highly personal conversation content. Please report suspected vulnerabilities privately and do not include real user data in a report.
 
 ## Supported versions
 
 | Version | Security fixes |
 |---|---|
-| Live synthetic beta deployment | Best effort; synthetic/non-sensitive testing only |
-| `main` prototype | Best effort; not a public service |
+| Current Mira beta deployment | Best effort; not independently security-certified |
+| Current `main` source | Best effort; deploy only after release verification |
 | Older deployments and forks | Not supported |
 
 ## Reporting a vulnerability
@@ -50,4 +50,4 @@ Good-faith research should minimize harm, stop after demonstrating impact, prese
 
 ## Deployment and production-readiness status
 
-The repository contains an integrated synthetic/demo Worker with adult confirmation, opaque demo sessions, tenant-scoped APIs, consent controls, deterministic safety routing, memories, synchronous export, and coordinated beta account/session deletion. Account, token-status, and rate-key records use SQLite Durable Objects with fixed alarms; KV holds only opaque routing pointers. No Gemini key/enable flag, D1/R2/Queue/Vectorize binding, billing/notification provider, or Cron Trigger is active. It is not verified production authentication or an approved private-data system. A reviewed production data architecture, encryption/key rotation, complete retention/deletion, durable audit/monitoring, approved providers, incident paging, and independent testing remain required before private user conversations are accepted. See [docs/security.md](docs/security.md) and [docs/go-live-checklist.md](docs/go-live-checklist.md).
+The public Mira beta runs from `apps/web/` on Cloudflare Workers, with SQLite-backed Durable Objects for account and application storage. Chat and speech use external inference providers. Export, deletion, rate limits and operational controls exist, but do not constitute an independent security assessment or approval for highly sensitive data. Provider processing and retention, account recovery, incident ownership and independent security/legal sign-off remain release-review items. See the [current provider and security review](docs/PROVIDER-AND-SECURITY-REVIEW.md) and [launch operations](docs/LAUNCH-OPERATIONS.md). Archived prototype documents do not describe the current deployment.

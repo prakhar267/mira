@@ -1,38 +1,44 @@
-# Deployment
+# Mira deployment
 
-The Companion workspace is validated with `pnpm check`; CI builds the Next.js, Fastify, and notification-worker artifacts. The legacy Saathkind Cloudflare workflow remains disabled.
+The public Mira website runs on Cloudflare Workers, built from `apps/web/` with vinext.
 
-## Container builds
+- [Website](https://luma-companion.prakhargupta267.workers.dev/)
+- [Demo](https://luma-companion.prakhargupta267.workers.dev/demo)
+- [Repository](https://github.com/prakhar267/mira)
 
-The web and API can be built independently from the repository root:
+The existing Worker resource name, `luma-companion`, is intentionally unchanged. Renaming the GitHub repository does not require changing its live URL, account storage or bindings.
+
+## Validate and release
+
+From the repository root:
 
 ```bash
-docker build -f apps/web/Dockerfile -t companion-web .
-docker build -f apps/api/Dockerfile -t companion-api .
-docker build -f apps/worker/Dockerfile -t companion-worker .
+pnpm install --frozen-lockfile
+pnpm db:generate
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm --filter @companion/web build:vinext
+pnpm --filter @companion/web deploy:vinext
+pnpm --filter @companion/web smoke:production
 ```
 
-Run local stateful dependencies with `docker compose up -d`, apply migrations with `pnpm --filter @companion/db exec prisma migrate deploy --schema prisma/schema.prisma`, seed catalog data with `pnpm db:seed`, and check API readiness at `GET /ready`. The worker is required for scheduled nudge delivery.
+Deploy uses `apps/web/dist/server/wrangler.json`. Record the exact commit, Worker version and smoke results. Provider-backed checks consume the available inference allowance; a static health check does not prove microphone or audio playback quality.
 
-No public domain or hosting target is configured, as requested. Before starting a private production-shaped environment, set:
+## Configuration and workflows
 
-- `APP_ENV=production`, `AI_MOCK_MODE=false`, and `NEXT_PUBLIC_API_MODE=live`;
-- `PERSISTENCE_PROVIDER=postgres`, `QUEUE_PROVIDER=redis`, and `STORAGE_PROVIDER=s3`;
-- unique `SESSION_SECRET` and `ADMIN_API_KEY` values;
-- `OPENAI_API_KEY` with every selected OpenAI provider;
-- `INWORLD_API_KEY` as a Worker secret for the selected Inworld TTS-2 Flash Priya voice across Hindi, English, and Hinglish (`pnpm exec wrangler secret put INWORLD_API_KEY` from `apps/web`); the free Inworld On-Demand allowance is capped and the application has no paid fallback;
-- LLM7 anonymous `fast` chat inference is used without a secret or billing method and is subject to its published free-tier limits; Workers AI and the deterministic local engine remain fallback paths;
-- `NOTIFICATION_PROVIDER=webhook` and `NOTIFICATION_WEBHOOK_URL`;
-- managed PostgreSQL/pgvector, Redis, S3 credentials, and exact `APP_ORIGIN`/`API_ORIGIN` values.
+The current providers, storage model, limits, secrets, activation gates and incident steps are documented in [launch operations](LAUNCH-OPERATIONS.md). Cloudflare credentials and provider keys belong in server-side secrets, never `NEXT_PUBLIC_` variables, client bundles or committed files.
 
-Production startup fails closed if persistence, queue, storage, notification delivery, or required secrets are missing. A hosting decision must still cover:
+GitHub workflow definitions:
 
-- web hosting and API/realtime regions;
-- database migration sequencing and rollback;
-- structured logging, traces, metrics, alerts, and cost budgets;
-- health/readiness checks, rate limits, abuse controls, backups, and restore drills;
-- provider data-processing terms and deletion support.
+- [CI](../.github/workflows/ci.yml)
+- [Mira Cloudflare deployment](../.github/workflows/mira-deploy.yml)
+- [External health checks](../.github/workflows/mira-health.yml)
 
-Use `.env.example` as the configuration contract. Never place provider or payment secrets in `NEXT_PUBLIC_` variables or client bundles.
+Running these requires working GitHub Actions access and the scoped Cloudflare production credentials. Repository naming does not resolve account billing/spending-limit blocks. Billing and email delivery need their own approved configuration and end-to-end verification before activation.
 
-Payment is disabled with `BILLING_ENABLED=false`; subscription webhooks return `501` and premium capability gates are open until billing is deliberately implemented. Never put provider, notification, storage, database, or admin credentials in `NEXT_PUBLIC_` variables.
+## Rollback boundary
+
+Only deploy a version compatible with the current SQLite-backed `MiraStore` storage and deletion guarantees. Do not remove Durable Object migrations or return to KV-authoritative code.
+
+The archived `app/` prototype, optional Fastify/PostgreSQL services and mobile workspace are not the public Mira deployment or a safe rollback target. Follow the [release and rollback procedure](LAUNCH-OPERATIONS.md#release-and-rollback).

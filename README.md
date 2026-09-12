@@ -1,110 +1,75 @@
 # Mira
 
-**An original adults-only AI companion built around presence, voice, memory, and shared moments.**
+An adults-only AI companion with chat, voice, animated avatar calls and memory you control.
 
-Mira is the product direction for this repository. It is an original avatar-led AI companion platform—not a copy of Replika or another product. The public website currently runs as a free adults-only beta; the visual system, copy, prompts, and character artwork are original assets.
+[Live website](https://luma-companion.prakhargupta267.workers.dev/) · [Try the demo](https://luma-companion.prakhargupta267.workers.dev/demo) · [GitHub](https://github.com/prakhar267/mira)
 
-## Try the website
+Mira is an original AI companion, not a real person or a substitute for professional or emergency support. The public website is a free beta. English, Hindi and Hinglish conversation is supported, but speech recognition and generated replies can make mistakes.
 
-With the development server running, open:
+## Current website
 
-- [Mira populated demo](http://127.0.0.1:3001/demo)
-- [Mira app](http://127.0.0.1:3001/app?preview=home)
-- [Public landing page](http://127.0.0.1:3001/)
-- [Ten-step signup](http://127.0.0.1:3001/signup)
-- [Operations console](http://127.0.0.1:3001/admin) — local key: `local-admin-key-change-me`
+- **Conversation:** context-aware chat, with Cloudflare Llama 3.3 70B inference.
+- **Voice and avatar calls:** shared call controls, automatic listening, Inworld speech recognition and the Priya voice. Cloudflare Whisper provides a transcription fallback. The video companion is an animated, open-licensed avatar; it is not a live human video feed.
+- **Memory:** inspect, edit and delete saved memories; export or delete your data.
+- **Accounts and storage:** authenticated account routes and SQLite-backed Cloudflare Durable Objects. Demo state is versioned and can be reset.
+- **Operations:** health reporting, private support inbox, aggregate metrics, request limits and provider-capacity safeguards.
 
-The deterministic demo needs no external credentials. Setting `NEXT_PUBLIC_API_MODE=live` connects the same web experience to the authenticated API, persistent data, media storage, and provider-backed AI/voice paths.
+Voice and chat depend on external inference services and their available quotas. The website being online does not guarantee speech availability. Camera preview is local; camera-frame understanding is not available.
 
-## What is built
-
-| Area | Current implementation |
-|---|---|
-| Web | Responsive Next.js PWA with credential-backed signup/login/recovery, adult onboarding, API-connected streaming chat, provider TTS/STT, WebRTC realtime voice/video with graceful local fallback, explicit camera-frame analysis, media generation/storage, memories, activities, journal/events, store, settings, privacy, export, deletion, and live aggregate admin controls |
-| Mobile | Expo/React Native companion shell with home, chat, companion, memory, activity/reward, camera, and profile surfaces; native release signing and store distribution remain outside this website deployment |
-| API | Fastify service with scrypt passwords, signed short access tokens, rotating one-time refresh tokens, recovery/verification challenges, owner-scoped routes, Redis rate limits/jobs, SSE chat, input/output moderation, voice/camera/media, persistent calls and provider usage, export, deletion, readiness, and Prometheus metrics |
-| AI | Current OpenAI Responses, Realtime, moderation, embedding, STT, TTS, vision, and image adapters plus deterministic offline adapters; structured context, summary rollups, memory extraction/ranking/contradiction handling, timeout and circuit-breaker utilities |
-| Data | Prisma/PostgreSQL + pgvector repository, initial production migration, data-driven seeds, call/usage persistence, immutable wallet, S3-compatible media storage, Redis nudge queue, and an owner-scoped in-memory development repository |
-| Shared platform | Strict TypeScript contracts, Zod validation, inherited plan entitlements, feature flags, design tokens, analytics redaction, PWA support, Docker packaging, CI, and Turborepo tasks |
-
-The defining tested loop is:
-
-```text
-conversation → candidate memory → user-visible memory → relevant recall
-```
-
-Every acceptance flow is usable in deterministic mock mode. The Cloudflare deployment is suitable for a non-sensitive public beta and has live AI, speech, account storage, export, deletion, health reporting, logs, and traces. Paid plans, regulated or highly sensitive data, transactional notifications, and claims of independently audited production security remain outside the beta boundary.
+Billing and transactional recovery-email integrations exist in code but still require configuration and verification. Independent security/legal review, real-device call acceptance, commercial setup and other launch gates are tracked in the [launch operations guide](docs/LAUNCH-OPERATIONS.md). This repository does not claim those gates are complete.
 
 ## Run locally
 
 Prerequisites: Node.js 22+ and pnpm 11.
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm db:generate
 pnpm dev:web
 ```
 
-Optional API and local infrastructure:
+Open [localhost:3001](http://127.0.0.1:3001). Local mock operation and the deployed provider-backed website are different environments; local startup alone does not configure production speech or accounts. Keep credentials in ignored local files or server-side secrets.
+
+## Validate and deploy
 
 ```bash
-docker compose up -d
-pnpm db:migrate
-pnpm db:seed
-pnpm dev:api
-pnpm --filter @companion/worker dev
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm --filter @companion/web build:vinext
 ```
 
-The default web origin is `http://127.0.0.1:3001`; the API defaults to `http://127.0.0.1:4000`.
-
-## Validate
-
-```bash
-pnpm check
-```
-
-That command runs linting, strict type checks, automated tests, and the production build across the workspace.
+See [deployment instructions](docs/DEPLOYMENT.md) for the Cloudflare release workflow, required credentials and post-deployment checks. GitHub Actions execution also depends on the account's Actions access and configured production secrets.
 
 ## Repository map
 
 ```text
-apps/web/           Next.js public site and companion experience
-apps/mobile/        Expo/React Native companion shell
-apps/api/           Fastify HTTP and SSE API
-packages/ai/        Context, memory, provider, and safety systems
-packages/db/        Prisma schema, repository contract, mock store, seeds
-packages/shared/    Domain types and request schemas
-packages/config/    Brand, environment, feature flags, plans
-packages/ui/        Accessible primitives and visual tokens
-packages/analytics/ Privacy-conscious event contracts
-design/             Selected original visual and generated assets
-docs/               Architecture and launch-boundary documentation
-app/                Legacy Saathkind implementation retained for rollback only
+apps/web/           Active Mira website, Worker routes and Cloudflare storage
+packages/           Shared contracts, UI, configuration and platform libraries
+apps/api/           Optional Fastify backend; not the public Cloudflare API
+apps/mobile/        Mobile shell; not a released native application
+apps/worker/        Optional background-service workspace
+design/             Product design and assets
+docs/               Current guides and historical architecture references
+audit/              Dated QA and deployment evidence
+app/                Archived prototype; not a deploy or rollback target
 ```
+
+The public deployment comes from `apps/web/`. Archived code and dated reports remain for provenance, not as instructions for the current product. Internal resource identifiers may retain earlier names to preserve URLs, sessions and stored data.
 
 ## Product principles
 
-1. Be explicit that the companion is AI and the product is for adults.
-2. Remember fewer things correctly; make memories inspectable, editable, pinnable, and deletable.
-3. Never use jealousy, guilt, streak pressure, exclusivity, or dependency-maximizing copy.
-4. Keep private conversation content out of generic logs and analytics.
-5. Treat billing and entitlements as server-authoritative in production.
-6. Let chat continue when memory extraction or optional media systems fail.
+1. Always be clear that Mira is AI and intended for adults.
+2. Keep memory visible, correctable and deletable.
+3. Do not use guilt, jealousy, exclusivity or dependency pressure.
+4. Keep private conversations out of generic logs and analytics.
+5. Show failures honestly; do not promise perfect recall or unlimited availability.
 
 ## Documentation
 
-- [Build plan](docs/BUILD_PLAN.md)
-- [Architecture](docs/architecture.md)
-- [AI system](docs/AI_SYSTEM.md)
-- [Memory system](docs/MEMORY_SYSTEM.md)
-- [Voice system](docs/VOICE_SYSTEM.md)
-- [Safety](docs/SAFETY.md)
-- [Database](docs/DATABASE.md)
-- [Deployment](docs/DEPLOYMENT.md)
-- [Privacy](docs/PRIVACY.md)
-- [Analytics](docs/ANALYTICS.md)
-- [Design QA](design-qa.md)
-- [Companion-depth before/after audit](audit/luma-companion-depth-2026-09-01/AUDIT.md)
-- [Human acceptance audit](docs/HUMAN_ACCEPTANCE_AUDIT_2026-09-01.md)
-
-The remaining lowercase historical documents describe the retained Saathkind beta and are not the target Mira architecture. Some architecture filenames still use the former internal codename, Luma.
+- [Current deployment](docs/DEPLOYMENT.md)
+- [Launch operations, providers and remaining gates](docs/LAUNCH-OPERATIONS.md)
+- [Mira brand guide](docs/brand.md)
+- [Security reporting](SECURITY.md)
+- [Provider and security review](docs/PROVIDER-AND-SECURITY-REVIEW.md)
+- [Latest recorded QA follow-up](audit/2026-09-12-followup/README.md)
