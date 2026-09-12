@@ -27,6 +27,8 @@ describe("edge companion prompting", () => {
   it("detects each input language and validates matching replies", () => {
     expect(detectCompanionLanguage("yar ofis mein boss ne sabke samne daant dia")).toBe("hinglish");
     expect(detectCompanionLanguage("The main road is closed")).toBe("en");
+    expect(detectCompanionLanguage("Riya bhi trip pe gayi thi")).toBe("hinglish");
+    expect(detectCompanionLanguage("I visited Gaya last week.")).toBe("en");
     expect(detectCompanionLanguage("How are you today?")).toBe("en");
     expect(detectCompanionLanguage("आज तुम कैसी हो?" )).toBe("hi");
     expect(detectCompanionLanguage("yaar aaj kaafi busy tha")).toBe("hinglish");
@@ -37,6 +39,8 @@ describe("edge companion prompting", () => {
     expect(detectCompanionLanguage("अब हिंदी में बात करो")).toBe("hi");
     expect(isInvalidCompanionReply("I’m good today.", "How are you today?")).toBe(false);
     expect(isInvalidCompanionReply("Main aaj badhiya hoon.", "How are you today?")).toBe(true);
+    expect(isInvalidCompanionReply("Exactly, simple plan hi best rahega, aap dono enjoy karoge, thakaan bhi nahin hogi.","Keep the plan simple, we are not trying to see everything")).toBe(true);
+    expect(isInvalidCompanionReply("Chai and aloo paratha could be nice before visiting Jaipur.","What should we eat?")).toBe(false);
     expect(isInvalidCompanionReply("आज मैं अच्छी हूँ।", "आज तुम कैसी हो?" )).toBe(false);
     expect(isInvalidCompanionReply("Main aaj badhiya hoon.", "आज तुम कैसी हो?" )).toBe(true);
     expect(isInvalidCompanionReply("Good luck tomorrow! Just be yourself.", "Okay, what should I text her tonight?")).toBe(false);
@@ -52,6 +56,7 @@ describe("edge companion prompting", () => {
     expect(isInvalidCompanionReply("Haan, woh plan accha tha.","Riya bhi trip pe gayi thi")).toBe(false);
     expect(isInvalidCompanionReply("Main khush hoon ki woh aa gaya.","mera bhai ghar aa gaya")).toBe(false);
     expect(isInvalidCompanionReply("मुझे अच्छा लगा था।", "तुम्हें कैसा लगा था?")).toBe(false);
+    expect(isInvalidCompanionReply("मैंने सोचा था कि आलू और चावल ठीक रहेंगे।", "मेरे पास सिर्फ आलू, चावल और दही है")).toBe(false);
     expect(isInvalidCompanionReply("Main tumse baat kar raha hoon.","tum kya kar rahi ho")).toBe(true);
     expect(isInvalidCompanionReply("Main baat kar raha hoon.","tum kya kar rahi ho")).toBe(true);
     expect(isInvalidCompanionReply("मैं बात कर रहा हूँ।", "तुम क्या कर रही हो?")).toBe(true);

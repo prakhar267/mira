@@ -64,6 +64,10 @@ export function detectCompanionLanguage(value: string): CompanionLanguage {
   if (/\b(?:reply|answer|speak|talk) in english\b/i.test(value) || /अंग्रेज़ी में/u.test(value)) return "en";
   if (/\p{Script=Devanagari}|\p{Script=Arabic}/u.test(value)) return "hi";
   if (hinglishPattern.test(value)) return "hinglish";
+  // Short natural updates often contain inflected verbs, not dictionary forms.
+  // Require two of these extra markers so an English mention of Gaya alone is
+  // not mistaken for Hindi.
+  if ((value.match(/\b(?:bhi|dono|rahega|rahegi|karoge|karogi|gaya|gayi|tha|thi|raha|rahi|aap|nahin|waapas)\b/gi)?.length??0)>=2) return "hinglish";
   return "en";
 }
 
@@ -323,14 +327,14 @@ export function isInvalidCompanionReply(value: string, latestUserMessage: string
   if ((suppressQuestions || requestsListeningOnly(latestUserMessage)) && /\b(?:batao|bata do|bol do|share karo|tell me)\b/i.test(reply)) return true;
   if (expectedLanguage === "hi" && !/\p{Script=Devanagari}/u.test(reply)) return true;
   if (expectedLanguage !== "hi" && /\p{Script=Devanagari}/u.test(reply)) return true;
-  if (expectedLanguage === "en" && (reply.match(/\b(?:aaj|abhi|hoon|haan|mujhe|tumhara|tumhari|kaafi|nahi|yaar|karti|rahi)\b/gi)?.length ?? 0) >= 2) return true;
+  if (expectedLanguage === "en" && (reply.match(/\b(?:aaj|abhi|hoon|haan|hai|hain|mujhe|tum|tumhe|tumhara|tumhari|kaafi|nahi|nahin|yaar|karti|rahi|aap|dono|bhi|rahega|rahegi|karoge|karogi|waapas|aaoge|thakaan|hoga|hogi|accha|kaise|kya|aur)\b/gi)?.length ?? 0) >= 2) return true;
   if (expectedLanguage === "hinglish" && !naturalHinglishReplyPattern.test(reply)) return true;
   // The user's sister, brother, a past day and Mira can have different gendered
   // predicates in the same turn. Comparing every masculine reply word against
   // any feminine input word rejected valid multi-person conversations. Check
   // only Mira's own clause; entity agreement belongs to contextual generation.
   const clauses=reply.split(/[,.!?;।]|\b(?:ki|lekin|magar|woh|vo|usne|tum|aap|he|she)\b|(?:^|\s)(?:कि|लेकिन|मगर|वह|वो|उसने|तुम|आप)(?=\s|$)/iu);
-  if (expectedLanguage !== "en" && clauses.some(clause=>/\bmain\b.{0,36}\b(?:karta|raha|gaya|tha|chahta)\b/i.test(clause) || /मैं[^।!?]{0,36}(?:करता|रहा|गया|था|चाहता)/u.test(clause))) return true;
+  if (expectedLanguage !== "en" && clauses.some(clause=>/\bmain\b.{0,36}\b(?:karta|raha|gaya|tha|chahta)\b/i.test(clause) || /मैं(?![\p{L}\p{M}])[^।!?]{0,36}(?:करता|रहा|गया|था|चाहता)/u.test(clause))) return true;
   return false;
 }
 import { normalizeHinglishText } from "./speech";

@@ -14,7 +14,10 @@ for(const scenario of dataset){
     const ms=Math.round(performance.now()-start);
     const hindi=/\p{Script=Devanagari}/u.test(reply);
     const romanHindi=/\b(?:haan|hai|hoon|tum|aaj|kya|kar|karo|yaar|mujhe|nahi|accha|kaafi|bilkul|batao|toh|usko|uske|ek|main|aur|phir|pasand|chahiye|wahan|kal|saath|liye|rakh|rakho|hoga|hum|tujhe|kaam|chalo|tumhe|tumhari|bolo|mat|bas)\b/i.test(reply);
-    const languageOk=turn.language==="hi"?hindi:turn.language==="hinglish"?!hindi&&romanHindi:!hindi;
+    // Roman script alone is not English: catch mixed Hindi replies that the
+    // earlier evaluation incorrectly allowed for an English turn.
+    const englishHasHindi=(reply.match(/\b(?:aaj|abhi|hoon|haan|hai|hain|mujhe|tum|tumhe|tumhara|tumhari|kaafi|nahi|nahin|yaar|karti|rahi|aap|dono|bhi|rahega|rahegi|karoge|karogi|waapas|aaoge|thakaan|hoga|hogi|accha|kaise|kya|aur)\b/gi)?.length??0)>=2;
+    const languageOk=turn.language==="hi"?hindi:turn.language==="hinglish"?!hindi&&romanHindi:!hindi&&!englishHasHindi;
     const anchorsOk=!turn.anchors||turn.anchors.some(a=>reply.toLowerCase().includes(a.toLowerCase()));
     const flags=[...(status!==200?["service-error"]:[]),...(!languageOk?["language"]:[]),...(generic.test(reply)?["generic-misunderstanding"]:[]),...(!anchorsOk?["context-anchor-review"]:[]),...(turn.noQuestion&&reply.includes("?")?["unwanted-question"]:[])];
     results.push({scenario:scenario.id,input:turn.text,expectedLanguage:turn.language,reply,provider,status,latencyMs:ms,flags,error});
