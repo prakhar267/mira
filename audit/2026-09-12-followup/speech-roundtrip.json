@@ -1,0 +1,99 @@
+{
+  "at": "2026-09-12T17:43:36.631Z",
+  "base": "https://luma-companion.prakhargupta267.workers.dev",
+  "method": "Synthetic Priya-generated clips through live TTS/STT APIs, plus pink-noise overlays. Not a physical microphone, accent diversity or human listening test.",
+  "results": [
+    {
+      "id": "english",
+      "variant": "clean",
+      "reference": "My brother Kabir has an interview tomorrow and he is feeling nervous.",
+      "transcript": "My brother Kabir has an interview tomorrow, and he is feeling nervous.",
+      "detectedLanguage": "en",
+      "status": 200,
+      "ttsMs": 2603,
+      "sttMs": 1024,
+      "anchorHits": [
+        "interview",
+        "kabir",
+        "brother"
+      ],
+      "passed": true
+    },
+    {
+      "id": "english",
+      "variant": "noise",
+      "reference": "My brother Kabir has an interview tomorrow and he is feeling nervous.",
+      "transcript": "My brother Kabir has an interview tomorrow, and he is feeling nervous.",
+      "detectedLanguage": "en",
+      "status": 200,
+      "ttsMs": 2603,
+      "sttMs": 1611,
+      "anchorHits": [
+        "interview",
+        "kabir",
+        "brother"
+      ],
+      "passed": true
+    },
+    {
+      "id": "hindi",
+      "variant": "clean",
+      "reference": "आज मेरा दिन अच्छा था। मेरी दोस्त नेहा कल पुणे आ रही है।",
+      "transcript": "आज मेरा दिन अच्छा था मेरी दोस्त नेहा कल पुणे आ रही है।",
+      "detectedLanguage": "hi",
+      "status": 200,
+      "ttsMs": 1074,
+      "sttMs": 810,
+      "anchorHits": [
+        "नेहा",
+        "पुणे",
+        "दोस्त"
+      ],
+      "passed": true
+    },
+    {
+      "id": "hindi",
+      "variant": "noise",
+      "reference": "आज मेरा दिन अच्छा था। मेरी दोस्त नेहा कल पुणे आ रही है।",
+      "transcript": "आज मेरा दिन अच्छा था मेरी दोस्त नेहा कल पुणे आ रही है।",
+      "detectedLanguage": "hi",
+      "status": 200,
+      "ttsMs": 1074,
+      "sttMs": 1446,
+      "anchorHits": [
+        "नेहा",
+        "पुणे",
+        "दोस्त"
+      ],
+      "passed": true
+    },
+    {
+      "id": "hinglish",
+      "variant": "clean",
+      "reference": "Yaar aaj office mein kaafi stress tha. Boss ne meeting mein daant diya.",
+      "transcript": "yaar aaj ophis men kaaphee stres thaa. bos ne meeting men daant diya.",
+      "detectedLanguage": "hinglish",
+      "status": 200,
+      "ttsMs": 932,
+      "sttMs": 1916,
+      "anchorHits": [
+        "meeting"
+      ],
+      "passed": true
+    },
+    {
+      "id": "hinglish",
+      "variant": "noise",
+      "reference": "Yaar aaj office mein kaafi stress tha. Boss ne meeting mein daant diya.",
+      "transcript": "yaar aaj ophis men kaaphee stres thaa. bos ne meeting men daant diya.",
+      "detectedLanguage": "hinglish",
+      "status": 200,
+      "ttsMs": 932,
+      "sttMs": 1300,
+      "anchorHits": [
+        "meeting"
+      ],
+      "passed": true
+    }
+  ]
+}

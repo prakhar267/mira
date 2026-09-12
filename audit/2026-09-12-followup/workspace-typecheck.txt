@@ -1,0 +1,37 @@
+$ turbo typecheck
+• turbo 2.10.12
+
+   • Packages in scope: @companion/ai, @companion/analytics, @companion/api, @companion/avatar, @companion/config, @companion/db, @companion/mobile, @companion/shared, @companion/ui, @companion/voice, @companion/web, @companion/worker
+   • Running typecheck in 12 packages
+   • Remote caching disabled
+
+@companion/avatar:typecheck: cache hit, replaying logs 9801a33b66815c79
+@companion/config:typecheck: cache hit, replaying logs 60abfbb237d3de82
+@companion/ui:typecheck: cache hit, replaying logs bc501ce5046cd106
+@companion/voice:typecheck: cache hit, replaying logs 048e160f1a8403bc
+@companion/mobile:typecheck: cache hit, replaying logs aab69993134fdf73
+@companion/shared:typecheck: cache hit, replaying logs 97ab8a6826edf8b3
+@companion/analytics:typecheck: cache hit, replaying logs b9b8a72bf181f903
+@companion/voice:typecheck: $ tsc --noEmit
+@companion/mobile:typecheck: $ tsc --noEmit
+@companion/avatar:typecheck: $ tsc --noEmit
+@companion/ui:typecheck: $ tsc --noEmit
+@companion/analytics:typecheck: $ tsc --noEmit
+@companion/config:typecheck: $ tsc --noEmit
+@companion/shared:typecheck: $ tsc --noEmit
+@companion/db:typecheck: cache hit, replaying logs 8bfbda57fbfecba9
+@companion/ai:typecheck: cache hit, replaying logs a6d889be08d64d32
+@companion/db:typecheck: $ tsc --noEmit
+@companion/worker:typecheck: cache hit, replaying logs 056bace55cfbe5be
+@companion/ai:typecheck: $ tsc --noEmit
+@companion/worker:typecheck: $ tsc --noEmit
+@companion/web:typecheck: cache miss, executing 83c17fdbd659f378
+@companion/api:typecheck: cache hit, replaying logs 19e963e75078a103
+@companion/api:typecheck: $ tsc --noEmit
+@companion/web:typecheck: $ next typegen && tsc --noEmit
+@companion/web:typecheck: Generating route types...
+@companion/web:typecheck: ✓ Types generated successfully
+
+ Tasks:    12 successful, 12 total
+Cached:    11 cached, 12 total
+  Time:    2.757s

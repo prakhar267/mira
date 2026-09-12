@@ -1,0 +1,229 @@
+$ turbo test
+• turbo 2.10.12
+
+   • Packages in scope: @companion/ai, @companion/analytics, @companion/api, @companion/avatar, @companion/config, @companion/db, @companion/mobile, @companion/shared, @companion/ui, @companion/voice, @companion/web, @companion/worker
+   • Running test in 12 packages
+   • Remote caching disabled
+
+@companion/config:test: cache hit, replaying logs 71c93d0a821cbc78
+@companion/shared:build: cache hit, replaying logs 6ea621c01e91463d
+@companion/config:build: cache hit, replaying logs 7fa7b60a304b9db3
+@companion/voice:test: cache hit, replaying logs b8a92a4ec23fb746
+@companion/ui:build: cache hit, replaying logs 4115f3ff9079cfae
+@companion/config:test: $ vitest run
+@companion/config:test:
+@companion/config:test:  RUN  v4.1.11 /Users/prakhar/Desktop/Companaro/packages/config
+@companion/config:test:
+@companion/config:test:  ✓ test/entitlements.test.ts (2 tests) 2ms
+@companion/config:test:  ✓ test/env.test.ts (3 tests) 4ms
+@companion/config:test:
+@companion/config:test:  Test Files  2 passed (2)
+@companion/config:test:       Tests  5 passed (5)
+@companion/config:test:    Start at  23:07:38
+@companion/config:test:    Duration  162ms (transform 35ms, setup 0ms, import 83ms, tests 6ms, environment 0ms)
+@companion/config:test:
+@companion/voice:test: $ vitest run
+@companion/voice:test:
+@companion/voice:test:  RUN  v4.1.11 /Users/prakhar/Desktop/Companaro/packages/voice
+@companion/voice:test:
+@companion/voice:test:  ✓ test/session.test.ts (1 test) 3ms
+@companion/voice:test:
+@companion/avatar:test: cache hit, replaying logs 5cd238c31bea0417
+@companion/voice:test:  Test Files  1 passed (1)
+@companion/voice:test:       Tests  1 passed (1)
+@companion/voice:test:    Start at  23:07:38
+@companion/config:build: $ tsc --noEmit
+@companion/voice:test:    Duration  96ms (transform 13ms, setup 0ms, import 20ms, tests 3ms, environment 0ms)
+@companion/voice:test:
+@companion/ui:build: $ tsc --noEmit
+@companion/avatar:test: $ vitest run
+@companion/avatar:test:
+@companion/avatar:test:  RUN  v4.1.11 /Users/prakhar/Desktop/Companaro/packages/avatar
+@companion/avatar:test:
+@companion/avatar:test:  ✓ test/behavior.test.ts (1 test) 1ms
+@companion/avatar:test:
+@companion/avatar:test:  Test Files  1 passed (1)
+@companion/avatar:test:       Tests  1 passed (1)
+@companion/avatar:test:    Start at  23:07:37
+@companion/avatar:test:    Duration  136ms (transform 32ms, setup 0ms, import 41ms, tests 1ms, environment 0ms)
+@companion/avatar:test:
+@companion/shared:build: $ tsc --noEmit
+@companion/ai:build: cache hit, replaying logs 960dd5f24a22a8ae
+@companion/ai:build: $ tsc --noEmit
+@companion/web:test: cache miss, executing dec975876985e312
+@companion/worker:test: cache hit, replaying logs 08a7294989667da2
+@companion/ai:test: cache hit, replaying logs 76ceb71584e3e2ab
+@companion/db:test: cache hit, replaying logs 30be17310e32e996
+@companion/worker:test: $ vitest run --passWithNoTests
+@companion/worker:test:
+@companion/worker:test:  RUN  v4.1.11 /Users/prakhar/Desktop/Companaro/apps/worker
+@companion/worker:test:
+@companion/worker:test: No test files found, exiting with code 0
+@companion/db:build: cache hit, replaying logs 547b220e9545efe7
+@companion/ai:test: $ vitest run
+@companion/ai:test:
+@companion/ai:test:  RUN  v4.1.11 /Users/prakhar/Desktop/Companaro/packages/ai
+@companion/ai:test:
+@companion/ai:test:  ✓ test/openai-voice.test.ts (1 test) 14ms
+@companion/ai:test:  ✓ test/context-engine.test.ts (9 tests) 14ms
+@companion/ai:test:  ✓ test/conversation-engine.test.ts (51 tests) 28ms
+@companion/worker:test:
+@companion/db:test: $ vitest run
+@companion/db:test:
+@companion/worker:test: include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+@companion/db:test:  RUN  v4.1.11 /Users/prakhar/Desktop/Companaro/packages/db
+@companion/db:test:
+@companion/db:test:  ✓ test/ledger.test.ts (2 tests) 3ms
+@companion/ai:test:  ✓ test/platform-services.test.ts (4 tests) 32ms
+@companion/db:test:  ✓ test/repository.test.ts (2 tests) 3ms
+@companion/db:test:
+@companion/db:test:  Test Files  2 passed (2)
+@companion/db:test:       Tests  4 passed (4)
+@companion/db:test:    Start at  23:07:40
+@companion/worker:test: exclude:  **/node_modules/**, **/.git/**
+@companion/ai:test:
+@companion/ai:test:  Test Files  4 passed (4)
+@companion/ai:test:       Tests  65 passed (65)
+@companion/db:test:    Duration  130ms (transform 51ms, setup 0ms, import 82ms, tests 7ms, environment 0ms)
+@companion/db:test:
+@companion/ai:test:    Start at  23:07:39
+@companion/ai:test:    Duration  175ms (transform 178ms, setup 0ms, import 253ms, tests 88ms, environment 0ms)
+@companion/ai:test:
+@companion/worker:test:
+@companion/db:build: $ tsc --noEmit
+@companion/api:test: cache hit, replaying logs bbfcfb337b8212f9
+@companion/api:test: $ vitest run
+@companion/api:test:
+@companion/api:test:  RUN  v4.1.11 /Users/prakhar/Desktop/Companaro/apps/api
+@companion/api:test:
+@companion/api:test:  ✓ test/auth.test.ts (4 tests) 204ms
+@companion/api:test: {"level":30,"time":1789234661326,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"46bdb1b8-d2ca-48d5-9c8e-d5c89db892b5","req":{"method":"GET","url":"/health","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661326,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"81fefe7a-df52-41a7-ae5b-c5fae480793b","req":{"method":"POST","url":"/auth/signup","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661326,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"0170eae7-b23f-49bd-ac3f-943065acee5f","req":{"method":"POST","url":"/auth/signup","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661329,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"46bdb1b8-d2ca-48d5-9c8e-d5c89db892b5","res":{"statusCode":200},"responseTime":2.2205410000000256,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661330,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"87f8dd01-d030-489f-bb86-3e4eb27d6bab","req":{"method":"OPTIONS","url":"/users/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661330,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"87f8dd01-d030-489f-bb86-3e4eb27d6bab","res":{"statusCode":204},"responseTime":0.24324999999998909,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661330,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"84685e18-0ecd-4535-b786-02b12ed33af0","req":{"method":"POST","url":"/auth/signup","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661332,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"84685e18-0ecd-4535-b786-02b12ed33af0","res":{"statusCode":400},"responseTime":2.145750000000021,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661333,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"e25275b6-5f5a-4c26-837c-090c289e3dfe","req":{"method":"POST","url":"/chat/stream","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661334,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"e25275b6-5f5a-4c26-837c-090c289e3dfe","res":{"statusCode":400},"responseTime":0.9353750000000218,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661334,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"c0c74718-ace9-410e-a667-2159e830df64","req":{"method":"POST","url":"/activities/activity-reflection/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661335,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"c0c74718-ace9-410e-a667-2159e830df64","res":{"statusCode":200},"responseTime":0.6073749999999336,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661335,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"e1f1d6e9-ce07-46fa-81ff-43b169712ce2","req":{"method":"POST","url":"/activities/activity-reflection/complete","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661335,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"e1f1d6e9-ce07-46fa-81ff-43b169712ce2","res":{"statusCode":200},"responseTime":0.349790999999982,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661336,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"6b9970d5-7571-4405-b9af-9df523706959","req":{"method":"POST","url":"/journal","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661336,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"6b9970d5-7571-4405-b9af-9df523706959","res":{"statusCode":201},"responseTime":0.34504199999992125,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661336,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"391da4d4-7d4f-4870-807a-458025b90581","req":{"method":"POST","url":"/events","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661346,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"391da4d4-7d4f-4870-807a-458025b90581","res":{"statusCode":201},"responseTime":10.188541999999984,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661347,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"759fc6e9-8cd0-4f10-b071-d8327598562c","req":{"method":"POST","url":"/voice/session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661348,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"759fc6e9-8cd0-4f10-b071-d8327598562c","res":{"statusCode":200},"responseTime":0.7238750000000209,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661348,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"e52834a0-e8da-47cf-a8e1-eac662102765","req":{"method":"POST","url":"/subscriptions/mock-upgrade","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661349,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"e52834a0-e8da-47cf-a8e1-eac662102765","res":{"statusCode":200},"responseTime":0.6904160000000275,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661349,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"f390c098-b6a2-41ee-bb73-dada635d052d","req":{"method":"POST","url":"/voice/session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661349,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"f390c098-b6a2-41ee-bb73-dada635d052d","res":{"statusCode":200},"responseTime":0.19870800000001054,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661349,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"7d7589cc-8d49-4fd2-b2f1-7341a6987591","req":{"method":"POST","url":"/store/purchase","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661350,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"7d7589cc-8d49-4fd2-b2f1-7341a6987591","res":{"statusCode":200},"responseTime":0.35920899999996436,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661350,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"e3a3c158-7a93-4860-aff6-b2e8a8bdf23b","req":{"method":"POST","url":"/store/purchase","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661350,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"e3a3c158-7a93-4860-aff6-b2e8a8bdf23b","res":{"statusCode":200},"responseTime":0.30262500000003456,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661350,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"334ff69c-4fb3-4d41-aa44-16c90349002f","req":{"method":"GET","url":"/wallet/transactions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661350,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"334ff69c-4fb3-4d41-aa44-16c90349002f","res":{"statusCode":200},"responseTime":0.10316699999998491,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661351,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"04f0c5bf-4f65-4818-b09b-c0e87c7b802c","req":{"method":"POST","url":"/media/analyze","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661351,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"04f0c5bf-4f65-4818-b09b-c0e87c7b802c","res":{"statusCode":200},"responseTime":0.3552910000000793,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661351,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"4d34b7c9-c9ea-400a-9d0c-b22206bdf61f","req":{"method":"GET","url":"/admin/metrics","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661351,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"4d34b7c9-c9ea-400a-9d0c-b22206bdf61f","res":{"statusCode":401},"responseTime":0.06866600000000744,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661351,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"3ec335a1-2798-4e11-afd4-94a7317ab3a8","req":{"method":"GET","url":"/admin/metrics","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661351,"pid":59692,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"3ec335a1-2798-4e11-afd4-94a7317ab3a8","res":{"statusCode":200},"responseTime":0.04004199999997127,"msg":"request completed"}
+@companion/api:test:  ✓ test/server.test.ts (9 tests) 131ms
+@companion/api:test: stdout | test/mock-session.test.ts > mock-provider signed sessions > keeps a signed account isolated from the public seeded demo
+@companion/api:test: [notification:email-verification] Verify your Mira account
+@companion/api:test:
+@companion/api:test: stdout | test/integration.test.ts > production-mode API journey > creates an account with real signed sessions
+@companion/api:test: [notification:email-verification] Verify your Mira account
+@companion/api:test:
+@companion/api:test: {"level":30,"time":1789234661358,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"81fefe7a-df52-41a7-ae5b-c5fae480793b","res":{"statusCode":201},"responseTime":31.397583999999938,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661358,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"0170eae7-b23f-49bd-ac3f-943065acee5f","res":{"statusCode":201},"responseTime":31.36691600000006,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661359,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"97880b05-a772-4790-9b60-0bfe376223ae","req":{"method":"GET","url":"/users/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661359,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"97880b05-a772-4790-9b60-0bfe376223ae","res":{"statusCode":401},"responseTime":0.20404199999995853,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661359,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"fe595ecc-beac-4b85-852e-957e96d92a30","req":{"method":"GET","url":"/users/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661360,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"fe595ecc-beac-4b85-852e-957e96d92a30","res":{"statusCode":200},"responseTime":0.28224999999997635,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661360,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"36c73be9-ea51-4e23-bce2-1f6785419b9b","req":{"method":"POST","url":"/conversations","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661361,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"36c73be9-ea51-4e23-bce2-1f6785419b9b","res":{"statusCode":201},"responseTime":0.7001250000000709,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661361,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"41792224-a6dc-41ec-b914-9d5de277e73d","req":{"method":"POST","url":"/chat/stream","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test:  ✓ test/mock-session.test.ts (1 test) 141ms
+@companion/api:test: {"level":30,"time":1789234661359,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"4e03bf7a-f1e2-440f-b50f-fa002581dc06","req":{"method":"GET","url":"/users/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661359,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"4e03bf7a-f1e2-440f-b50f-fa002581dc06","res":{"statusCode":200},"responseTime":0.3099579999999378,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661359,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"4ef211dd-7a5d-40e2-9ce6-4818131087bf","req":{"method":"GET","url":"/companions","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661360,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"4ef211dd-7a5d-40e2-9ce6-4818131087bf","res":{"statusCode":200},"responseTime":0.20212499999990996,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661360,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"41e6700c-9ea8-408a-b16a-ca8bc9593388","req":{"method":"POST","url":"/data/export","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661360,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"41e6700c-9ea8-408a-b16a-ca8bc9593388","res":{"statusCode":200},"responseTime":0.24508300000002237,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661360,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"15583ec3-4775-4be4-97a2-cc65dcaedfe0","req":{"method":"GET","url":"/users/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661361,"pid":59691,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"15583ec3-4775-4be4-97a2-cc65dcaedfe0","res":{"statusCode":200},"responseTime":0.14945799999998144,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661369,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"41792224-a6dc-41ec-b914-9d5de277e73d","res":{"statusCode":200},"responseTime":8.247083000000089,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661370,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"395c39f3-4df0-4f43-b627-fca65a97b453","req":{"method":"GET","url":"/conversations/fa84a262-fa2a-4f21-bf85-3414fb945420/messages","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661370,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"395c39f3-4df0-4f43-b627-fca65a97b453","res":{"statusCode":200},"responseTime":0.33829100000002654,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661370,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"cc0e8468-5126-4dc7-97b7-0da205ceb639","req":{"method":"POST","url":"/conversations/fa84a262-fa2a-4f21-bf85-3414fb945420/messages/1e6b7eea-5a18-4c4a-b2ad-3553038a21a9:6d076ba1-a0f4-494d-ab20-c025eeed8256/regenerate","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661373,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"cc0e8468-5126-4dc7-97b7-0da205ceb639","res":{"statusCode":200},"responseTime":3.0300829999999905,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661374,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"1b4df753-49c1-4cbe-afd5-22ac9e732543","req":{"method":"POST","url":"/voice/session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661374,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"1b4df753-49c1-4cbe-afd5-22ac9e732543","res":{"statusCode":200},"responseTime":0.5217089999999871,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661375,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"c4ec9a60-c9ec-4794-a810-18123507b072","req":{"method":"POST","url":"/video/session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661375,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"c4ec9a60-c9ec-4794-a810-18123507b072","res":{"statusCode":201},"responseTime":0.7597090000000435,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661376,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"31c93b4c-b861-4947-9815-7845eff61290","req":{"method":"POST","url":"/camera/session","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661376,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"31c93b4c-b861-4947-9815-7845eff61290","res":{"statusCode":200},"responseTime":0.3994580000000951,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661376,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"0675ad2f-d733-4895-ae6f-22157cb14681","req":{"method":"POST","url":"/media/upload","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661377,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"0675ad2f-d733-4895-ae6f-22157cb14681","res":{"statusCode":201},"responseTime":0.46124999999995,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661377,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"feea274d-f8f1-4188-a169-4ec851a9341d","req":{"method":"DELETE","url":"/conversations/fa84a262-fa2a-4f21-bf85-3414fb945420","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661377,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"feea274d-f8f1-4188-a169-4ec851a9341d","res":{"statusCode":204},"responseTime":0.27845800000000054,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661377,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"b782872c-51e9-4118-96c0-18a1821ec7ca","req":{"method":"GET","url":"/conversations","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661377,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"b782872c-51e9-4118-96c0-18a1821ec7ca","res":{"statusCode":200},"responseTime":0.062208999999938897,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661377,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"b8d453d3-035c-41db-a79f-3fa753d8642c","req":{"method":"GET","url":"/users/me","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661377,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"b8d453d3-035c-41db-a79f-3fa753d8642c","res":{"statusCode":200},"responseTime":0.045999999999935426,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661378,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"c16ebabf-a16f-491b-bbbd-7efe0e75a216","req":{"method":"POST","url":"/auth/refresh","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661378,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"c16ebabf-a16f-491b-bbbd-7efe0e75a216","res":{"statusCode":200},"responseTime":0.3242079999999987,"msg":"request completed"}
+@companion/api:test: {"level":30,"time":1789234661378,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"9c4bffcf-38f3-407f-a421-2c69c33c5b49","req":{"method":"POST","url":"/auth/refresh","host":"localhost:80","remoteAddress":"127.0.0.1"},"msg":"incoming request"}
+@companion/api:test: {"level":30,"time":1789234661378,"pid":59690,"hostname":"Prakhars-MacBook-Air-2.local","reqId":"9c4bffcf-38f3-407f-a421-2c69c33c5b49","res":{"statusCode":401},"responseTime":0.36083400000006804,"msg":"request completed"}
+@companion/api:test:  ✓ test/integration.test.ts (6 tests) 159ms
+@companion/api:test:
+@companion/api:test:  Test Files  4 passed (4)
+@companion/api:test:       Tests  20 passed (20)
+@companion/api:test:    Start at  23:07:40
+@companion/api:test:    Duration  651ms (transform 284ms, setup 0ms, import 1.29s, tests 635ms, environment 0ms)
+@companion/api:test:
+@companion/web:test: $ vitest run --config vitest.config.ts --passWithNoTests
+@companion/web:test:
+@companion/web:test:  RUN  v4.1.11 /Users/prakhar/Desktop/Companaro/apps/web
+@companion/web:test:
+@companion/web:test: (node:68556) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+@companion/web:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@companion/web:test:  ✓ lib/chat-stream.test.ts (6 tests) 7ms
+@companion/web:test:  ✓ lib/provider-resilience.test.ts (3 tests) 5ms
+@companion/web:test:  ✓ lib/memory-relevance.test.ts (7 tests) 7ms
+@companion/web:test:  ✓ lib/inworld-speech.test.ts (5 tests) 6ms
+@companion/web:test:  ✓ lib/store-engine.test.ts (13 tests) 10ms
+@companion/web:test:  ✓ lib/call-session.test.ts (22 tests) 22ms
+@companion/web:test:  ✓ lib/demo-storage.test.ts (4 tests) 5ms
+@companion/web:test:  ✓ lib/operational-monitor.test.ts (5 tests) 21ms
+@companion/web:test:  ✓ lib/companion-prompt.test.ts (14 tests) 26ms
+@companion/web:test:  ✓ lib/semantic-memory.test.ts (2 tests) 4ms
+@companion/web:test:  ✓ lib/billing-signature.test.ts (3 tests) 9ms
+@companion/web:test:  ✓ lib/billing-access.test.ts (3 tests) 2ms
+@companion/web:test:  ✓ lib/free-chat.test.ts (3 tests) 5ms
+@companion/web:test:  ✓ lib/inworld-transcription.test.ts (4 tests) 11ms
+@companion/web:test:  ✓ lib/call-listening.test.ts (5 tests) 6ms
+@companion/web:test:  ✓ lib/edge-security.test.ts (2 tests) 5ms
+@companion/web:test:  ✓ lib/product-rules.test.ts (3 tests) 2ms
+@companion/web:test:  ✓ lib/speech.test.ts (3 tests) 2ms
+@companion/web:test:  ✓ lib/launch-readiness.test.ts (2 tests) 2ms
+@companion/web:test:  ✓ lib/voice-activity.test.ts (1 test) 1ms
+@companion/web:test:  ✓ lib/conversation-state.test.ts (2 tests) 2ms
+@companion/web:test:
+@companion/web:test:  Test Files  21 passed (21)
+@companion/web:test:       Tests  112 passed (112)
+@companion/web:test:    Start at  23:28:29
+@companion/web:test:    Duration  431ms (transform 474ms, setup 0ms, import 791ms, tests 160ms, environment 1ms)
+@companion/web:test:
+
+ Tasks:    13 successful, 13 total
+Cached:    12 cached, 13 total
+  Time:    1.074s
+
+ WARNING  no output files found for task @companion/web#test. Please check your `outputs` key in `turbo.json`

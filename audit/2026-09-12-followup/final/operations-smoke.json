@@ -1,0 +1,96 @@
+{
+  "at": "2026-09-12T17:49:04.893Z",
+  "base": "https://luma-companion.prakhargupta267.workers.dev",
+  "versionId": "622fbef8-ce1d-436a-abd3-bf471528e304",
+  "checks": [
+    {
+      "name": "production account store healthy before isolated drill",
+      "passed": true
+    },
+    {
+      "name": "anonymous recovery access rejected",
+      "passed": true
+    },
+    {
+      "name": "operator dashboard reports readiness and recent metrics",
+      "passed": true
+    },
+    {
+      "name": "monitor can probe storage without consuming inference credits",
+      "passed": true
+    },
+    {
+      "name": "synthetic marker written after recovery bookmark",
+      "passed": true
+    },
+    {
+      "name": "synthetic-only recovery requested",
+      "passed": true
+    },
+    {
+      "name": "Cloudflare PITR restored the earlier synthetic marker",
+      "passed": true
+    },
+    {
+      "name": "production account store remains healthy; release unchanged",
+      "passed": true
+    }
+  ],
+  "readiness": {
+    "domain": {
+      "configured": false,
+      "action": "Choose an owned Mira domain; the workers.dev beta remains available."
+    },
+    "billing": {
+      "configured": false,
+      "enabled": false,
+      "mode": "test_mode",
+      "missing": [
+        "DODO_PAYMENTS_API_KEY",
+        "DODO_PAYMENTS_WEBHOOK_KEY",
+        "DODO_PRODUCT_ID",
+        "BILLING_PRICE_LABEL"
+      ],
+      "action": "Correct Mira merchant, approved price and test-card lifecycle required before activation."
+    },
+    "recovery": {
+      "configured": false,
+      "missing": [
+        "RESEND_API_KEY",
+        "EMAIL_FROM"
+      ],
+      "action": "Verify the sending domain and receive a real password-reset email."
+    },
+    "alerts": {
+      "configured": false,
+      "action": "Configure an approved HTTPS webhook; verify delivery and recovery notifications."
+    },
+    "support": {
+      "ownerConfigured": false,
+      "action": "Confirm an on-call owner and response hours; dashboard availability is not staffed support."
+    },
+    "externalSignOffs": [
+      "real-device call acceptance",
+      "independent security review",
+      "legal and provider-retention review",
+      "age-assurance decision",
+      "GitHub Actions account access",
+      "YouTube upload Terms approval"
+    ]
+  },
+  "monitor": {
+    "checkedAt": "2026-09-12T17:49:03.566Z",
+    "source": "manual",
+    "database": true,
+    "alerts": [],
+    "delivery": "not-configured",
+    "fingerprint": "",
+    "windowMinutes": 15,
+    "providerBalances": "not-probed"
+  },
+  "drill": {
+    "marker": "synthetic-before",
+    "recovered": true
+  },
+  "scope": "Real remote Cloudflare PITR on a separate synthetic-only object. No account backup was restored. Does not prove cross-account/provider disaster recovery, external alert delivery or human call quality."
+}

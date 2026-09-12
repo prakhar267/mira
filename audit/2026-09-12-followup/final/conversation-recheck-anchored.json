@@ -1,0 +1,91 @@
+{
+  "at": "2026-09-12T18:00:06.019Z",
+  "startingVersion": "52fcff83-a365-41ee-a502-7413d8c2689b",
+  "endingVersion": "52fcff83-a365-41ee-a502-7413d8c2689b",
+  "stableDeployment": true,
+  "scope": "Targeted API recheck of the failed turns plus manually found English-script leak and mixed-person regression, with preserved synthetic history in both voice and video delivery. Not a full-dataset rerun or physical microphone test.",
+  "passed": 8,
+  "total": 8,
+  "results": [
+    {
+      "input": "मेरे पास सिर्फ आलू, चावल और दही है",
+      "delivery": "voice",
+      "reply": "तो फिर आलू की सब्जी बना लो, चावल ke saath serve kar sakti ho aur dahi ka raita bana lo.",
+      "status": 200,
+      "error": "",
+      "latencyMs": 2690,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "मेरे पास सिर्फ आलू, चावल और दही है",
+      "delivery": "video",
+      "reply": "आलू की सब्जी बनayi ja sakti hai, usmein thoda namak, mirch aur dhaniya daalkar achha taste aa jaayega.",
+      "status": 200,
+      "error": "",
+      "latencyMs": 2551,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "yaar kal mera presentation hai, nahi sorry parso hai",
+      "delivery": "voice",
+      "reply": "parso ka matlab kal se thoda aur time milta hai, tu presentation ke liye achhe se taiyar ho sakti hai, koi special topic hai jo cover karna hai?",
+      "status": 200,
+      "error": "",
+      "latencyMs": 1531,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "yaar kal mera presentation hai, nahi sorry parso hai",
+      "delivery": "video",
+      "reply": "parso ka matlab kal se thoda aur time milta hai, tu apna presentation ek baar aur check kar le, sab theek hai?",
+      "status": 200,
+      "error": "",
+      "latencyMs": 1390,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "Keep the plan simple, we are not trying to see everything",
+      "delivery": "voice",
+      "reply": "Let's focus on enjoying the trip and each other's company, rather than trying to cram in too many activities.",
+      "status": 200,
+      "error": "",
+      "latencyMs": 1310,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "Keep the plan simple, we are not trying to see everything",
+      "delivery": "video",
+      "reply": "Let's focus on enjoying the trip rather than trying to cram in too many activities, a simple plan will help you both relax and make the most of your time together.",
+      "status": 200,
+      "error": "",
+      "latencyMs": 1401,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "Meri behen Riya kal Delhi gayi thi. Mera bhai Aman abhi Mumbai mein hai.",
+      "delivery": "voice",
+      "reply": "Toh Riya ka Delhi trip kaisa raha? Kab tak wahan rehkar waapas aa rahi hai?",
+      "status": 200,
+      "error": "",
+      "latencyMs": 1577,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "Meri behen Riya kal Delhi gayi thi. Mera bhai Aman abhi Mumbai mein hai.",
+      "delivery": "video",
+      "reply": "Mujhe pata hai Riya kal Delhi gayi thi, lekin mujhe yeh nahi pata ki usko wahan kis cheez ki ichha thi. Main chahti hoon ki tum batado ki Riya ko Delhi mein kya dekhne ki ichha thi?",
+      "status": 200,
+      "error": "",
+      "latencyMs": 2500,
+      "languageOk": true,
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "at": "2026-09-12T17:49:20.899Z",
+  "baseUrl": "https://luma-companion.prakhargupta267.workers.dev",
+  "passed": 19,
+  "total": 19,
+  "results": [
+    {
+      "name": "public site and security headers",
+      "passed": true,
+      "detail": "200, CSP/HSTS/frame protection present"
+    },
+    {
+      "name": "launch metadata and indexing",
+      "passed": true,
+      "detail": "indexable canonical, social previews, sitemap and robots present"
+    },
+    {
+      "name": "public beta and support boundary",
+      "passed": true,
+      "detail": "free-beta copy and working support route present"
+    },
+    {
+      "name": "authenticated app gate",
+      "passed": true,
+      "detail": "307 → /login"
+    },
+    {
+      "name": "operational health and backup policy",
+      "passed": true,
+      "detail": "SQLite reachable, AI binding configured (not probed), 30-day rolling snapshots enabled"
+    },
+    {
+      "name": "avatar delivery cache",
+      "passed": true,
+      "detail": "11 MB, immutable"
+    },
+    {
+      "name": "natural identity answer",
+      "passed": true,
+      "detail": "I’m Mira, your AI companion. I chat with you, join voice and video calls, and remember only the details you approve."
+    },
+    {
+      "name": "listen-only boundary",
+      "passed": true,
+      "detail": "That can be really tough to deal with, just talking about it might help a bit."
+    },
+    {
+      "name": "Hinglish-only conversation",
+      "passed": true,
+      "detail": "koi baat nahi yaar, hum baat karke thoda mood theek kar sakte hain, kya hua aaj?"
+    },
+    {
+      "name": "Hindi input stays conversational Hindi",
+      "passed": true,
+      "detail": "क्या हुआ, कुछ मजेदार करने को नहीं मिला क्या?"
+    },
+    {
+      "name": "cross-language conversation continuity",
+      "passed": true,
+      "detail": "Just something light, like \"you've got this\" or \"all the best for tomorrow\"."
+    },
+    {
+      "name": "explicit memory recall",
+      "passed": true,
+      "detail": "Yes, I remember: You like masala chai; You work on companion apps"
+    },
+    {
+      "name": "multilingual semantic memory ranking",
+      "passed": true,
+      "detail": "@cf/baai/bge-reranker-base, cross-language recall ranked correctly"
+    },
+    {
+      "name": "server-side exploitation safety",
+      "passed": true,
+      "detail": "unsafe request refused before generation"
+    },
+    {
+      "name": "cross-origin API protection",
+      "passed": true,
+      "detail": "403"
+    },
+    {
+      "name": "voice upload validation",
+      "passed": true,
+      "detail": "malformed/non-audio upload rejected"
+    },
+    {
+      "name": "Hinglish speech audio generation",
+      "passed": true,
+      "detail": "inworld-tts-2-flash, 53376 bytes"
+    },
+    {
+      "name": "invalid login rejection",
+      "passed": true,
+      "detail": "401"
+    },
+    {
+      "name": "account create, sync, export, and delete",
+      "passed": true,
+      "detail": "secure cookie, database persistence, checksummed export, backup cleanup and deletion verified"
+    }
+  ]
+}

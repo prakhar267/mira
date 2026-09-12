@@ -1,0 +1,91 @@
+{
+  "at": "2026-09-12T17:57:41.116Z",
+  "startingVersion": "22fd15b6-d659-4cce-9511-78e55f4d3241",
+  "endingVersion": "22fd15b6-d659-4cce-9511-78e55f4d3241",
+  "stableDeployment": true,
+  "scope": "Targeted API recheck of the failed turns plus manually found English-script leak and mixed-person regression, with preserved synthetic history in both voice and video delivery. Not a full-dataset rerun or physical microphone test.",
+  "passed": 6,
+  "total": 8,
+  "results": [
+    {
+      "input": "मेरे पास सिर्फ आलू, चावल और दही है",
+      "delivery": "voice",
+      "reply": "फिर तो आलू की सब्जी बना लो, चावल ke saath serve kar sakti ho, aur dahi ke saath raita bana lo.",
+      "status": 200,
+      "error": "",
+      "latencyMs": 3922,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "मेरे पास सिर्फ आलू, चावल और दही है",
+      "delivery": "video",
+      "reply": "मैं तो फिर दही और आलू का रायता बनाती हूँ और उसके साथ चावल खाती हूँ, बहुत ही सिंपल और स्वादिष्ट है।",
+      "status": 200,
+      "error": "",
+      "latencyMs": 5024,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "yaar kal mera presentation hai, nahi sorry parso hai",
+      "delivery": "voice",
+      "reply": "parso ka presentation ke liye abhi tak preparation kar liya hai ya abhi bhi padhna hai?",
+      "status": 200,
+      "error": "",
+      "latencyMs": 1685,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "yaar kal mera presentation hai, nahi sorry parso hai",
+      "delivery": "video",
+      "reply": "parso ka matlab kal se thoda aur time milta hai, tu apna presentation ek baar aur check kar le, sab theek hai?",
+      "status": 200,
+      "error": "",
+      "latencyMs": 1295,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "Keep the plan simple, we are not trying to see everything",
+      "delivery": "voice",
+      "reply": "",
+      "status": 503,
+      "error": "The generated reply missed the conversation style.",
+      "latencyMs": 8087,
+      "languageOk": true,
+      "passed": false
+    },
+    {
+      "input": "Keep the plan simple, we are not trying to see everything",
+      "delivery": "video",
+      "reply": "",
+      "status": 503,
+      "error": "Mira could not form a fresh reply just now.",
+      "latencyMs": 8524,
+      "languageOk": true,
+      "passed": false
+    },
+    {
+      "input": "Meri behen Riya kal Delhi gayi thi. Mera bhai Aman abhi Mumbai mein hai.",
+      "delivery": "voice",
+      "reply": "Riya kal hi Delhi gayi thi, abhi kaisi hogi wahan?",
+      "status": 200,
+      "error": "",
+      "latencyMs": 1122,
+      "languageOk": true,
+      "passed": true
+    },
+    {
+      "input": "Meri behen Riya kal Delhi gayi thi. Mera bhai Aman abhi Mumbai mein hai.",
+      "delivery": "video",
+      "reply": "Toh Riya ka Delhi trip kaisa raha, kab wapas aa rahi hai?",
+      "status": 200,
+      "error": "",
+      "latencyMs": 3116,
+      "languageOk": true,
+      "passed": true
+    }
+  ]
+}

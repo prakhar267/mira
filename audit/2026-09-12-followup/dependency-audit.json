@@ -1,0 +1,19 @@
+{
+  "at": "2026-09-12T17:48:26.185Z",
+  "parserRegression": "Malformed ICNS/HEIF/JXL size guards and valid ICNS/PNG: PASS",
+  "findings": [
+    {
+      "name": "image-size",
+      "severity": "high",
+      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "webPaths": []
+    },
+    {
+      "name": "image-size",
+      "severity": "high",
+      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "webPaths": []
+    }
+  ],
+  "note": "The two image-size advisories remain in version-based audit output. A committed pnpm patch guards the zero-length/truncated parser loops and regression tests passed; this is a local mitigation, not a published upstream fix or independent security approval."
+}

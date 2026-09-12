@@ -1,0 +1,10 @@
+{
+  "method": "Read-only authenticated /api/admin/operations response; tickets and secrets excluded",
+  "checkedAt": "2026-09-12T17:59:24.217Z",
+  "source": "durable-object-alarm",
+  "database": true,
+  "alerts": [{"id":"capacity:chat","message":"Shared beta chat requests: 480/600 today. Check upstream credits; this is an application cap, not a provider balance."}],
+  "delivery": "not-configured",
+  "windowMinutes": 15,
+  "providerBalances": "not-probed"
+}
