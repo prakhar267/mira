@@ -2,7 +2,7 @@ name: Mira Cloudflare deployment
 on:
   push:
     branches: [main]
-    paths: ['apps/web/**', 'packages/**', 'pnpm-lock.yaml', '.github/workflows/mira-deploy.yml']
+    paths: ['apps/web/**', 'packages/**', 'patches/**', 'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.github/workflows/mira-deploy.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:generate
       - run: pnpm lint && pnpm typecheck && pnpm test
+      - run: node apps/web/scripts/dependency-smoke.mjs
       - run: pnpm --filter @companion/web build:vinext
       - name: Validate release credentials
         env:

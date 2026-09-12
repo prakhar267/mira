@@ -25,12 +25,12 @@ The new SQLite coordinator avoids the old per-request KV write design, but is st
 
 ## Residual risks requiring a release decision
 
-1. Dependency scanning found remaining advisories in legacy Prisma/mobile dependency chains. These are not evidence of an exploit in the deployed web Worker, but they must be addressed before shipping those surfaces. The remaining web chain advisory is a low-severity esbuild tooling issue; inspect the captured audit before claiming a clean dependency scan. PostCSS was patched during this change.
+1. Effect, deepmerge-ts, esbuild and uuid advisory chains were updated. The two remaining version-based advisories concern legacy mobile tooling's `image-size@1.2.1`, not the deployed web dependency path. A committed pnpm patch rejects non-advancing/truncated ICNS/HEIF/JXL entries; isolated timeout-guarded regressions also verify valid files. Upstream currently has no published fixed version for those two advisories. This local mitigation does not erase audit findings or replace an independent assessment. See `audit/2026-09-12-followup/dependency-audit.json` and `patches/image-size@1.2.1.patch`.
 2. A public anonymous beta remains vulnerable to distributed quota exhaustion. IP throttles and app caps reduce impact but are not identity assurance, bot detection or a guarantee of provider capacity.
 3. PBKDF2 currently uses the Workers WebCrypto limit of 100,000 iterations. Have the independent assessor evaluate password-hardening and the identity-provider strategy. Existing password records require a migration plan for any algorithm change.
 4. Account support identity verification, legal grievance handling, jurisdiction-specific age assurance, statutory retention, export controls and incident notification need owner/counsel decisions.
 5. Platform point-in-time recovery copies and upstream provider records are outside the application delete transaction. Obtain written retention/deletion evidence; do not equate active-store erasure with immediate removal from every backup.
-6. Scheduled GitHub checks cannot provide alerts until GitHub restores Actions execution. A staffed owner and an actual alert destination still need to be confirmed.
+6. Scheduled GitHub checks cannot provide independent alerts until GitHub restores Actions execution. The store's existing alarm now runs a content-free 15-minute monitor without requiring an additional cron slot, but cannot independently detect all Cloudflare/platform failures. A staffed owner, approved webhook and verified delivery still need to be confirmed.
 
 ## Independent review handoff
 

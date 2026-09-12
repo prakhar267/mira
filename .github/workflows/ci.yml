@@ -42,14 +42,17 @@ jobs:
       - name: Verify the workspace
         run: pnpm check
 
+      - name: Check patched image parsers and dependency advisories
+        run: node apps/web/scripts/dependency-smoke.mjs
+
       - name: Build the actual Cloudflare deployment target
         run: pnpm --filter @companion/web build:vinext
 
       - name: Upload the web build
-        if: always() && hashFiles('apps/web/.next/BUILD_ID') != ''
+        if: success()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: companion-web-${{ github.sha }}
-          path: apps/web/.next
+          path: apps/web/dist
           if-no-files-found: error
           retention-days: 7

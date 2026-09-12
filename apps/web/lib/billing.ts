@@ -1,6 +1,7 @@
 import DodoPayments from "dodopayments";
 import { AccountError } from "./account-server";
 import { cloudStore } from "./cloud-store";
+import {hasPaidAccess} from "./billing-access";
 export async function billingConfig() {
   const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
   const environment =
@@ -38,10 +39,7 @@ export async function billingEntitlement(userId: string) {
   const { enabled, environment } = await billingConfig();
   const raw = await cloudStore.get(`billing:${userId}`);
   const record = raw ? JSON.parse(raw) : null;
-  const active =
-    enabled &&
-    record?.status === "active" &&
-    (!record.renewsAt || Date.parse(record.renewsAt) > Date.now());
+  const active = enabled && hasPaidAccess(record);
   // The existing beta includes voice/video. Keep that access when commerce is off.
   return {
     record,

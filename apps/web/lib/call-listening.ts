@@ -3,7 +3,10 @@ export interface CallListeningSession {
 }
 
 export interface CallListeningOptions {
+  /** Headphones-only experimental talk-over. Never enabled by default. */
+  interruption?: boolean;
   onSpeechStart?: () => void;
+  onSpeechEnd?: () => void;
   onTranscript: (text: string) => void;
   onSilence: () => void;
   onError: (message: string) => void;
@@ -96,6 +99,8 @@ export async function startCallListening(options: CallListeningOptions): Promise
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     video: false,
   });
+  let acquiredContext: AudioContext | undefined;
+  try {
   const AudioContextConstructor = window.AudioContext
     ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextConstructor) {
@@ -106,6 +111,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
   const mimeType = recorderMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const context = new AudioContextConstructor();
+  acquiredContext = context;
   await context.resume();
   const source = context.createMediaStreamSource(stream);
   const analyser = context.createAnalyser();
@@ -143,7 +149,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
     recognitionEndResolver = null;
   };
 
-  if (Recognition) {
+  if (Recognition && !options.interruption) {
     const recognition = new Recognition();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -221,6 +227,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
       options.onSilence();
       return;
     }
+    options.onSpeechEnd?.();
 
     const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
     void blobBase64(blob)
@@ -249,7 +256,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
         }
         if (serverResult === "pending") serverResult = await responsePromise;
         if (!serverResult) {
-          if (nativeTranscript) {
+          if (isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) {
             if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
             return;
           }
@@ -257,12 +264,12 @@ export async function startCallListening(options: CallListeningOptions): Promise
         }
         const { response, body } = serverResult;
         if (isCallSilenceResponse(response.status)) {
-          if (!canceled && nativeTranscript) options.onTranscript(preferredCallTranscript(nativeTranscript));
+          if (!canceled && isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) options.onTranscript(preferredCallTranscript(nativeTranscript));
           else if (!canceled) options.onSilence();
           return;
         }
         if (!response.ok || !body?.text?.trim()) {
-          if (nativeTranscript) {
+          if (isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) {
             if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
             return;
           }
@@ -288,7 +295,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
       frame = window.requestAnimationFrame(detect);
       return;
     }
-    const speechThreshold = Math.max(.018, noiseFloor * 2.8);
+    const speechThreshold = options.interruption ? Math.max(.04, noiseFloor * 4) : Math.max(.018, noiseFloor * 2.8);
     const silenceThreshold = Math.max(.011, noiseFloor * 1.6);
 
     if (level >= speechThreshold) {
@@ -298,7 +305,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
       firstVoicedAt ||= now;
       lastVoicedAt = now;
       quietSince = 0;
-      if (!heardSpeech && voicedFrames >= 5) {
+      if (!heardSpeech && voicedFrames >= (options.interruption ? 12 : 5)) {
         heardSpeech = true;
         options.onSpeechStart?.();
       }
@@ -331,4 +338,9 @@ export async function startCallListening(options: CallListeningOptions): Promise
       stop();
     },
   };
+  } catch (error) {
+    stream.getTracks().forEach(track => track.stop());
+    void acquiredContext?.close().catch(() => undefined);
+    throw error;
+  }
 }

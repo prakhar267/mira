@@ -1,7 +1,10 @@
-import { requireOperator, operationalAlerts } from "@/lib/operations";
+import { requireOperator } from "@/lib/operations";
 import { AccountError,accountErrorResponse,assertSameOrigin,parseJsonObject } from "@/lib/account-server";
 import { cloudStore,storeAction } from "@/lib/cloud-store";
 import { providerCircuitStatus } from "@/lib/provider-resilience";
+import {launchReadiness} from "@/lib/launch-readiness";
+import {monitorStore} from "@/lib/monitor-store";
+import {monitorAlerts} from "@/lib/operational-monitor";
 export async function GET(request:Request) {
   try {
     await requireOperator(request);
@@ -9,8 +12,8 @@ export async function GET(request:Request) {
     const [{metrics},page,{capacity}]=await Promise.all([storeAction<{metrics:Record<string,unknown>[]}>({action:"metrics"}),cloudStore.list({prefix:"support:",limit:30,...(cursor?{cursor}:{})}),storeAction<{capacity:{key:string;count:number}[]}>({action:"capacity"})]);
     const tickets=(await Promise.all(page.keys.map(async({name})=>JSON.parse(await cloudStore.get(name)??"null")))).filter(Boolean);
     const {env}=await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const capacityAlerts=capacity.flatMap(row=>{const service=row.key.split(":")[1];const max=Number(service==="chat"?env.CHAT_DAILY_LIMIT:service==="speech"?env.SPEECH_DAILY_LIMIT:env.TRANSCRIBE_DAILY_LIMIT)||600;return row.count>=max*.8?[`Beta ${service} capacity: ${row.count}/${max} requests today. Check upstream credits before raising the limit.`]:[];});
-    return Response.json({metrics,tickets,nextCursor:page.cursor,alerts:[...operationalAlerts(metrics),...capacityAlerts],circuits:providerCircuitStatus(),configuration:{recovery:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.SITE_ORIGIN),billing:env.BILLING_ENABLED==="true",storage:"sqlite-durable-object",circuitScope:"this-worker-isolate",capacity,retention:"metrics 30 days; support 90 days"}},{headers:{"cache-control":"no-store"}});
+    const recentMetrics=await monitorStore.recentMetrics();
+    return Response.json({metrics,recentMetrics,tickets,nextCursor:page.cursor,alerts:monitorAlerts(recentMetrics,capacity,env).map(a=>a.message),monitor:JSON.parse(await cloudStore.get("ops:monitor")??"null"),readiness:launchReadiness(env),circuits:providerCircuitStatus(),configuration:{recovery:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.SITE_ORIGIN),billing:env.BILLING_ENABLED==="true",storage:"sqlite-durable-object",circuitScope:"this-worker-isolate",capacity,retention:"metrics 30 days; minute buckets 24 hours; support 90 days"}},{headers:{"cache-control":"no-store"}});
   } catch(cause){return accountErrorResponse(cause);}
 }
 export async function PATCH(request:Request) {

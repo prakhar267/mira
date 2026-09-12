@@ -44,7 +44,17 @@ describe("edge companion prompting", () => {
     expect(isInvalidCompanionReply("main اس کے لئے کیا کر سکتا ہوں", "main uske liye kya kar sakta hoon")).toBe(true);
     expect(isInvalidCompanionReply("तो सलाह छोड़ दो। बस प्रिया को बता दो कि तुम उसके साथ हो, बिना लंबा भाषण दिए।", "लेकिन उसे सलाह पसंद नहीं है।")).toBe(false);
     expect(isInvalidCompanionReply("Haan, aaj mood kaafi accha hai.", "yaar tum kaisi ho?")).toBe(false);
-    expect(isInvalidCompanionReply("Hamesha aisa hi karta hai.", "woh manager hamesha aisa hi karti hai")).toBe(true);
+  });
+
+  it("does not confuse Mira's grammar with a different person's or a past event",()=>{
+    const input="Meri behen Riya kal Delhi gayi thi. Mera bhai Aman abhi Mumbai mein hai.";
+    expect(isInvalidCompanionReply("Riya Delhi gayi thi aur Aman Mumbai mein hai. Kya Aman kal aa raha tha?",input)).toBe(false);
+    expect(isInvalidCompanionReply("Haan, woh plan accha tha.","Riya bhi trip pe gayi thi")).toBe(false);
+    expect(isInvalidCompanionReply("Main khush hoon ki woh aa gaya.","mera bhai ghar aa gaya")).toBe(false);
+    expect(isInvalidCompanionReply("मुझे अच्छा लगा था।", "तुम्हें कैसा लगा था?")).toBe(false);
+    expect(isInvalidCompanionReply("Main tumse baat kar raha hoon.","tum kya kar rahi ho")).toBe(true);
+    expect(isInvalidCompanionReply("Main baat kar raha hoon.","tum kya kar rahi ho")).toBe(true);
+    expect(isInvalidCompanionReply("मैं बात कर रहा हूँ।", "तुम क्या कर रही हो?")).toBe(true);
   });
 
   it("keeps short acknowledgements in the active language but switches on clear input", () => {

@@ -16,7 +16,10 @@ export async function readChatStream(stream: ReadableStream<Uint8Array>, signal:
       for (const line of lines) {
         if (!line.startsWith("data:")) continue;
         const data = line.slice(5).trim();
-        if (!data || data === "[DONE]") continue;
+        // Some inference gateways keep the transport open after the SSE end
+        // marker. The marker, not TCP close, completes this reply.
+        if (data === "[DONE]") return text.trim();
+        if (!data) continue;
         const part = JSON.parse(data) as {response?:string;error?:unknown};
         if (part.error) throw new Error("Inference stream failed");
         text += part.response ?? "";
@@ -31,7 +34,9 @@ export async function readChatStream(stream: ReadableStream<Uint8Array>, signal:
     }
   } finally {
     signal.removeEventListener("abort", abort);
-    await reader.cancel().catch(() => undefined);
+    // Cancellation is cleanup, not part of reply latency. An upstream cancel
+    // acknowledgement can hang even though we already have the complete reply.
+    void reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }

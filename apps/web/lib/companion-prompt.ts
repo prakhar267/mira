@@ -325,8 +325,12 @@ export function isInvalidCompanionReply(value: string, latestUserMessage: string
   if (expectedLanguage !== "hi" && /\p{Script=Devanagari}/u.test(reply)) return true;
   if (expectedLanguage === "en" && (reply.match(/\b(?:aaj|abhi|hoon|haan|mujhe|tumhara|tumhari|kaafi|nahi|yaar|karti|rahi)\b/gi)?.length ?? 0) >= 2) return true;
   if (expectedLanguage === "hinglish" && !naturalHinglishReplyPattern.test(reply)) return true;
-  if (expectedLanguage !== "en" && (/\bmain\b.{0,36}\b(?:karta|raha|gaya|tha|chahta)\b/i.test(reply) || /(?:मैं|मुझे)[^।!?]{0,36}(?:करता|रहा|गया|था|चाहता)/u.test(reply))) return true;
-  if (/\b(?:karti|rahi|gayi|thi)\b/i.test(latestUserMessage) && /\b(?:karta|kar raha|gaya|tha)\b/i.test(reply)) return true;
+  // The user's sister, brother, a past day and Mira can have different gendered
+  // predicates in the same turn. Comparing every masculine reply word against
+  // any feminine input word rejected valid multi-person conversations. Check
+  // only Mira's own clause; entity agreement belongs to contextual generation.
+  const clauses=reply.split(/[,.!?;।]|\b(?:ki|lekin|magar|woh|vo|usne|tum|aap|he|she)\b|(?:^|\s)(?:कि|लेकिन|मगर|वह|वो|उसने|तुम|आप)(?=\s|$)/iu);
+  if (expectedLanguage !== "en" && clauses.some(clause=>/\bmain\b.{0,36}\b(?:karta|raha|gaya|tha|chahta)\b/i.test(clause) || /मैं[^।!?]{0,36}(?:करता|रहा|गया|था|चाहता)/u.test(clause))) return true;
   return false;
 }
 import { normalizeHinglishText } from "./speech";

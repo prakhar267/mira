@@ -1,5 +1,8 @@
 import handler from "vinext/server/fetch-handler";
 import { StoreEngine, type SqlStorage } from "./lib/store-engine";
+import {runOperationalMonitor} from "./lib/operational-monitor";
+import type {LaunchEnvironment} from "./lib/launch-readiness";
+export {MiraRecoveryDrill} from "./lib/recovery-drill";
 
 interface LegacyKV {
   get(key: string): Promise<string | null>;
@@ -12,9 +15,14 @@ interface State {
 }
 export class MiraStore {
   private engine: StoreEngine;
-  constructor(private ctx: State, private env: { LUMA_ACCOUNTS?: LegacyKV }) {
+  constructor(private ctx: State, private env: LaunchEnvironment & { LUMA_ACCOUNTS?: LegacyKV }) {
     this.engine = new StoreEngine(ctx.storage.sql);
-    void ctx.blockConcurrencyWhile(async () => { if (!await ctx.storage.getAlarm()) await ctx.storage.setAlarm(Date.now() + 86400000); });
+    void ctx.blockConcurrencyWhile(async () => {
+      const alarm=await ctx.storage.getAlarm();
+      // Reuse this store's existing alarm: account-wide free cron slots may be
+      // occupied. Keep a pending deletion retry, otherwise bootstrap in a minute.
+      if(alarm===null || alarm>Date.now()+15*60000)await ctx.storage.setAlarm(Date.now()+60000);
+    });
   }
   private async importLegacy(key: string) {
     if (this.engine.row(key)) return;
@@ -50,6 +58,7 @@ export class MiraStore {
             case "rate": return { limited: this.engine.rate(data.key!, data.max!, data.seconds!) };
             case "metric": this.engine.metric(data.name!, Boolean(data.failed), data.duration ?? 0); return { ok: true };
             case "metrics": return { metrics: this.engine.metrics() };
+            case "recentMetrics": return { metrics: this.engine.recentMetrics() };
             case "capacity":return {capacity:this.engine.capacity()};
             case "resetPassword": return { reset: this.engine.resetPassword(data.key!, data.hash!, data.salt!) };
             case "claimEmail": return { created: this.engine.claimEmail(data.key!, data.account!) };
@@ -74,6 +83,21 @@ export class MiraStore {
     }
     if(this.engine.list("purge:","",1).length)await this.ctx.storage.setAlarm(Date.now()+60000);
   }
-  async alarm() { this.engine.cleanup(); await this.ctx.storage.setAlarm(Date.now()+86400000); await this.purgeLegacy(); }
+  async alarm() {
+    await this.ctx.storage.setAlarm(Date.now()+15*60000);
+    if(Date.now()-Number(this.engine.get("ops:cleanup-at")??0)>=86400000) {
+      this.engine.cleanup();this.engine.put("ops:cleanup-at",String(Date.now()));
+    }
+    await this.purgeLegacy();
+    // Direct adapter, not the MIRA_STORE binding: calling the same object's
+    // public fetch from its alarm could deadlock. No user content is reported.
+    const state=await runOperationalMonitor(this.env,{
+      get:async key=>this.engine.get(key),
+      put:async(key,value,options)=>{this.engine.put(key,value,options?.expirationTtl);},
+      recentMetrics:async()=>this.engine.recentMetrics(),
+      capacity:async()=>this.engine.capacity().map(row=>({key:String(row.key),count:Number(row.count)})),
+    },fetch,"durable-object-alarm");
+    console.log(JSON.stringify({event:"mira-monitor",source:state.source,checkedAt:state.checkedAt,database:state.database,alerts:state.alerts.map(a=>a.id),delivery:state.delivery}));
+  }
 }
 export default handler;

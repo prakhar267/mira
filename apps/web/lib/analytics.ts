@@ -1,4 +1,4 @@
-export const analyticsEvents = ["view_home", "view_chat", "view_profile", "view_memory", "view_companion", "view_moments", "view_activities", "voice_call_start", "video_call_start", "chat_send", "reply_received", "reply_failed", "reply_misunderstood", "demo_reset"] as const;
+export const analyticsEvents = ["view_home", "view_chat", "view_profile", "view_memory", "view_companion", "view_moments", "view_activities", "voice_call_start", "video_call_start", "chat_send", "reply_received", "reply_failed", "reply_misunderstood", "demo_reset", "call_transcribe_ms", "call_reply_ms", "call_speech_ms", "call_roundtrip_ms"] as const;
 export const analyticsConsentKey = "mira-analytics-consent-v1";
 export function trackEvent(event: typeof analyticsEvents[number], durationMs = 0) {
   try {

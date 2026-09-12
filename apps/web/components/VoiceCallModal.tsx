@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ChatCircleDots,
@@ -12,13 +12,7 @@ import {
   SpeakerSlash,
   Waveform,
 } from "@phosphor-icons/react";
-import {
-  playCompanionSpeech,
-  type CompanionSpeechPlayback,
-} from "@/lib/speech";
-import { startCallListening, type CallListeningSession } from "@/lib/call-listening";
-
-type CallPhase = "connecting" | "listening" | "thinking" | "speaking" | "interrupted";
+import { useCompanionCall } from "./useCompanionCall";
 
 export function VoiceCallModal({
   companionName,
@@ -31,204 +25,25 @@ export function VoiceCallModal({
   onUserTurn: (content: string) => Promise<string>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const greeting = `Hey ${userName}, you made it. What’s going on?`;
-  const [muted, setMuted] = useState(false);
-  const [speaker, setSpeaker] = useState(true);
+  const { phase, userLine: heard, companionLine, error: speechError, muted, speaker, talkOver, seconds, call } = useCompanionCall(userName, onUserTurn);
   const [captions, setCaptions] = useState(true);
   const [heartSent, setHeartSent] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [phase, setPhase] = useState<CallPhase>("connecting");
-  const [heard, setHeard] = useState("");
-  const [companionLine, setCompanionLine] = useState(greeting);
-  const [speechError, setSpeechError] = useState("");
-  const recognitionRef = useRef<CallListeningSession | null>(null);
-  const greetingSpoken = useRef(false);
-  const speechTurn = useRef(0);
-  const playbackRef = useRef<CompanionSpeechPlayback | null>(null);
-  const listenTimerRef = useRef<number | null>(null);
-  const startListeningRef = useRef<() => void>(() => undefined);
-  const mutedRef = useRef(false);
-  const activeRef = useRef(true);
-  const phaseRef = useRef<CallPhase>("connecting");
-  const listeningAttemptRef = useRef(0);
-
-  const changePhase = useCallback((next: CallPhase) => {
-    phaseRef.current = next;
-    setPhase(next);
-  }, []);
-
-  const stopRecognition = useCallback(() => {
-    listeningAttemptRef.current += 1;
-    const recognition = recognitionRef.current;
-    if (!recognition) return;
-    recognitionRef.current = null;
-    recognition.cancel();
-  }, []);
-
-  const queueAutoListen = useCallback((delay = 280) => {
-    if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
-    listenTimerRef.current = window.setTimeout(() => {
-      listenTimerRef.current = null;
-      if (
-        activeRef.current
-        && !mutedRef.current
-        && !recognitionRef.current
-        && phaseRef.current !== "speaking"
-        && phaseRef.current !== "thinking"
-      ) startListeningRef.current();
-    }, delay);
-  }, []);
-
-  const speak = useCallback((text: string, force = false) => {
-    if (!speaker && !force) {
-      changePhase("listening");
-      queueAutoListen();
-      return;
-    }
-    if (listenTimerRef.current) {
-      window.clearTimeout(listenTimerRef.current);
-      listenTimerRef.current = null;
-    }
-    stopRecognition();
-    speechTurn.current += 1;
-    const turn = speechTurn.current;
-    playbackRef.current?.cancel();
-    changePhase("connecting");
-    playbackRef.current = playCompanionSpeech(text, {
-      onStart: () => {
-        if (speechTurn.current !== turn) return;
-        setSpeechError("");
-        changePhase("speaking");
-      },
-      onEnd: () => {
-        if (speechTurn.current !== turn || !activeRef.current) return;
-        changePhase("listening");
-        queueAutoListen();
-      },
-      onError: (message) => {
-        if (speechTurn.current !== turn || !activeRef.current) return;
-        setSpeechError(message);
-        changePhase("listening");
-        queueAutoListen(400);
-      },
-    });
-  }, [changePhase, queueAutoListen, speaker, stopRecognition]);
-
-  useEffect(() => {
-    activeRef.current = true;
-    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1_000);
-    return () => {
-      activeRef.current = false;
-      window.clearInterval(timer);
-      stopRecognition();
-      playbackRef.current?.cancel();
-      if (listenTimerRef.current) window.clearTimeout(listenTimerRef.current);
-    };
-  }, [stopRecognition]);
-
-  useEffect(() => {
-    const speakingFrame = new Image();
-    speakingFrame.src = "/assets/mira/portrait-speaking.png";
-  }, []);
-
-  useEffect(() => {
-    if (greetingSpoken.current) return;
-    const connect = window.setTimeout(() => {
-      if (greetingSpoken.current) return;
-      greetingSpoken.current = true;
-      speak(greeting);
-    }, 650);
-    return () => window.clearTimeout(connect);
-  }, [greeting, speak]);
-
-  const submitTurn = useCallback(async (content: string) => {
-    const clean = content.trim();
-    if (!clean || phaseRef.current === "thinking") return;
-    setHeard(clean);
-    setSpeechError("");
-    changePhase("thinking");
-    try {
-      const reply = await onUserTurn(clean);
-      setCompanionLine(reply);
-      speak(reply);
-    } catch {
-      const fallback = "Reply miss ho gaya. Ek baar phir bolo?";
-      setCompanionLine(fallback);
-      speak(fallback);
-    }
-  }, [changePhase, onUserTurn, speak]);
-
-  const beginListening = useCallback(() => {
-    if (listenTimerRef.current) {
-      window.clearTimeout(listenTimerRef.current);
-      listenTimerRef.current = null;
-    }
-    if (mutedRef.current || phaseRef.current === "thinking" || phaseRef.current === "speaking") return;
-    if (recognitionRef.current) { changePhase("listening"); return; }
-    const attempt = listeningAttemptRef.current + 1;
-    listeningAttemptRef.current = attempt;
-    setHeard("");
-    changePhase("listening");
-    void startCallListening({
-      onSpeechStart: () => { if (listeningAttemptRef.current === attempt) setHeard("Hearing you…"); },
-      onTranscript: (transcript) => {
-        if (listeningAttemptRef.current !== attempt || !activeRef.current) return;
-        recognitionRef.current = null;
-        void submitTurn(transcript);
-      },
-      onSilence: () => {
-        if (listeningAttemptRef.current !== attempt || !activeRef.current) return;
-        recognitionRef.current = null;
-        setHeard("");
-        queueAutoListen(250);
-      },
-      onError: (message) => {
-        if (listeningAttemptRef.current !== attempt || !activeRef.current) return;
-        recognitionRef.current = null;
-        setHeard("");
-        setSpeechError(message);
-        changePhase("listening");
-        queueAutoListen(900);
-      },
-    }).then((session) => {
-      if (listeningAttemptRef.current !== attempt || !activeRef.current) session.cancel();
-      else recognitionRef.current = session;
-    }).catch((cause) => {
-      if (listeningAttemptRef.current !== attempt || !activeRef.current) return;
-      recognitionRef.current = null;
-      setSpeechError(cause instanceof Error ? cause.message : "Microphone access is unavailable.");
-      changePhase("listening");
-    });
-  }, [changePhase, queueAutoListen, submitTurn]);
-  useEffect(() => { startListeningRef.current = beginListening; }, [beginListening]);
-
-  const interrupt = useCallback(() => {
-    if (muted) return;
-    speechTurn.current += 1;
-    changePhase("interrupted");
-    playbackRef.current?.cancel();
-    window.setTimeout(beginListening, 180);
-  }, [beginListening, changePhase, muted]);
-
-  const toggleSpeaker = () => {
-    if (speaker) {
-      playbackRef.current?.cancel();
-      setSpeaker(false);
-      changePhase("listening");
-    } else {
-      setSpeaker(true);
-      window.setTimeout(() => speak(companionLine, true), 0);
-    }
+  const phaseCopy: Record<typeof phase, string> = {
+    idle: muted ? "Microphone muted" : "Ready to listen",
+    "opening-mic": "Opening microphone…",
+    listening: "Listening to you",
+    transcribing: "Understanding your words…",
+    thinking: "Thinking about that",
+    preparing: "Preparing Mira’s voice…",
+    speaking: "Talking with you",
+    error: "Call needs attention",
+    closed: "Call ended",
   };
+  const interrupt = () => call.current?.interrupt();
+  const beginListening = () => call.current?.retry();
+  const toggleSpeaker = () => call.current?.setSpeaker(!speaker);
 
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  const phaseCopy: Record<CallPhase, string> = {
-    connecting: "Connecting Mira’s voice…",
-    listening: "Listening to you",
-    thinking: "Thinking about that",
-    speaking: "Talking with you",
-    interrupted: "Stopped · listening",
-  };
 
   return (
     <motion.div className="live-call live-call--voice" role="dialog" aria-modal="true" aria-label={`Voice call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -246,21 +61,22 @@ export function VoiceCallModal({
 
       <div className="call-pickers">
         <div className="call-language-picker"><span>English · Hindi · Hinglish · Priya</span></div>
+        <button type="button" className="call-language-picker" aria-pressed={talkOver} onClick={() => call.current?.setTalkOver(!talkOver)}>Talk-over · headphones beta · {talkOver ? "On" : "Off"}</button>
       </div>
 
-      <button type="button" className="barge-in" onClick={phase === "speaking" ? interrupt : beginListening} disabled={muted || phase === "thinking" || phase === "connecting"}>
-        <Waveform aria-hidden="true" /> {phase === "speaking" ? "Tap to interrupt" : phase === "thinking" ? "Thinking…" : phase === "connecting" ? "Preparing voice…" : phase === "listening" ? "Listening automatically" : "Start hands-free listening"}
+      <button type="button" className="barge-in" onClick={phase === "speaking" || phase === "preparing" ? interrupt : beginListening} disabled={muted || ["thinking", "transcribing", "opening-mic"].includes(phase)}>
+        <Waveform aria-hidden="true" /> {phase === "speaking" ? talkOver ? "Speak to interrupt · headphones" : "Tap to interrupt" : phase === "preparing" ? "Cancel voice & listen" : phase === "error" ? "Retry" : phase === "listening" ? "Listening automatically" : phaseCopy[phase]}
       </button>
 
       <div className="live-call__controls">
-        <button type="button" className={muted ? "call-orb call-orb--active" : "call-orb"} onClick={() => { const next = !muted; mutedRef.current = next; setMuted(next); if (next) stopRecognition(); if (!next) { changePhase("listening"); queueAutoListen(220); } }} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicrophoneSlash aria-hidden="true" /> : <Microphone aria-hidden="true" />}</button>
+        <button type="button" className={muted ? "call-orb call-orb--active" : "call-orb"} onClick={() => call.current?.setMuted(!muted)} aria-label={muted ? "Unmute microphone" : "Mute microphone"}>{muted ? <MicrophoneSlash aria-hidden="true" /> : <Microphone aria-hidden="true" />}</button>
         <button type="button" className={speaker ? "call-orb call-orb--active" : "call-orb"} onClick={toggleSpeaker} aria-label={speaker ? "Turn speaker off" : "Turn speaker on"}>{speaker ? <SpeakerHigh aria-hidden="true" /> : <SpeakerSlash aria-hidden="true" />}</button>
         <button type="button" className={captions ? "call-orb call-orb--active" : "call-orb"} onClick={() => setCaptions((value) => !value)} aria-label={captions ? "Hide captions" : "Show captions"}><ChatCircleDots aria-hidden="true" /></button>
         <button type="button" className={heartSent ? "call-orb call-orb--heart" : "call-orb"} onClick={() => { setHeartSent(true); window.setTimeout(() => setHeartSent(false), 1_500); }} aria-label="Send a heart reaction"><Heart aria-hidden="true" weight={heartSent ? "fill" : "regular"} /></button>
-        <button type="button" className="call-orb call-orb--end" onClick={() => onClose(seconds)} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
+        <button type="button" className="call-orb call-orb--end" onClick={() => { call.current?.close(); onClose(seconds); }} aria-label="End call"><PhoneDisconnect aria-hidden="true" weight="fill" /></button>
       </div>
       <AnimatePresence>{heartSent ? <motion.div className="call-heart" initial={{ opacity: 0, scale: .5, y: 0 }} animate={{ opacity: 1, scale: 1.3, y: -90 }} exit={{ opacity: 0 }}><Heart weight="fill" /></motion.div> : null}</AnimatePresence>
-      <small className="live-call__disclosure">Hands-free listening resumes after every reply · voice input uses Inworld STT with browser and Cloudflare fallback · conversation replies use free hosted inference with a local fallback · speech uses Inworld Priya · no call recording is saved</small>
+      <small className="live-call__disclosure">Hands-free listening resumes after every reply · voice input uses Inworld STT with browser and Cloudflare fallback · conversation replies use Cloudflare AI · speech uses Inworld Priya · talk-over is experimental and needs headphones · no call recording is saved</small>
     </motion.div>
   );
 }

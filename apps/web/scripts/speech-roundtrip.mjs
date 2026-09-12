@@ -1,7 +1,8 @@
 import {mkdir,writeFile,readFile} from "node:fs/promises";
 import {spawnSync} from "node:child_process";
 const base=(process.env.COMPANARO_URL||"https://luma-companion.prakhargupta267.workers.dev").replace(/\/$/,"");
-const out=new URL("../../../audit/2026-09-12-launch/audio/",import.meta.url);await mkdir(out,{recursive:true});
+const directory=new URL(process.env.QA_DIRECTORY||"audit/2026-09-12-launch/",new URL("../../../",import.meta.url));
+const out=new URL("audio/",directory);await mkdir(out,{recursive:true});
 const cases=[{id:"english",text:"My brother Kabir has an interview tomorrow and he is feeling nervous.",anchors:["interview","kabir","brother"]},{id:"hindi",text:"आज मेरा दिन अच्छा था। मेरी दोस्त नेहा कल पुणे आ रही है।",anchors:["नेहा","पुणे","दोस्त"]},{id:"hinglish",text:"Yaar aaj office mein kaafi stress tha. Boss ne meeting mein daant diya.",anchors:["office","boss","meeting","बॉस","मीटिंग"]}];
 const results=[];
 async function post(path,body){return fetch(base+path,{method:"POST",headers:{"content-type":"application/json",origin:base},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});}

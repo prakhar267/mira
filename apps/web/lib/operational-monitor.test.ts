@@ -1,0 +1,13 @@
+import {describe,expect,it,vi} from "vitest";
+import {monitorAlerts,runOperationalMonitor,type MonitorStore} from "./operational-monitor";
+function store(rows:Record<string,unknown>[]) {const data=new Map<string,string>();return {data,get:async(key:string)=>data.get(key)??null,put:async(key:string,value:string)=>{data.set(key,value);},recentMetrics:async()=>rows,capacity:async()=>[]} satisfies MonitorStore & {data:Map<string,string>};}
+describe("content-free operational alerts",()=>{
+  it("requires enough traffic and warns about configured application caps",()=>{expect(monitorAlerts([{name:"api:chat",total:1,failures:1}],[],{})).toEqual([]);expect(monitorAlerts([],[{key:"capacity:chat:1",count:480}],{})).toHaveLength(1);});
+  it("deduplicates unchanged incidents and sends a recovery",async()=>{
+    const rows=[{name:"api:companion-chat",total:20,failures:4,p95UpperBoundMs:8000}];const db=store(rows),send=vi.fn(async()=>new Response("ok"));const env={MIRA_ALERT_WEBHOOK:"https://alerts.example.test/hook"};
+    expect((await runOperationalMonitor(env,db,send)).delivery).toBe("delivered");expect((await runOperationalMonitor(env,db,send)).delivery).toBe("not-needed");expect(send).toHaveBeenCalledTimes(1);rows.splice(0);expect((await runOperationalMonitor(env,db,send)).delivery).toBe("delivered");expect(send).toHaveBeenLastCalledWith(expect.any(URL),expect.objectContaining({body:expect.stringContaining("recovery")}));
+  });
+  it("retries failed delivery without claiming it was sent",async()=>{const db=store([{name:"api:chat",total:10,failures:2}]);const send=vi.fn(async()=>new Response("no",{status:503}));expect((await runOperationalMonitor({MIRA_ALERT_WEBHOOK:"https://alerts.example.test/hook"},db,send)).delivery).toBe("failed");await runOperationalMonitor({MIRA_ALERT_WEBHOOK:"https://alerts.example.test/hook"},db,send);expect(send).toHaveBeenCalledTimes(2);});
+  it("records missing setup honestly and still alerts when the database is down",async()=>{const db=store([]);expect((await runOperationalMonitor({},db)).delivery).toBe("not-configured");db.recentMetrics=async()=>{throw new Error("offline");};const send=vi.fn(async()=>new Response("ok"));const state=await runOperationalMonitor({MIRA_ALERT_WEBHOOK:"https://alerts.example.test/hook"},db,send);expect(state.database).toBe(false);expect(state.alerts[0]?.id).toBe("database");expect(send).toHaveBeenCalledOnce();});
+  it("rejects insecure destinations without transmitting",async()=>{const db=store([{name:"api:chat",total:10,failures:2}]);const send=vi.fn();expect((await runOperationalMonitor({MIRA_ALERT_WEBHOOK:"http://example.test/hook"},db,send)).delivery).toBe("failed");expect(send).not.toHaveBeenCalled();});
+});

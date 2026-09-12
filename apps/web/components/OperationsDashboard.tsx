@@ -15,6 +15,9 @@ type Snapshot = {
   alerts: string[];
   nextCursor?: string;
   configuration: Record<string, unknown>;
+  readiness: Record<string, unknown>;
+  monitor: Record<string, unknown> | null;
+  recentMetrics: Record<string, unknown>[];
 };
 export function OperationsDashboard() {
   const [key, setKey] = useState(""),
@@ -112,11 +115,19 @@ export function OperationsDashboard() {
               </p>
             )}
             <p>
-              Investigate above 5% failed/limited requests or 6s average AI
-              latency (minimum 10 requests/day). Refresh to check; external
-              notifications require an alert channel.
+              Rolling 15-minute alerts: above 5% failed/limited requests
+              (at least 10 requests) or approximate P95 above 5 seconds
+              (at least 20). Cloudflare checks every 15 minutes; external
+              delivery still requires an approved alert channel.
             </p>
             <pre>{JSON.stringify(data.configuration, null, 2)}</pre>
+            <details><summary>Last scheduled check</summary><pre>{JSON.stringify(data.monitor, null, 2)}</pre></details>
+            <details><summary>Recent latency buckets (P95 is an upper bound)</summary><pre>{JSON.stringify(data.recentMetrics, null, 2)}</pre></details>
+          </section>
+          <section className="settings-section">
+            <h2>Launch readiness</h2>
+            <p>Configured is not the same as tested or legally approved. No credentials are displayed.</p>
+            <pre>{JSON.stringify(data.readiness, null, 2)}</pre>
           </section>
           <section className="settings-section">
             <h2>Support inbox</h2>

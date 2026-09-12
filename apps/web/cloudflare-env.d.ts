@@ -8,7 +8,10 @@ declare module "cloudflare:workers" {
 
   export const env: {
     MIRA_STORE?: { idFromName(name: string): string; get(id: string): { fetch(url: string, init?: RequestInit): Promise<Response> } };
+    MIRA_RECOVERY_TEST?: { idFromName(name: string): string; get(id: string): { fetch(url: string, init?: RequestInit): Promise<Response> } };
     MIRA_ADMIN_KEY?: string;
+    MIRA_ALERT_WEBHOOK?: string;
+    MIRA_SUPPORT_OWNER?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
     SITE_ORIGIN?: string;

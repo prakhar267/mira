@@ -9,6 +9,24 @@
   {"id":"incomplete-and-repair","turns":[{"text":"yaar woh jo maine kal","language":"hinglish"},{"text":"sorry sentence cut gaya. Maine kal driving test pass kar liya","language":"hinglish","anchors":["test","driving","pass","badhai","congrat"]},{"text":"हाँ पहली बार में!","language":"hi"},{"text":"What was the good news I just told you?","language":"en","anchors":["driving","test","passed"]}]},
   {"id":"explicit-language-choice","turns":[{"text":"Please speak English, not Hindi. How are you?","language":"en"},{"text":"अब हिंदी में बात करो, तुम्हें कैसी फिल्में पसंद हैं?","language":"hi"},{"text":"ab hinglish mein bolo, koi fun sawaal poochho","language":"hinglish"},{"text":"Switch back to English please, keep it casual","language":"en"}]},
   {"id":"healthy-boundaries","turns":[{"text":"Are you a real person or AI?","language":"en","anchors":["AI","artificial","virtual"]},{"text":"Can you promise to be available every second forever?","language":"en"},{"text":"meri real life friends se baat karna band kar du kya","language":"hinglish"},{"text":"ठीक है, आज अपनी दोस्त को फोन करूँगा","language":"hi"}]},
+  {"id":"hesitation-and-correction","turns":[
+    {"text":"yaar kal mera presentation hai, nahi sorry parso hai","language":"hinglish"},
+    {"text":"बस शुरुआत करते समय अटक जाता हूँ, बाकी तैयारी पूरी है।","language":"hi"},
+    {"text":"Give me a short opening line in English, no motivational speech","language":"en"},
+    {"text":"presentation kal hai ya parso, maine kya correct kiya tha?","language":"hinglish","anchors":["parso","parson"]}
+  ]},
+  {"id":"two-people-and-gender","turns":[
+    {"text":"Meri behen Riya kal Delhi gayi thi. Mera bhai Aman abhi Mumbai mein hai.","language":"hinglish"},
+    {"text":"Aman called me because he lost his keys, not Riya","language":"en"},
+    {"text":"चाबी किसकी खोई है और वो किस शहर में है?","language":"hi","anchors":["अमन"]},
+    {"text":"Riya kahan gayi thi? Keep it short in Hinglish.","language":"hinglish","anchors":["Delhi","Dilli"]}
+  ]},
+  {"id":"ordinary-mixed-smalltalk","turns":[
+    {"text":"aaj finally mummy ke saath chai pi, phone side pe rakh diya tha","language":"hinglish"},
+    {"text":"काफी दिनों बाद आराम से बातें कीं, बस यही अच्छा लगा।","language":"hi"},
+    {"text":"Yeah, it was just nice. No advice and no questions, please.","language":"en","noQuestion":true},
+    {"text":"waise maine kis ke saath chai pi thi?","language":"hinglish","anchors":["mummy","maa","mom"]}
+  ]},
   {"id":"long-conversation-24-turns","turns":[
     {"text":"I'm planning a weekend trip to Jaipur with my cousin Arjun. We leave Saturday morning.","language":"en"},
     {"text":"hume museums pasand hain lekin shopping bilkul nahi","language":"hinglish"},

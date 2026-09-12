@@ -11,6 +11,7 @@ export class StoreEngine {
     sql.exec("CREATE TABLE IF NOT EXISTS limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL)");
     sql.exec("CREATE TABLE IF NOT EXISTS metrics (day TEXT, name TEXT, total INTEGER NOT NULL, failures INTEGER NOT NULL, duration INTEGER NOT NULL, PRIMARY KEY(day,name))");
     sql.exec("CREATE TABLE IF NOT EXISTS receipts (id TEXT PRIMARY KEY, received INTEGER NOT NULL)");
+    sql.exec("CREATE TABLE IF NOT EXISTS metric_windows (minute INTEGER, name TEXT, total INTEGER, failures INTEGER, duration INTEGER, max_duration INTEGER, le1000 INTEGER, le2500 INTEGER, le5000 INTEGER, le8000 INTEGER, le15000 INTEGER, PRIMARY KEY(minute,name))");
   }
   row(key: string) { return this.sql.exec("SELECT * FROM records WHERE key = ?", key).toArray()[0]; }
   get(key: string) {
@@ -43,9 +44,14 @@ export class StoreEngine {
     return Number(row?.count) > max;
   }
   metric(name: string, failed: boolean, duration: number) {
+    const ms = Math.max(0, Math.min(120000, Math.round(duration)));
+    this.sql.exec("INSERT INTO metric_windows VALUES(?,?,1,?,?,?,?,?,?,?,?) ON CONFLICT(minute,name) DO UPDATE SET total=total+1,failures=failures+excluded.failures,duration=duration+excluded.duration,max_duration=max(max_duration,excluded.max_duration),le1000=le1000+excluded.le1000,le2500=le2500+excluded.le2500,le5000=le5000+excluded.le5000,le8000=le8000+excluded.le8000,le15000=le15000+excluded.le15000",Math.floor(Date.now()/60000),name,failed?1:0,ms,ms,...[1000,2500,5000,8000,15000].map(bound=>ms<=bound?1:0));
     this.sql.exec("INSERT INTO metrics(day,name,total,failures,duration) VALUES(?,?,1,?,?) ON CONFLICT(day,name) DO UPDATE SET total=total+1, failures=failures+excluded.failures, duration=duration+excluded.duration", new Date().toISOString().slice(0,10), name, failed ? 1 : 0, Math.max(0, Math.min(120000, Math.round(duration))));
   }
   metrics() { return this.sql.exec("SELECT day,name,total,failures,round(duration * 1.0 / total) AS averageLatencyMs FROM metrics WHERE day >= ? ORDER BY day DESC,name", new Date(Date.now()-7*86400000).toISOString().slice(0,10)).toArray(); }
+  recentMetrics() {
+    return this.sql.exec("SELECT name,sum(total) AS total,sum(failures) AS failures,round(sum(duration)*1.0/sum(total)) AS averageLatencyMs,max(max_duration) AS maxLatencyMs,sum(le1000) AS le1000,sum(le2500) AS le2500,sum(le5000) AS le5000,sum(le8000) AS le8000,sum(le15000) AS le15000 FROM metric_windows WHERE minute>=? GROUP BY name",Math.floor(Date.now()/60000)-14).toArray().map(row=>({...row,p95UpperBoundMs:[1000,2500,5000,8000,15000].find(bound=>Number(row[`le${bound}`])>=Number(row.total)*.95)??120000,windowMinutes:15}));
+  }
   capacity() { return this.sql.exec("SELECT key,count FROM limits WHERE key LIKE 'capacity:%' AND key LIKE ?",`%:${Math.floor(Date.now()/86400000)}`).toArray(); }
   cleanup() {
     // Tombstone expired records so stale KV values cannot return after cleanup.
@@ -53,6 +59,7 @@ export class StoreEngine {
     this.sql.exec("DELETE FROM limits WHERE expires <= ?", Date.now());
     this.sql.exec("DELETE FROM metrics WHERE day < ?", new Date(Date.now()-30*86400000).toISOString().slice(0,10));
     this.sql.exec("DELETE FROM receipts WHERE received < ?", Date.now()-90*86400000);
+    this.sql.exec("DELETE FROM metric_windows WHERE minute < ?", Math.floor(Date.now()/60000)-1440);
   }
   resetPassword(tokenKey: string, hash: string, salt: string) {
     const token = this.get(tokenKey);

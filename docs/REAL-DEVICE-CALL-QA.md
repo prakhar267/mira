@@ -21,7 +21,7 @@ Run on Android Chrome, iPhone Safari, Windows Chrome and macOS Chrome/Safari. In
 
 - Allow, deny and revoke microphone permission; retry must be understandable, with no stuck “listening” indicator.
 - Speak naturally without pressing a button for each turn. Listening should resume after each completed reply.
-- Interrupt using the visible interrupt control. **Full-duplex automatic barge-in is not currently implemented or certified.** Speaking over Mira without tapping is a separate unfulfilled requirement.
+- Interrupt using the visible interrupt control, including while voice is being prepared. Then enable **Talk-over · headphones beta** using a headset: start speaking over Mira and check that playback stops without clipping your first words. It is off by default. Automatic speakerphone barge-in and physical echo rejection are **not certified**; do not enable headphone mode on speakers and call that a passing echo test.
 - Try short pauses and incomplete sentences. Count clipped turns, missed words, duplicate turns and repeated clarification replies; retain actual examples.
 - In speaker mode, verify Mira's own voice is not transcribed as the user. Test at multiple volume levels.
 - Allow/deny camera, turn it off and on, background/foreground the app, end the call, and verify camera/mic indicators stop.
@@ -29,3 +29,5 @@ Run on Android Chrome, iPhone Safari, Windows Chrome and macOS Chrome/Safari. In
 - Disconnect/reconnect Wi-Fi. Report a provider/network failure honestly, without inventing a companion reply or silently switching to another voice.
 
 Suggested beta acceptance targets (not measured results): at least 95% intent understood on the collected samples; fewer than 5% unnecessary clarification turns; no stuck mic/camera, duplicate replies or self-transcription; P95 end-of-speech to audible reply under 5 seconds. Record STT time, generation time, TTS time and playback separately. Current server API latency results do **not** equal this complete acoustic round-trip measurement.
+
+With opt-in analytics, `call_transcribe_ms`, `call_reply_ms`, `call_speech_ms` and `call_roundtrip_ms` measure the client stages without transcripts or recordings. The total starts when the microphone silence detector closes the utterance, so its preceding silence window is not included. DNT and denied analytics consent suppress these events. Local controller regressions exercise both call labels, not physical devices or different browsers.

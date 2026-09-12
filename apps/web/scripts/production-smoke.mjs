@@ -1,3 +1,4 @@
+import {mkdir,writeFile} from "node:fs/promises";
 const baseUrl = (process.env.COMPANARO_URL || "https://luma-companion.prakhargupta267.workers.dev").replace(/\/$/, "");
 
 const results = [];
@@ -244,4 +245,9 @@ await run("account create, sync, export, and delete", async () => {
 
 const failures = results.filter((result) => !result.passed);
 console.log(`\n${results.length - failures.length}/${results.length} production smoke checks passed.`);
+if(process.env.QA_DIRECTORY){
+  const directory=new URL(process.env.QA_DIRECTORY,new URL("../../../",import.meta.url));
+  await mkdir(directory,{recursive:true});
+  await writeFile(new URL("production-smoke.json",directory),JSON.stringify({at:new Date().toISOString(),baseUrl,passed:results.length-failures.length,total:results.length,results},null,2));
+}
 if (failures.length) process.exitCode = 1;
