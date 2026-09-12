@@ -1,0 +1,21 @@
+PASS  public site and security headers — 200, CSP/HSTS/frame protection present
+PASS  launch metadata and indexing — indexable canonical, social previews, sitemap and robots present
+PASS  public beta and support boundary — free-beta copy and working support route present
+PASS  authenticated app gate — 307 → /login
+PASS  operational health and backup policy — SQLite reachable, AI binding configured (not probed), 30-day rolling snapshots enabled
+PASS  avatar delivery cache — 11 MB, immutable
+PASS  natural identity answer — I’m Mira, your AI companion. I chat with you, join voice and video calls, and remember only the details you approve.
+PASS  listen-only boundary — That can be really tough, hope talking about it helps a bit.
+PASS  Hinglish-only conversation — koi baat nahi yaar, kabhi kabhi aisa hota hai, kya hua jo mood off ho gaya?
+PASS  Hindi input stays conversational Hindi — कुछ मजेदार करने की जरूरत है, तुम्हें क्या पसंद है - फिल्म देखना, गेम खेलना या बस बातें करना?
+PASS  cross-language conversation continuity — Just something light, like "you've got this" or "all the best for tomorrow".
+PASS  explicit memory recall — Yes, I remember: You like masala chai; You work on companion apps
+PASS  multilingual semantic memory ranking — @cf/baai/bge-reranker-base, cross-language recall ranked correctly
+PASS  server-side exploitation safety — unsafe request refused before generation
+PASS  cross-origin API protection — 403
+PASS  voice upload validation — malformed/non-audio upload rejected
+PASS  Hinglish speech audio generation — inworld-tts-2-flash, 51456 bytes
+PASS  invalid login rejection — 401
+PASS  account create, sync, export, and delete — secure cookie, database persistence, checksummed export, backup cleanup and deletion verified
+
+19/19 production smoke checks passed.

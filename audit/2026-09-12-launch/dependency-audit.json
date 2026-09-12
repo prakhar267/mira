@@ -1,0 +1,57 @@
+{
+  "at": "2026-09-12T15:31:16.780Z",
+  "scope": "Workspace production dependency graph; webPaths identify deployed-web dependency chains, not exploitability",
+  "findings": [
+    {
+      "name": "effect",
+      "severity": "high",
+      "patched": ">=3.20.0",
+      "url": "https://github.com/advisories/GHSA-38f7-945m-qr2g",
+      "webPaths": []
+    },
+    {
+      "name": "uuid",
+      "severity": "moderate",
+      "patched": ">=11.1.1",
+      "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+      "webPaths": []
+    },
+    {
+      "name": "esbuild",
+      "severity": "low",
+      "patched": ">=0.28.1",
+      "url": "https://github.com/advisories/GHSA-g7r4-m6w7-qqqr",
+      "webPaths": [
+        "apps__web>@vinext/cloudflare>vinext>@vitejs/plugin-react>vite>tsx>esbuild",
+        "apps__web>@vinext/cloudflare>vinext>vite>tsx>esbuild",
+        "apps__web>@vinext/cloudflare>vinext>@vitejs/plugin-rsc>vite>tsx>esbuild",
+        "apps__web>@vinext/cloudflare>vinext>@vitejs/plugin-rsc>vitefu>vite>tsx>esbuild",
+        "apps__web>vinext>@vitejs/plugin-react>vite>tsx>esbuild",
+        "apps__web>vinext>vite>tsx>esbuild",
+        "apps__web>vinext>@vitejs/plugin-rsc>vite>tsx>esbuild",
+        "apps__web>vinext>@vitejs/plugin-rsc>vitefu>vite>tsx>esbuild"
+      ]
+    },
+    {
+      "name": "image-size",
+      "severity": "high",
+      "patched": ">=2.0.3",
+      "url": "https://github.com/advisories/GHSA-w3rx-r6r6-pgpr",
+      "webPaths": []
+    },
+    {
+      "name": "image-size",
+      "severity": "high",
+      "patched": ">=2.0.3",
+      "url": "https://github.com/advisories/GHSA-5p2g-fcmc-qvqq",
+      "webPaths": []
+    },
+    {
+      "name": "deepmerge-ts",
+      "severity": "high",
+      "patched": ">=8.0.0",
+      "url": "https://github.com/advisories/GHSA-ggr8-5vv4-36mx",
+      "webPaths": []
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+$ turbo lint
+• turbo 2.10.12
+
+   • Packages in scope: @companion/ai, @companion/analytics, @companion/api, @companion/avatar, @companion/config, @companion/db, @companion/mobile, @companion/shared, @companion/ui, @companion/voice, @companion/web, @companion/worker
+   • Running lint in 12 packages
+   • Remote caching disabled
+
+@companion/shared:lint: cache hit, replaying logs 120cb528e204bd2a
+@companion/voice:lint: cache hit, replaying logs 485140fb085b913b
+@companion/analytics:lint: cache hit, replaying logs 35164a667fcacb1b
+@companion/avatar:lint: cache hit, replaying logs b8a56f4c2696d0c5
+@companion/config:lint: cache hit, replaying logs c467e3030267f977
+@companion/ui:lint: cache hit, replaying logs dd63ab0c90f401d2
+@companion/voice:lint: $ tsc --noEmit
+@companion/avatar:lint: $ tsc --noEmit
+@companion/mobile:lint: cache hit, replaying logs a0069b80bafa6832
+@companion/analytics:lint: $ tsc --noEmit
+@companion/config:lint: $ tsc --noEmit
+@companion/shared:lint: $ tsc --noEmit
+@companion/ui:lint: $ tsc --noEmit
+@companion/mobile:lint: $ tsc --noEmit
+@companion/ai:lint: cache hit, replaying logs 82fd11f09affb09f
+@companion/ai:lint: $ tsc --noEmit
+@companion/worker:lint: cache hit, replaying logs 4a8b0243bbc2291e
+@companion/db:lint: cache hit, replaying logs d94365a69736d010
+@companion/worker:lint: $ tsc --noEmit
+@companion/web:lint: cache miss, executing b620c9372210a4e5
+@companion/db:lint: $ tsc --noEmit
+@companion/api:lint: cache hit, replaying logs 42477ea465e5920f
+@companion/api:lint: $ tsc --noEmit
+@companion/web:lint: $ eslint . --max-warnings 0
+
+ Tasks:    12 successful, 12 total
+Cached:    11 cached, 12 total
+  Time:    3.239s

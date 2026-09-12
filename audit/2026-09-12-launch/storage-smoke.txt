@@ -1,0 +1,11 @@
+Verified 2026-09-12T15:47:41.510Z after the production rollback drill.
+PASS signup 201
+PASS write state
+PASS read after write without stale KV cache
+PASS ignore forged plan; preserve free beta call access
+PASS checksummed export
+PASS delete account and application snapshots
+PASS revoked session cannot read
+PASS late autosave cannot recreate deleted account
+PASS deleted account cannot sign in
+PASS operator inbox denies anonymous access

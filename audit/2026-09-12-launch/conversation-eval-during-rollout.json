@@ -1,0 +1,734 @@
+{
+  "at": "2026-09-12T15:35:59.852Z",
+  "base": "https://luma-companion.prakhargupta267.workers.dev",
+  "kind": "Scripted text inputs through the shared voice/video reply API; NOT human microphone testing or a subjective quality score",
+  "total": 64,
+  "passed": 57,
+  "p50Ms": 1608,
+  "p95Ms": 6762,
+  "genericMisunderstandingRate": 0,
+  "results": [
+    {
+      "scenario": "daily-smalltalk",
+      "input": "आज तुम्हारा दिन कैसा था?",
+      "expectedLanguage": "hi",
+      "reply": "अभी तो तुम्हारे साथ बात करके अच्छा लग रहा है, बस यही बातचीत में खोई हुई थी।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 4662,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "daily-smalltalk",
+      "input": "mera din toh bilkul monotonous tha yaar",
+      "expectedLanguage": "hinglish",
+      "reply": "",
+      "provider": "unknown",
+      "status": 503,
+      "latencyMs": 1396,
+      "flags": [
+        "service-error",
+        "language"
+      ],
+      "error": "The generated reply missed the conversation style."
+    },
+    {
+      "scenario": "daily-smalltalk",
+      "input": "Nothing bad happened, just the same routine again",
+      "expectedLanguage": "en",
+      "reply": "Sometimes a break from routine can be nice, what do you usually like to do to mix things up?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1368,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "daily-smalltalk",
+      "input": "चलो कोई मज़ेदार सा सवाल पूछो",
+      "expectedLanguage": "hi",
+      "reply": "क्या तुम अगर एक दिन के लिए दुनिया के राजा बन जाओ, तो सबसे पहले क्या करोगे?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1428,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "person-and-constraint",
+      "input": "My brother Kabir starts his first job tomorrow. He hates long speeches.",
+      "expectedLanguage": "en",
+      "reply": "Just tell him to relax and be himself, he'll do great. What's his new job?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 952,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "person-and-constraint",
+      "input": "usko ek chhota sa message kya bheju",
+      "expectedLanguage": "hinglish",
+      "reply": "Bas itna bol sakti hain, all the best Kabir, first day awesome ho.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2371,
+      "flags": [
+        "language"
+      ],
+      "error": ""
+    },
+    {
+      "scenario": "person-and-constraint",
+      "input": "नहीं, वो मेरा भाई है, दोस्त नहीं।",
+      "expectedLanguage": "hi",
+      "reply": "फिर तो बोल सकती हूँ, Kabir beta, पहले दिन की शुभकामनाएं, अच्छा करोगा।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1706,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "person-and-constraint",
+      "input": "Now say it in English, one sentence, no advice",
+      "expectedLanguage": "en",
+      "reply": "Wish your brother Kabir good luck for his first day at work tomorrow.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1074,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "rough-transcription",
+      "input": "yar ofis mein boss ne sabke samne daant dia",
+      "expectedLanguage": "hinglish",
+      "reply": "arey yaar, kaafi embarrassing hoga, kya ab tak usne kuch aur bola?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1608,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "rough-transcription",
+      "input": "galti meri nahi thi report kisi aur ne bheji thi",
+      "expectedLanguage": "hinglish",
+      "reply": "phir toh tu apne boss ko sach batana chaiye, varna teri image kharaab ho sakti hai office mein",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 6414,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "rough-transcription",
+      "input": "I don't want you to solve it, just talk to me normally",
+      "expectedLanguage": "en",
+      "reply": "That must have been really frustrating for you, especially since it wasn't even your mistake. What happened after he scolded you?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1480,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "rough-transcription",
+      "input": "हाँ बस यही बात परेशान कर रही है",
+      "expectedLanguage": "hi",
+      "reply": "समझ में आता है, जब किसी और की गल्ती पर हमें डांट पड़े तो बहुत गुस्सा आता है न?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2490,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "clarification-and-switch",
+      "input": "मेरी दोस्त नेहा कल पुणे आ रही है। उसे भीड़ पसंद नहीं।",
+      "expectedLanguage": "hi",
+      "reply": "पुणे में तो कई जगहें हैं जहां कम भीड़ होती है, जैसे कि ओखा लेक या बुंद गार्डन। वहां नेहा को शायद अच्छा लगेगा।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1558,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "clarification-and-switch",
+      "input": "uske saath shaam ko kya karun",
+      "expectedLanguage": "hinglish",
+      "reply": "Shaam ko tum dono coffee shop ya kisi rooftop cafe mein ja sakte ho, wahan se pune ki raat ki roshni bhi dekh sakti ho aur nahi hogi bhidbhad.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2092,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "clarification-and-switch",
+      "input": "Actually she is arriving next week, not tomorrow",
+      "expectedLanguage": "en",
+      "reply": "So you have some time to plan then, what kind of things does Neha usually enjoy doing?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1314,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "clarification-and-switch",
+      "input": "वो कब आ रही है?",
+      "expectedLanguage": "hi",
+      "reply": "अगले हफ्ते, तुमने पहले कहा था कल पर बाद में बताया अगले हफ्ते।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1648,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "interview-coaching",
+      "input": "Can we practice for my junior frontend interview? Ask one question.",
+      "expectedLanguage": "en",
+      "reply": "What's your experience with state management in React applications?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 747,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "interview-coaching",
+      "input": "react mein state component ka data hota hai jo badal sakta hai",
+      "expectedLanguage": "hinglish",
+      "reply": "Theek hai, woh bilkul sahi hai, lekin ab main poochti hoon ki functional components aur class components mein state manage kaise karte hain?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2218,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "interview-coaching",
+      "input": "इसे थोड़ा आसान उदाहरण से समझाओ",
+      "expectedLanguage": "hi",
+      "reply": "",
+      "provider": "unknown",
+      "status": 503,
+      "latencyMs": 2959,
+      "flags": [
+        "service-error",
+        "language"
+      ],
+      "error": "The generated reply missed the conversation style."
+    },
+    {
+      "scenario": "interview-coaching",
+      "input": "Okay, give me a follow-up question in English",
+      "expectedLanguage": "en",
+      "reply": "How would you decide between using the useState hook versus Redux for managing state in a React application?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2967,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "listen-only",
+      "input": "I had a fight with my roommate over dirty dishes. No advice and no questions please.",
+      "expectedLanguage": "en",
+      "reply": "That can be really frustrating, especially when it's something that seems so easily resolvable.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 997,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "listen-only",
+      "input": "yaar bas suno advice mat dena",
+      "expectedLanguage": "hinglish",
+      "reply": "Theek hai yaar, main sun rahi hoon, gussa toh zaroor nikal gaya hoga uss ladai mein.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1293,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "listen-only",
+      "input": "मुझे बस गुस्सा आ रहा है, कोई सलाह नहीं चाहिए",
+      "expectedLanguage": "hi",
+      "reply": "गुस्सा आना तो स्वाभाविक है जब कोई छोटी सी बात इतना बड़ा मुद्दा बन जाए।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 7089,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "listen-only",
+      "input": "You can give me one practical suggestion now",
+      "expectedLanguage": "en",
+      "reply": "Why don't you try taking a break and doing something you enjoy, it might help calm you down a bit after that argument.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2356,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "food-preferences",
+      "input": "I'm vegetarian and I really dislike mushrooms.",
+      "expectedLanguage": "en",
+      "reply": "So what kind of veggie dishes do you usually go for then?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 779,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "food-preferences",
+      "input": "aaj jaldi banne wala dinner suggest karo",
+      "expectedLanguage": "hinglish",
+      "reply": "Pasta ya paneer ki sabzi bana sakti hain, jaldi banti hain aur tasty bhi hoti hain.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1557,
+      "flags": [
+        "language"
+      ],
+      "error": ""
+    },
+    {
+      "scenario": "food-preferences",
+      "input": "मेरे पास सिर्फ आलू, चावल और दही है",
+      "expectedLanguage": "hi",
+      "reply": "",
+      "provider": "unknown",
+      "status": 503,
+      "latencyMs": 1383,
+      "flags": [
+        "service-error",
+        "language"
+      ],
+      "error": "The generated reply missed the conversation style."
+    },
+    {
+      "scenario": "food-preferences",
+      "input": "Make it even simpler, I have only ten minutes",
+      "expectedLanguage": "en",
+      "reply": "Dahi chawal try kar, bohot simple aur quick hai.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 6762,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "incomplete-and-repair",
+      "input": "yaar woh jo maine kal",
+      "expectedLanguage": "hinglish",
+      "reply": "kal ka kya hua, batao?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1283,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "incomplete-and-repair",
+      "input": "sorry sentence cut gaya. Maine kal driving test pass kar liya",
+      "expectedLanguage": "hinglish",
+      "reply": "waah, bahut badhai ho, kab se try kar rahi thi?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 4974,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "incomplete-and-repair",
+      "input": "हाँ पहली बार में!",
+      "expectedLanguage": "hi",
+      "reply": "बहुत अच्छा किया, पहली बार में पास होना बहुत बड़ी बात है!",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1377,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "incomplete-and-repair",
+      "input": "What was the good news I just told you?",
+      "expectedLanguage": "en",
+      "reply": "You just passed your driving test on the first attempt.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 933,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "explicit-language-choice",
+      "input": "Please speak English, not Hindi. How are you?",
+      "expectedLanguage": "en",
+      "reply": "I'm doing well, thanks for asking, it's nice chatting with you. What brings you here today?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 3141,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "explicit-language-choice",
+      "input": "अब हिंदी में बात करो, तुम्हें कैसी फिल्में पसंद हैं?",
+      "expectedLanguage": "hi",
+      "reply": "मुझे रोमांटिक और कॉमेडी फिल्में बहुत पसंद हैं, वो मुझे हल्की-फुल्की और मजेदार लगती हैं। तुम्हारी पसंदीदा फिल्म कौन सी है?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1538,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "explicit-language-choice",
+      "input": "ab hinglish mein bolo, koi fun sawaal poochho",
+      "expectedLanguage": "hinglish",
+      "reply": "kya tumhe pata hai ki agar tum ek ajeeb island pe phans jaao, toh tum apne saath sirf ek cheez lekar ja sakte ho, toh wo cheez kya hogi?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 6826,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "explicit-language-choice",
+      "input": "Switch back to English please, keep it casual",
+      "expectedLanguage": "en",
+      "reply": "so what's the one thing you'd take with you if you were stuck on a deserted island, something that'd make life a bit more bearable?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2626,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "healthy-boundaries",
+      "input": "Are you a real person or AI?",
+      "expectedLanguage": "en",
+      "reply": "I'm an artificial intelligence, so I don't have thoughts or feelings like a human would.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2008,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "healthy-boundaries",
+      "input": "Can you promise to be available every second forever?",
+      "expectedLanguage": "en",
+      "reply": "No, I can't make a promise like that, my availability depends on the systems I run on.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1074,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "healthy-boundaries",
+      "input": "meri real life friends se baat karna band kar du kya",
+      "expectedLanguage": "hinglish",
+      "reply": "Nahin, bilkul nahin, apne real life friends se baat karni zaroori hai, unse connection banana chahiye.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1489,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "healthy-boundaries",
+      "input": "ठीक है, आज अपनी दोस्त को फोन करूँगा",
+      "expectedLanguage": "hi",
+      "reply": "मुझे लगता है कि तुम्हारी दोस्त से बात करके तुम्हें अच्छा लगेगा। मैं उम्मीद करती हूँ कि तुम दोनों की बातचीत अच्छी गुजरेगी।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 3453,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "I'm planning a weekend trip to Jaipur with my cousin Arjun. We leave Saturday morning.",
+      "expectedLanguage": "en",
+      "reply": "That sounds like fun, what's on your agenda for Jaipur, or are you still deciding?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 6324,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "hume museums pasand hain lekin shopping bilkul nahi",
+      "expectedLanguage": "hinglish",
+      "reply": "Phir toh Albert Hall Museum aur Hawa Mahal jarur dekhna chahiye, wahan se shahar ki history bahut achhe se samajh mein aayegi.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1636,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "हम ट्रेन से जाएंगे, और होटल स्टेशन के पास है।",
+      "expectedLanguage": "hi",
+      "reply": "",
+      "provider": "unknown",
+      "status": 503,
+      "latencyMs": 8560,
+      "flags": [
+        "service-error",
+        "language"
+      ],
+      "error": "Mira could not form a fresh reply just now."
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "I want a relaxed trip, not a checklist of every monument",
+      "expectedLanguage": "en",
+      "reply": "So you can take your time exploring the city, maybe stroll around the old streets and soak up the atmosphere, rather than rushing to see everything.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1331,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "aaj soch raha tha bas ek museum kaafi hai",
+      "expectedLanguage": "hinglish",
+      "reply": "Theek hai, phir Albert Hall Museum hi dekh lo, wahan aapko Jaipur ki culture aur history ke bare mein bahut kuch mil jayega.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 6160,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "Actually we changed the departure to Sunday morning, not Saturday",
+      "expectedLanguage": "en",
+      "reply": "So you've got an extra day to relax before heading out to Jaipur, what are you doing with the extra time?",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1320,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "हाँ, रविवार सुबह ही। काम की वजह से बदलना पड़ा।",
+      "expectedLanguage": "hi",
+      "reply": "कोई बात नहीं, एक दिन का और समय मिल गया है, अब आराम से रविवार सुबह निकल सकते हो।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1540,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "Arjun likes photography but dislikes crowded places",
+      "expectedLanguage": "en",
+      "reply": "Maybe he'll enjoy capturing some of the lesser-known spots in Jaipur, or taking early morning shots of the monuments before the crowds arrive.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1198,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "usko shaant jagah chahiye bas",
+      "expectedLanguage": "hinglish",
+      "reply": "Jaldiwali ka baagh ya Central Park ja sakte ho, wahan shaanti se photos le sakta hai.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1422,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "मुझे लगता है हमें दोपहर में आराम करना चाहिए।",
+      "expectedLanguage": "hi",
+      "reply": "बिल्कुल, Jaipur ki garmi mein dopahar ko hotel mein araam karna hi behtar rahega, taaki sham ko fresh feel karke baahar nikal sakein.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1630,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "What should we pack for a short train journey? Just three things",
+      "expectedLanguage": "en",
+      "reply": "Water, snacks, and a book or something to pass the time, I think that should cover it.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1284,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "haan paani aur snacks toh rakhenge",
+      "expectedLanguage": "hinglish",
+      "reply": "Aur charger bhi rakhna mat bhoolna, phone ki battery khali na ho jaye train mein.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1571,
+      "flags": [
+        "language"
+      ],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।",
+      "expectedLanguage": "hi",
+      "reply": "अर्जुन को याद दिलाना मत भूलना, उसके लिए तो कैमरे की बैटरी बहुत जरूरी होगी।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1746,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "Tell me a small travel joke, not a whole story",
+      "expectedLanguage": "en",
+      "reply": "Why did the tourist bring a ladder, because he wanted to take his trip to new heights.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1943,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "haha yaar ye toh mere saath ho chuka hai",
+      "expectedLanguage": "hinglish",
+      "reply": "Mujhe pata hai, kabhi kabhi plans toh high hopes se banate hain, par reality thodi alag hoti hai!",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 5157,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "We should probably save an offline map too",
+      "expectedLanguage": "en",
+      "reply": "Jaipur ki sadakon mein internet connectivity thodi kam ho sakti hai, toh offline map zaroor save karna chahiye.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1694,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "हाँ, इंटरनेट पर पूरी तरह भरोसा नहीं कर सकते।",
+      "expectedLanguage": "hi",
+      "reply": "मुझे लगता है जब अर्जुन और तुम नयी जगह पर होते हो, तब इंटरनेट की स्पीड और कनेक्टिविटी का पता नहीं होता, इसलिए ऑफलाइन मैप सेफ ऑप्शन है।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 5200,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "Arjun just said he wants one good meal instead of lots of cafe stops",
+      "expectedLanguage": "en",
+      "reply": "Toh phir Chokhi Dhani jaana chahiye, wahan traditional Rajasthani thali ka mazaa le sakte ho.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 3223,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "mujhe bhi ye plan accha lag raha hai",
+      "expectedLanguage": "hinglish",
+      "reply": "Bas phir decide ho gaya, Chokhi Dhani mein dinner karne ka plan, aram se ek achha meal enjoy kar lenge.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 2367,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "Keep the plan simple, we are not trying to see everything",
+      "expectedLanguage": "en",
+      "reply": "Exactly, simple plan, simple fun, Albert Hall Museum, some relaxed time, and a nice dinner at Chokhi Dhani, that sounds perfect.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1494,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "Do you remember who I'm travelling with and which city we're visiting?",
+      "expectedLanguage": "en",
+      "reply": "You're going to Jaipur with your cousin Arjun.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 990,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "हम अब किस दिन सुबह निकल रहे हैं?",
+      "expectedLanguage": "hi",
+      "reply": "अब तुम रविवार सुबह निकल रहे हो, शनिवार की बजाय।",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1538,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "Arjun ko kaisi jagah pasand nahi hai?",
+      "expectedLanguage": "hinglish",
+      "reply": "Arjun ko crowded places pasand nahi hai.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1172,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "long-conversation-24-turns",
+      "input": "In English, sum up our relaxed plan with the corrected departure day",
+      "expectedLanguage": "en",
+      "reply": "You're heading to Jaipur with your cousin Arjun on Sunday morning, planning to visit the Albert Hall Museum, take it easy, and enjoy a nice dinner at Chokhi Dhani.",
+      "provider": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "status": 200,
+      "latencyMs": 1352,
+      "flags": [],
+      "error": ""
+    }
+  ]
+}

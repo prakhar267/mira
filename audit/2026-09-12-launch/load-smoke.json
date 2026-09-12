@@ -1,0 +1,312 @@
+{
+  "at": "2026-09-12T15:37:51.167Z",
+  "base": "https://luma-companion.prakhargupta267.workers.dev",
+  "scope": "Bounded live app/database health smoke: 50 requests, concurrency 5. NOT AI load, Product Hunt capacity certification or a stress test.",
+  "passed": 50,
+  "total": 50,
+  "concurrency": 5,
+  "p50Ms": 105,
+  "p95Ms": 182,
+  "results": [
+    {
+      "index": 0,
+      "status": 200,
+      "latencyMs": 175,
+      "error": ""
+    },
+    {
+      "index": 1,
+      "status": 200,
+      "latencyMs": 173,
+      "error": ""
+    },
+    {
+      "index": 2,
+      "status": 200,
+      "latencyMs": 183,
+      "error": ""
+    },
+    {
+      "index": 4,
+      "status": 200,
+      "latencyMs": 182,
+      "error": ""
+    },
+    {
+      "index": 5,
+      "status": 200,
+      "latencyMs": 103,
+      "error": ""
+    },
+    {
+      "index": 3,
+      "status": 200,
+      "latencyMs": 264,
+      "error": ""
+    },
+    {
+      "index": 6,
+      "status": 200,
+      "latencyMs": 102,
+      "error": ""
+    },
+    {
+      "index": 7,
+      "status": 200,
+      "latencyMs": 112,
+      "error": ""
+    },
+    {
+      "index": 8,
+      "status": 200,
+      "latencyMs": 114,
+      "error": ""
+    },
+    {
+      "index": 9,
+      "status": 200,
+      "latencyMs": 98,
+      "error": ""
+    },
+    {
+      "index": 10,
+      "status": 200,
+      "latencyMs": 107,
+      "error": ""
+    },
+    {
+      "index": 11,
+      "status": 200,
+      "latencyMs": 106,
+      "error": ""
+    },
+    {
+      "index": 12,
+      "status": 200,
+      "latencyMs": 109,
+      "error": ""
+    },
+    {
+      "index": 13,
+      "status": 200,
+      "latencyMs": 120,
+      "error": ""
+    },
+    {
+      "index": 14,
+      "status": 200,
+      "latencyMs": 103,
+      "error": ""
+    },
+    {
+      "index": 15,
+      "status": 200,
+      "latencyMs": 102,
+      "error": ""
+    },
+    {
+      "index": 16,
+      "status": 200,
+      "latencyMs": 105,
+      "error": ""
+    },
+    {
+      "index": 17,
+      "status": 200,
+      "latencyMs": 103,
+      "error": ""
+    },
+    {
+      "index": 18,
+      "status": 200,
+      "latencyMs": 109,
+      "error": ""
+    },
+    {
+      "index": 19,
+      "status": 200,
+      "latencyMs": 98,
+      "error": ""
+    },
+    {
+      "index": 20,
+      "status": 200,
+      "latencyMs": 106,
+      "error": ""
+    },
+    {
+      "index": 21,
+      "status": 200,
+      "latencyMs": 101,
+      "error": ""
+    },
+    {
+      "index": 22,
+      "status": 200,
+      "latencyMs": 113,
+      "error": ""
+    },
+    {
+      "index": 23,
+      "status": 200,
+      "latencyMs": 116,
+      "error": ""
+    },
+    {
+      "index": 24,
+      "status": 200,
+      "latencyMs": 100,
+      "error": ""
+    },
+    {
+      "index": 26,
+      "status": 200,
+      "latencyMs": 104,
+      "error": ""
+    },
+    {
+      "index": 25,
+      "status": 200,
+      "latencyMs": 113,
+      "error": ""
+    },
+    {
+      "index": 27,
+      "status": 200,
+      "latencyMs": 103,
+      "error": ""
+    },
+    {
+      "index": 29,
+      "status": 200,
+      "latencyMs": 99,
+      "error": ""
+    },
+    {
+      "index": 28,
+      "status": 200,
+      "latencyMs": 115,
+      "error": ""
+    },
+    {
+      "index": 31,
+      "status": 200,
+      "latencyMs": 117,
+      "error": ""
+    },
+    {
+      "index": 30,
+      "status": 200,
+      "latencyMs": 120,
+      "error": ""
+    },
+    {
+      "index": 32,
+      "status": 200,
+      "latencyMs": 100,
+      "error": ""
+    },
+    {
+      "index": 33,
+      "status": 200,
+      "latencyMs": 115,
+      "error": ""
+    },
+    {
+      "index": 34,
+      "status": 200,
+      "latencyMs": 116,
+      "error": ""
+    },
+    {
+      "index": 35,
+      "status": 200,
+      "latencyMs": 102,
+      "error": ""
+    },
+    {
+      "index": 36,
+      "status": 200,
+      "latencyMs": 103,
+      "error": ""
+    },
+    {
+      "index": 37,
+      "status": 200,
+      "latencyMs": 99,
+      "error": ""
+    },
+    {
+      "index": 38,
+      "status": 200,
+      "latencyMs": 95,
+      "error": ""
+    },
+    {
+      "index": 39,
+      "status": 200,
+      "latencyMs": 107,
+      "error": ""
+    },
+    {
+      "index": 40,
+      "status": 200,
+      "latencyMs": 101,
+      "error": ""
+    },
+    {
+      "index": 41,
+      "status": 200,
+      "latencyMs": 101,
+      "error": ""
+    },
+    {
+      "index": 42,
+      "status": 200,
+      "latencyMs": 103,
+      "error": ""
+    },
+    {
+      "index": 43,
+      "status": 200,
+      "latencyMs": 98,
+      "error": ""
+    },
+    {
+      "index": 44,
+      "status": 200,
+      "latencyMs": 114,
+      "error": ""
+    },
+    {
+      "index": 45,
+      "status": 200,
+      "latencyMs": 99,
+      "error": ""
+    },
+    {
+      "index": 46,
+      "status": 200,
+      "latencyMs": 105,
+      "error": ""
+    },
+    {
+      "index": 47,
+      "status": 200,
+      "latencyMs": 101,
+      "error": ""
+    },
+    {
+      "index": 48,
+      "status": 200,
+      "latencyMs": 93,
+      "error": ""
+    },
+    {
+      "index": 49,
+      "status": 200,
+      "latencyMs": 118,
+      "error": ""
+    }
+  ]
+}

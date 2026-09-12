@@ -1,0 +1,10 @@
+{
+  "at": "2026-09-12T15:37:13.837Z",
+  "site": "https://luma-companion.prakhargupta267.workers.dev",
+  "fromVersion": "083115a7-932c-4c74-b8fe-0384ac435f12",
+  "toVersion": "e9d6dd89-6ccb-4e25-a6bf-6e17ea74856c",
+  "scope": "Controlled production rollback between two deployments of the same SQLite-compatible source. No schema downgrade or data rollback.",
+  "wranglerResult": "Success; target version deployed to 100% of traffic",
+  "verifiedHealth": {"status":"ok","accountStorage":"sqlite-reachable","demoSchemaVersion":2},
+  "notTested": "Disaster recovery, platform point-in-time restore, rollback to an incompatible schema"
+}
