@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import {buildFreeChatMessages} from "./free-chat";
 import { buildCompanionSystemPrompt, buildContextualDirectReply, buildDayCheckInReply, buildIdentityReply, buildMemoryRecallReply, canUseSavedMemoryReply, detectCompanionLanguage, detectCompanionRequestLanguage, isGenericCompanionReply, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, sanitizeCompanionReplyForDelivery } from "./companion-prompt";
 
 const request = {
@@ -12,6 +13,15 @@ const request = {
 };
 
 describe("edge companion prompting", () => {
+  it("anchors the current call language after history without dropping facts",()=>{
+    const input={...request,messages:[{role:"user" as const,content:"Arjun ko bheed pasand nahi"},{role:"assistant" as const,content:"Haan, shaant jagah choose karenge."},{role:"user" as const,content:"Keep the plan simple, we are not trying to see everything"}]};
+    const messages=buildFreeChatMessages(input);
+    expect(messages[1]).toEqual(input.messages[0]);expect(messages[2]).toEqual(input.messages[1]);
+    expect(messages.at(-1)?.content).toContain("English only (no Hindi words)");
+    expect(input.messages.at(-1)?.content).not.toContain("Application reply setting");
+    expect(buildFreeChatMessages({...input,messages:[{role:"user",content:"हिंदी में बात करो"}]}).at(-1)?.content).toContain("Hindi in Devanagari");
+    expect(buildFreeChatMessages({...input,messages:[{role:"user",content:"ab hinglish mein bolo"}]}).at(-1)?.content).toContain("Hinglish in Roman letters");
+  });
   it("answers simple day check-ins without depending on provider availability",()=>{expect(buildDayCheckInReply("आज तुम्हारा दिन कैसा था?")).toContain("तुम्हारे साथ");expect(buildDayCheckInReply("How was your day?")).toContain("conversation");expect(buildDayCheckInReply("tumhara din kaisa tha")).toContain("tumhare saath");expect(buildDayCheckInReply("My day was rough")).toBeNull();});
   it("forbids the canned listener language seen in the failed call", () => {
     const prompt = buildCompanionSystemPrompt(request);

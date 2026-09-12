@@ -1,7 +1,7 @@
 import { buildDayCheckInReply, buildIdentityReply, buildMemoryRecallReply, canUseSavedMemoryReply, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "@/lib/companion-prompt";
 import { assessSafety } from "@companion/ai";
 import { assertEdgeSameOrigin, containsDisallowedAbuse, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
-import { buildFreeChatSystemPrompt, type FreeChatMessage } from "@/lib/free-chat";
+import { buildFreeChatMessages } from "@/lib/free-chat";
 import { withProviderDeadline } from "@/lib/provider-resilience";
 import { consumeCapacity } from "@/lib/capacity";
 import { readChatStream } from "@/lib/chat-stream";
@@ -83,10 +83,7 @@ export async function POST(request: Request) {
     const dayReply = buildDayCheckInReply(latestUserMessage, expectedLanguage);
     if (dayReply && !suppressQuestions) return respond({reply:dayReply,model:"day-check-in"},200,{model:"day-check-in",language:expectedLanguage});
     await consumeCapacity("chat");
-    const messages: FreeChatMessage[] = [
-      { role: "system", content: buildFreeChatSystemPrompt(input) },
-      ...input.messages,
-    ];
+    const messages = buildFreeChatMessages(input);
     const validReply = (reply: string) => !isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions, expectedLanguage);
     // Anonymous LLM7 is not an approved downstream production service. Use the
     // project's existing Workers AI binding without exposing conversations to it.

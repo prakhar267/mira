@@ -8,6 +8,19 @@ export interface FreeChatMessage {
   content: string;
 }
 
+/** Anchor the current language adjacent to the latest utterance. A long mixed-
+ * language history must supply facts, not override the current turn's language. */
+export function buildFreeChatMessages(input:EdgeCompanionRequest):FreeChatMessage[] {
+  const language=detectCompanionRequestLanguage(input);
+  const label=language==="en"?"English only (no Hindi words)":language==="hi"?"Hindi in Devanagari":"Hinglish in Roman letters";
+  return [
+    {role:"system",content:buildFreeChatSystemPrompt(input)},
+    ...input.messages.map((message,index)=>index===input.messages.length-1?{
+      ...message,content:`${message.content}\n\n[Application reply setting: ${label}. Earlier language choices are context only. Answer the message above directly; do not discuss this setting.]`,
+    }:message),
+  ];
+}
+
 function compact(value: string, limit: number) {
   return value.trim().replace(/\s+/g, " ").slice(0, limit);
 }

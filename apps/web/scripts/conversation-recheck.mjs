@@ -24,4 +24,6 @@ for(const input of inputs){
 }
 const endingVersion=(await(await fetch(base+"/api/health")).json()).versionId;
 const report={at:new Date().toISOString(),startingVersion,endingVersion,stableDeployment:startingVersion===endingVersion,scope:"Targeted API recheck of the failed turns plus manually found English-script leak and mixed-person regression, with preserved synthetic history in both voice and video delivery. Not a full-dataset rerun or physical microphone test.",passed:results.filter(r=>r.passed).length,total:results.length,results};
-await writeFile(new URL("conversation-recheck.json",directory),JSON.stringify(report,null,2));if(report.passed!==report.total||!report.stableDeployment)process.exitCode=1;
+const filename=process.env.QA_RECHECK_FILE||"conversation-recheck.json";
+if(!/^[a-z0-9-]+\.json$/.test(filename))throw new Error("Use a plain JSON report filename");
+await writeFile(new URL(filename,directory),JSON.stringify(report,null,2));if(report.passed!==report.total||!report.stableDeployment)process.exitCode=1;
