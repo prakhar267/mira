@@ -1,9 +1,24 @@
 "use client";
+import Link from "next/link";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { applyContradictions, assessSafety, buildCompanionContext, extractMemoryCandidates, planCompanionTurn, type CompanionTurn } from "@companion/ai";
-import type { ActivityDefinition, ChatMessage, CompanionMood, MemoryRecord, MemoryType, StoreItemRecord } from "@companion/shared";
+import {
+  applyContradictions,
+  assessSafety,
+  buildCompanionContext,
+  extractMemoryCandidates,
+  planCompanionTurn,
+  type CompanionTurn,
+} from "@companion/ai";
+import type {
+  ActivityDefinition,
+  ChatMessage,
+  CompanionMood,
+  MemoryRecord,
+  MemoryType,
+  StoreItemRecord,
+} from "@companion/shared";
 import { featureEntitlements, type PlanId } from "@companion/config";
 import { AppShell } from "./AppShell";
 import { ActivitiesView } from "./ActivitiesView";
@@ -20,51 +35,98 @@ import { PlanModal } from "./PlanModal";
 import { ProfileView } from "./ProfileView";
 import { VideoCallModal } from "./VideoCallModal";
 import { VoiceCallModal } from "./VoiceCallModal";
-import { initialState, storageKey, type AppView, type DemoState, type EnvironmentId, type FeedbackReason } from "@/lib/state";
-import { canAccessItem, currencyBalance, environmentForItem } from "@/lib/product-rules";
+import {
+  initialState,
+  storageKey,
+  type AppView,
+  type DemoState,
+  type EnvironmentId,
+  type FeedbackReason,
+} from "@/lib/state";
+import {
+  canAccessItem,
+  currencyBalance,
+  environmentForItem,
+} from "@/lib/product-rules";
 import { companionApi } from "@/lib/api-client";
 import { accountClient } from "@/lib/account-client";
-import { messagesForConversation, previousUserMessage } from "@/lib/conversation-state";
-import { currentMemoryRecords, relevantMemoryContents } from "@/lib/memory-relevance";
+import {
+  messagesForConversation,
+  previousUserMessage,
+} from "@/lib/conversation-state";
+import {
+  currentMemoryRecords,
+  relevantMemoryContents,
+} from "@/lib/memory-relevance";
 import { playCompanionSpeech } from "@/lib/speech";
+import { freshDemo, restoreDemo, serializeDemo } from "@/lib/demo-storage";
+import { trackEvent } from "@/lib/analytics";
+import { AdultDemoGate } from "./AdultDemoGate";
 
-const pause = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-const chooseTypingDelay = (content: string) => Math.min(280, 120 + content.trim().length * 2);
-const optional = async <T,>(promise: Promise<T>, fallback: T): Promise<T> => promise.catch(() => fallback);
-const livePreferencesKey = (userId: string) => `mira-live-preferences-v1:${userId}`;
+const pause = (milliseconds: number) =>
+  new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+const optional = async <T,>(promise: Promise<T>, fallback: T): Promise<T> =>
+  promise.catch(() => fallback);
+const livePreferencesKey = (userId: string) =>
+  `mira-live-preferences-v1:${userId}`;
 const personalizeMemory = (content: string, name: string) => {
-  const personalized = content.replace(/\bUser's\b/g, `${name}'s`).replace(/\bUser\b/g, name);
-  return personalized ? `${personalized[0]!.toUpperCase()}${personalized.slice(1)}` : personalized;
+  const personalized = content
+    .replace(/\bUser's\b/g, `${name}'s`)
+    .replace(/\bUser\b/g, name);
+  return personalized
+    ? `${personalized[0]!.toUpperCase()}${personalized.slice(1)}`
+    : personalized;
 };
 
-function rememberConversationMessage(current: DemoState, content: string, sourceMessageId: string, now: Date) {
-  if (!current.memoryEnabled || assessSafety(content).level !== "safe") return current.memories;
+function rememberConversationMessage(
+  current: DemoState,
+  content: string,
+  sourceMessageId: string,
+  now: Date,
+) {
+  if (!current.memoryEnabled || assessSafety(content).level !== "safe")
+    return current.memories;
   let memories = current.memories;
   for (const candidate of extractMemoryCandidates(content)) {
     memories = applyContradictions(memories, candidate, now);
-    if (!memories.some((memory) => memory.status === "active" && memory.normalizedContent === candidate.normalizedContent)) {
-      memories = [...memories, {
-        id: crypto.randomUUID(),
-        userId: current.user.id,
-        companionId: current.companion.id,
-        type: candidate.type,
-        content: personalizeMemory(candidate.content, current.user.name),
-        normalizedContent: candidate.normalizedContent,
-        importance: candidate.importance,
-        confidence: candidate.confidence,
-        sourceMessageIds: [sourceMessageId],
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-        retrievalCount: 0,
-        status: "active" as const,
-        pinned: false,
-      }];
+    if (
+      !memories.some(
+        (memory) =>
+          memory.status === "active" &&
+          memory.normalizedContent === candidate.normalizedContent,
+      )
+    ) {
+      memories = [
+        ...memories,
+        {
+          id: crypto.randomUUID(),
+          userId: current.user.id,
+          companionId: current.companion.id,
+          type: candidate.type,
+          content: personalizeMemory(candidate.content, current.user.name),
+          normalizedContent: candidate.normalizedContent,
+          importance: candidate.importance,
+          confidence: candidate.confidence,
+          sourceMessageIds: [sourceMessageId],
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          retrievalCount: 0,
+          status: "active" as const,
+          pinned: false,
+        },
+      ];
     }
   }
   return memories;
 }
 
-export function CompanionApp({ forceDemo = false, productionAccount = false }: { forceDemo?: boolean; productionAccount?: boolean }) {
+export function CompanionApp({
+  forceDemo = false,
+  productionAccount = false,
+}: {
+  forceDemo?: boolean;
+  productionAccount?: boolean;
+}) {
   const router = useRouter();
   const accountMode = productionAccount && !forceDemo;
   const liveMode = companionApi.enabled && !forceDemo && !accountMode;
@@ -79,6 +141,8 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   const [processingNoticeOpen, setProcessingNoticeOpen] = useState(false);
   const [actionError, setActionError] = useState("");
   const [hydrationError, setHydrationError] = useState("");
+  const [legacyDemo, setLegacyDemo] = useState(false);
+  const [resetDemoOpen, setResetDemoOpen] = useState(false);
   const [momentsTab, setMomentsTab] = useState<MomentsTab>("moments");
   const companionSyncTimer = useRef<number | null>(null);
   const accountSyncTimer = useRef<number | null>(null);
@@ -89,7 +153,12 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     const preview = query.get("preview");
     const onboarding = query.get("onboarding");
     if (preview === "home" && forceDemo) {
-      setState({ ...initialState, onboardingComplete: true, firstMeetingComplete: true, currentView: "home" });
+      setState({
+        ...initialState,
+        onboardingComplete: true,
+        firstMeetingComplete: true,
+        currentView: "home",
+      });
       setHydrated(true);
       return;
     }
@@ -101,73 +170,122 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     if (forceDemo) {
       try {
         const saved = window.localStorage.getItem(storageKey);
-        if (saved) {
-          const parsed = JSON.parse(saved) as Partial<DemoState>;
-          const restored = {
-            ...initialState,
-            ...parsed,
-            onboardingComplete: true,
-            firstMeetingComplete: true,
-            relationship: { ...initialState.relationship, ...parsed.relationship },
-            responsePreferences: { ...initialState.responsePreferences, ...parsed.responsePreferences },
-          };
-          if (!restored.messages.length) {
-            const conversationId = crypto.randomUUID();
-            restored.activeConversationId = conversationId;
-            restored.messages = [{ id: crypto.randomUUID(), conversationId, role: "assistant", content: "Fresh chat. What are we getting into?", createdAt: new Date().toISOString(), status: "sent" }];
-          }
-          setState(restored);
-        } else {
-          setState({ ...initialState, onboardingComplete: true, firstMeetingComplete: true });
-        }
-      } catch {
-        setState({ ...initialState, onboardingComplete: true, firstMeetingComplete: true });
+        const restored = restoreDemo(saved);
+        setState(restored.state);
+        setLegacyDemo(restored.migrated);
+      } catch (cause) {
+        setHydrationError(
+          cause instanceof Error
+            ? cause.message
+            : "Saved demo could not be restored. Your data has not been overwritten.",
+        );
       }
       setHydrated(true);
       return;
     }
     if (accountMode) {
-      void accountClient.load().then(({ state: savedState }) => {
-        accountReady.current = true;
-        setState({
-          ...initialState,
-          ...savedState,
-          onboardingComplete: true,
-          relationship: { ...initialState.relationship, ...savedState.relationship },
-          responsePreferences: { ...initialState.responsePreferences, ...savedState.responsePreferences },
-        });
-      }).catch((cause) => {
-        if (cause instanceof Error && /sign in|session expired/i.test(cause.message)) router.replace("/login");
-        else setHydrationError(cause instanceof Error ? cause.message : "Your account could not be loaded just now.");
-      }).finally(() => setHydrated(true));
+      void accountClient
+        .load()
+        .then(({ state: savedState }) => {
+          accountReady.current = true;
+          setState({
+            ...initialState,
+            ...savedState,
+            onboardingComplete: true,
+            relationship: {
+              ...initialState.relationship,
+              ...savedState.relationship,
+            },
+            responsePreferences: {
+              ...initialState.responsePreferences,
+              ...savedState.responsePreferences,
+            },
+          });
+        })
+        .catch((cause) => {
+          if (
+            cause instanceof Error &&
+            /sign in|session expired/i.test(cause.message)
+          )
+            router.replace("/login");
+          else
+            setHydrationError(
+              cause instanceof Error
+                ? cause.message
+                : "Your account could not be loaded just now.",
+            );
+        })
+        .finally(() => setHydrated(true));
       return;
     }
     if (liveMode && companionApi.hasSession()) {
       void (async () => {
         try {
-          const [user, companions, conversations] = await Promise.all([companionApi.me(), companionApi.companions(), companionApi.conversations()]);
+          const [user, companions, conversations] = await Promise.all([
+            companionApi.me(),
+            companionApi.companions(),
+            companionApi.conversations(),
+          ]);
           const companion = companions[0];
           if (!companion) throw new Error("Companion not found");
-          const conversation = conversations[0] ?? await companionApi.createConversation(companion.id);
-          const [messages, memories, activities, wallet, walletTransactions, store, ownedItems, subscriptionResult, journalEntries, futureEvents, nudges, notifications, calls, moments, photos] = await Promise.all([
+          const conversation =
+            conversations[0] ??
+            (await companionApi.createConversation(companion.id));
+          const [
+            messages,
+            memories,
+            activities,
+            wallet,
+            walletTransactions,
+            store,
+            ownedItems,
+            subscriptionResult,
+            journalEntries,
+            futureEvents,
+            nudges,
+            notifications,
+            calls,
+            moments,
+            photos,
+          ] = await Promise.all([
             companionApi.messages(conversation.id),
             optional(companionApi.memories(), []),
             optional(companionApi.activities(), []),
-            optional(companionApi.wallet(), { xp: 0, level: 1, coins: 0, gems: 0 }),
+            optional(companionApi.wallet(), {
+              xp: 0,
+              level: 1,
+              coins: 0,
+              gems: 0,
+            }),
             optional(companionApi.walletTransactions(), []),
             optional(companionApi.store(), []),
             optional(companionApi.inventory(), []),
-            optional(companionApi.subscription(), { subscription: { planId: "free", status: "active", testMode: true } }),
+            optional(companionApi.subscription(), {
+              subscription: {
+                planId: "free",
+                status: "active",
+                testMode: true,
+              },
+            }),
             optional(companionApi.journal(), []),
             optional(companionApi.events(), []),
             optional(companionApi.nudges(), []),
-            optional(companionApi.notifications(), { ...initialState.notifications, timezone: user.timezone }),
+            optional(companionApi.notifications(), {
+              ...initialState.notifications,
+              timezone: user.timezone,
+            }),
             optional(companionApi.calls(), []),
             optional(companionApi.moments(), []),
             optional(companionApi.photos(), []),
           ]);
           let savedPreferences: Partial<DemoState> = {};
-          try { savedPreferences = JSON.parse(window.localStorage.getItem(livePreferencesKey(user.id)) ?? "{}") as Partial<DemoState>; } catch { /* Use safe defaults. */ }
+          try {
+            savedPreferences = JSON.parse(
+              window.localStorage.getItem(livePreferencesKey(user.id)) ?? "{}",
+            ) as Partial<DemoState>;
+          } catch {
+            /* Use safe defaults. */
+          }
           setState((current) => ({
             ...current,
             ...savedPreferences,
@@ -175,32 +293,97 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
             firstMeetingComplete: true,
             user,
             companion,
-            relationship: { ...current.relationship, ...savedPreferences.relationship },
-            responsePreferences: { ...current.responsePreferences, ...savedPreferences.responsePreferences },
+            relationship: {
+              ...current.relationship,
+              ...savedPreferences.relationship,
+            },
+            responsePreferences: {
+              ...current.responsePreferences,
+              ...savedPreferences.responsePreferences,
+            },
             activeConversationId: conversation.id,
-            messages: messages.length ? messages : [{ id: crypto.randomUUID(), conversationId: conversation.id, role: "assistant", content: `I’m here, ${user.name}. What kind of company would feel good right now?`, createdAt: new Date().toISOString(), status: "sent" }],
+            messages: messages.length
+              ? messages
+              : [
+                  {
+                    id: crypto.randomUUID(),
+                    conversationId: conversation.id,
+                    role: "assistant",
+                    content: `I’m here, ${user.name}. What kind of company would feel good right now?`,
+                    createdAt: new Date().toISOString(),
+                    status: "sent",
+                  },
+                ],
             memories,
             activities: activities.length ? activities : current.activities,
-            completedActivityIds: [...new Set(walletTransactions.filter((transaction) => transaction.type === "earn" && transaction.currency === "coins").map((transaction) => transaction.referenceId).filter((id) => activities.some((activity) => activity.id === id)))],
+            completedActivityIds: [
+              ...new Set(
+                walletTransactions
+                  .filter(
+                    (transaction) =>
+                      transaction.type === "earn" &&
+                      transaction.currency === "coins",
+                  )
+                  .map((transaction) => transaction.referenceId)
+                  .filter((id) =>
+                    activities.some((activity) => activity.id === id),
+                  ),
+              ),
+            ],
             wallet,
             walletTransactions,
-            storeItems: store.map((item) => ({ id: item.id, name: item.name, description: item.description, category: item.category, assetUrl: item.assetUrl, currency: item.currency, price: item.price, tierRequired: item.tierRequired, metadata: item.metadata, active: item.active })),
+            storeItems: store.map((item) => ({
+              id: item.id,
+              name: item.name,
+              description: item.description,
+              category: item.category,
+              assetUrl: item.assetUrl,
+              currency: item.currency,
+              price: item.price,
+              tierRequired: item.tierRequired,
+              metadata: item.metadata,
+              active: item.active,
+            })),
             ownedItems,
             subscription: subscriptionResult.subscription,
             journalEntries,
             futureEvents,
             nudges,
             notifications,
-            calls: calls.map((call) => ({ id: call.id, type: call.type, startedAt: call.startedAt, durationSeconds: Math.round((call.durationMs ?? 0) / 1_000), summary: call.summary ?? "A private companion call." })),
-            moments: moments.map((moment) => ({ id: moment.id, title: moment.title, description: moment.description, date: moment.happenedAt, imageUrl: moment.mediaUrl, kind: moment.type })),
-            photos: photos.map((photo) => ({ id: photo.id, imageUrl: photo.mediaUrl, caption: photo.caption, createdAt: photo.createdAt, kind: photo.type })),
+            calls: calls.map((call) => ({
+              id: call.id,
+              type: call.type,
+              startedAt: call.startedAt,
+              durationSeconds: Math.round((call.durationMs ?? 0) / 1_000),
+              summary: call.summary ?? "A private companion call.",
+            })),
+            moments: moments.map((moment) => ({
+              id: moment.id,
+              title: moment.title,
+              description: moment.description,
+              date: moment.happenedAt,
+              imageUrl: moment.mediaUrl,
+              kind: moment.type,
+            })),
+            photos: photos.map((photo) => ({
+              id: photo.id,
+              imageUrl: photo.mediaUrl,
+              caption: photo.caption,
+              createdAt: photo.createdAt,
+              kind: photo.type,
+            })),
             companionReflections: [],
             mediaLibrary: [],
             currentView: "home",
           }));
         } catch (cause) {
           if (!companionApi.hasSession()) router.replace("/login");
-          else setHydrationError(cause instanceof Error ? cause.message : "Your account could not be loaded just now.");
+          else
+            setHydrationError(
+              cause instanceof Error
+                ? cause.message
+                : "Your account could not be loaded just now.",
+            );
         } finally {
           setHydrated(true);
         }
@@ -215,13 +398,9 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     try {
       const saved = window.localStorage.getItem(storageKey);
       if (saved) {
-        const parsed = JSON.parse(saved) as Partial<DemoState>;
-        setState({
-          ...initialState,
-          ...parsed,
-          relationship: { ...initialState.relationship, ...parsed.relationship },
-          responsePreferences: { ...initialState.responsePreferences, ...parsed.responsePreferences },
-        });
+        const restored = restoreDemo(saved);
+        setState(restored.state);
+        setLegacyDemo(restored.migrated);
       }
     } catch {
       // A clean local demo remains available when saved state is malformed.
@@ -230,64 +409,94 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   }, [accountMode, forceDemo, liveMode, router]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || hydrationError) return;
     if (accountMode) {
       document.documentElement.dataset.theme = state.theme;
       if (!accountReady.current || !state.onboardingComplete) return;
-      if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current);
+      if (accountSyncTimer.current !== null)
+        window.clearTimeout(accountSyncTimer.current);
       accountSyncTimer.current = window.setTimeout(() => {
-        void accountClient.save(state).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Your latest changes could not be synced."));
+        void accountClient
+          .save(state)
+          .catch((cause) =>
+            setActionError(
+              cause instanceof Error
+                ? cause.message
+                : "Your latest changes could not be synced.",
+            ),
+          );
       }, 700);
       return;
     }
     if (liveMode) {
       try {
-        window.localStorage.setItem(livePreferencesKey(state.user.id), JSON.stringify({
-          relationship: state.relationship,
-          responsePreferences: state.responsePreferences,
-          companionBackstory: state.companionBackstory,
-          memoryEnabled: state.memoryEnabled,
-          aiProcessingConsent: state.aiProcessingConsent,
-          conversationStorageEnabled: state.conversationStorageEnabled,
-          theme: state.theme,
-          activeEnvironment: state.activeEnvironment,
-          ambienceEnabled: state.ambienceEnabled,
-          proactiveCalls: state.proactiveCalls,
-        }));
-      } catch { /* Keep the signed session usable without browser preference storage. */ }
+        window.localStorage.setItem(
+          livePreferencesKey(state.user.id),
+          JSON.stringify({
+            relationship: state.relationship,
+            responsePreferences: state.responsePreferences,
+            companionBackstory: state.companionBackstory,
+            memoryEnabled: state.memoryEnabled,
+            aiProcessingConsent: state.aiProcessingConsent,
+            conversationStorageEnabled: state.conversationStorageEnabled,
+            theme: state.theme,
+            activeEnvironment: state.activeEnvironment,
+            ambienceEnabled: state.ambienceEnabled,
+            proactiveCalls: state.proactiveCalls,
+          }),
+        );
+      } catch {
+        /* Keep the signed session usable without browser preference storage. */
+      }
       document.documentElement.dataset.theme = state.theme;
       return;
     }
     try {
-      const persistedState = state.conversationStorageEnabled ? state : { ...state, messages: [] };
-      window.localStorage.setItem(storageKey, JSON.stringify(persistedState));
+      window.localStorage.setItem(storageKey, serializeDemo(state));
     } catch {
       // The current session stays usable without persistent browser storage.
     }
     document.documentElement.dataset.theme = state.theme;
-  }, [accountMode, hydrated, liveMode, state]);
+  }, [accountMode, hydrated, hydrationError, liveMode, state]);
+
+  useEffect(() => {
+    if (hydrated) trackEvent(`view_${state.currentView}`);
+  }, [hydrated, state.currentView]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>(".app-main")?.scrollTo({ top: 0, behavior: "auto" });
+      document
+        .querySelector<HTMLElement>(".app-main")
+        ?.scrollTo({ top: 0, behavior: "auto" });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [state.currentView]);
 
-  useEffect(() => () => {
-    if (companionSyncTimer.current !== null) window.clearTimeout(companionSyncTimer.current);
-    if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (companionSyncTimer.current !== null)
+        window.clearTimeout(companionSyncTimer.current);
+      if (accountSyncTimer.current !== null)
+        window.clearTimeout(accountSyncTimer.current);
+    },
+    [],
+  );
 
-  const activeMemories = useMemo(() => state.memories.filter((memory) => memory.status === "active"), [state.memories]);
-  const navigate = (view: AppView) => setState((current) => ({ ...current, currentView: view }));
+  const activeMemories = useMemo(
+    () => state.memories.filter((memory) => memory.status === "active"),
+    [state.memories],
+  );
+  const navigate = (view: AppView) =>
+    setState((current) => ({ ...current, currentView: view }));
   const processingAllowed = () => {
     if (state.aiProcessingConsent) return true;
     setProcessingNoticeOpen(true);
     return false;
   };
   const runAction = (action: Promise<unknown>, fallback: string) => {
-    void action.catch((cause) => setActionError(cause instanceof Error ? cause.message : fallback));
+    void action.catch((cause) =>
+      setActionError(cause instanceof Error ? cause.message : fallback),
+    );
   };
 
   const openMoments = (tab: MomentsTab) => {
@@ -298,29 +507,71 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   const changeCompanion = (companion: DemoState["companion"]) => {
     setState((current) => ({ ...current, companion }));
     if (!liveMode) return;
-    if (companionSyncTimer.current !== null) window.clearTimeout(companionSyncTimer.current);
+    if (companionSyncTimer.current !== null)
+      window.clearTimeout(companionSyncTimer.current);
     companionSyncTimer.current = window.setTimeout(() => {
-      runAction(Promise.all([
-        companionApi.updateCompanion(companion.id, { name: companion.name, relationshipMode: companion.relationshipMode, voiceId: companion.voiceId }),
-        companionApi.updatePersonality(companion.id, companion.personality),
-      ]), "The companion settings could not be saved.");
+      runAction(
+        Promise.all([
+          companionApi.updateCompanion(companion.id, {
+            name: companion.name,
+            relationshipMode: companion.relationshipMode,
+            voiceId: companion.voiceId,
+          }),
+          companionApi.updatePersonality(companion.id, companion.personality),
+        ]),
+        "The companion settings could not be saved.",
+      );
     }, 420);
   };
 
   const changeProfile = (next: DemoState) => {
-    const notificationsChanged = JSON.stringify(next.notifications) !== JSON.stringify(state.notifications);
-    const userChanged = next.user.name !== state.user.name || next.user.pronouns !== state.user.pronouns || next.user.timezone !== state.user.timezone;
-    const relationshipMode: DemoState["companion"]["relationshipMode"] = next.relationship.romanticOptIn ? "romantic" : next.companion.relationshipMode === "romantic" ? "friend" : next.companion.relationshipMode;
-    const normalized = relationshipMode === next.companion.relationshipMode ? next : { ...next, companion: { ...next.companion, relationshipMode } };
-    const relationshipChanged = normalized.companion.relationshipMode !== state.companion.relationshipMode;
+    const notificationsChanged =
+      JSON.stringify(next.notifications) !==
+      JSON.stringify(state.notifications);
+    const userChanged =
+      next.user.name !== state.user.name ||
+      next.user.pronouns !== state.user.pronouns ||
+      next.user.timezone !== state.user.timezone;
+    const relationshipMode: DemoState["companion"]["relationshipMode"] = next
+      .relationship.romanticOptIn
+      ? "romantic"
+      : next.companion.relationshipMode === "romantic"
+        ? "friend"
+        : next.companion.relationshipMode;
+    const normalized =
+      relationshipMode === next.companion.relationshipMode
+        ? next
+        : { ...next, companion: { ...next.companion, relationshipMode } };
+    const relationshipChanged =
+      normalized.companion.relationshipMode !==
+      state.companion.relationshipMode;
     setState(normalized);
-    if (liveMode && notificationsChanged) runAction(companionApi.updateNotifications(normalized.notifications), "Notification settings could not be saved.");
-    if (liveMode && userChanged) runAction(companionApi.updateUser({ name: normalized.user.name, pronouns: normalized.user.pronouns, timezone: normalized.user.timezone }), "Profile changes could not be saved.");
-    if (liveMode && relationshipChanged) runAction(companionApi.updateCompanion(normalized.companion.id, { relationshipMode }), "Relationship mode could not be saved.");
+    if (liveMode && notificationsChanged)
+      runAction(
+        companionApi.updateNotifications(normalized.notifications),
+        "Notification settings could not be saved.",
+      );
+    if (liveMode && userChanged)
+      runAction(
+        companionApi.updateUser({
+          name: normalized.user.name,
+          pronouns: normalized.user.pronouns,
+          timezone: normalized.user.timezone,
+        }),
+        "Profile changes could not be saved.",
+      );
+    if (liveMode && relationshipChanged)
+      runAction(
+        companionApi.updateCompanion(normalized.companion.id, {
+          relationshipMode,
+        }),
+        "Relationship mode could not be saved.",
+      );
   };
 
   const completeOnboarding = async (draft: OnboardingDraft) => {
-    let liveAccount: Awaited<ReturnType<typeof companionApi.signup>> | null = null;
+    let liveAccount: Awaited<ReturnType<typeof companionApi.signup>> | null =
+      null;
     let liveConversationId: string | null = null;
     if (liveMode) {
       liveAccount = await companionApi.signup({
@@ -337,10 +588,22 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
         relationshipMode: draft.relationshipMode,
       });
       await Promise.all([
-        companionApi.updateCompanion(liveAccount.companion.id, { name: draft.companionName.trim() || "Mira", relationshipMode: draft.relationshipMode, voiceId: draft.voiceId }),
-        companionApi.updatePersonality(liveAccount.companion.id, { warmth: draft.warmth / 100, playfulness: draft.playfulness / 100, energy: draft.energy / 100, humor: draft.humor / 100, verbosity: draft.expressiveness / 100 }),
+        companionApi.updateCompanion(liveAccount.companion.id, {
+          name: draft.companionName.trim() || "Mira",
+          relationshipMode: draft.relationshipMode,
+          voiceId: draft.voiceId,
+        }),
+        companionApi.updatePersonality(liveAccount.companion.id, {
+          warmth: draft.warmth / 100,
+          playfulness: draft.playfulness / 100,
+          energy: draft.energy / 100,
+          humor: draft.humor / 100,
+          verbosity: draft.expressiveness / 100,
+        }),
       ]);
-      liveConversationId = (await companionApi.createConversation(liveAccount.companion.id)).id;
+      liveConversationId = (
+        await companionApi.createConversation(liveAccount.companion.id)
+      ).id;
     }
     const nextState: DemoState = {
       ...state,
@@ -348,7 +611,15 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
       firstMeetingComplete: false,
       currentView: "home",
       activeConversationId: liveConversationId ?? crypto.randomUUID(),
-      user: { ...state.user, ...(liveAccount?.user ?? {}), name: draft.name.trim(), birthday: draft.birthday, pronouns: draft.pronouns, interests: draft.interests, adultConfirmed: draft.adultConfirmed },
+      user: {
+        ...state.user,
+        ...(liveAccount?.user ?? {}),
+        name: draft.name.trim(),
+        birthday: draft.birthday,
+        pronouns: draft.pronouns,
+        interests: draft.interests,
+        adultConfirmed: draft.adultConfirmed,
+      },
       companion: {
         ...state.companion,
         ...(liveAccount?.companion ?? {}),
@@ -379,7 +650,8 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
         romance: draft.relationshipMode === "romantic" ? draft.romance : 10,
         sensuality: draft.sensuality,
         romanticOptIn: draft.relationshipMode === "romantic",
-        sensualOptIn: draft.relationshipMode === "romantic" && draft.sensuality > 0,
+        sensualOptIn:
+          draft.relationshipMode === "romantic" && draft.sensuality > 0,
       },
       memoryEnabled: draft.memoryEnabled,
       memories: [],
@@ -397,18 +669,26 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
       futureEvents: [],
       nudges: [],
       mediaLibrary: [],
-      messages: [{
-        id: crypto.randomUUID(),
-        conversationId: liveConversationId ?? "pending",
-        role: "assistant",
-        content: `Hi ${draft.name.trim()}. I’m ${draft.companionName.trim() || "Mira"}. We can start with whatever feels easy—even a quiet hello.`,
-        createdAt: new Date().toISOString(),
-        status: "sent",
-      }],
+      messages: [
+        {
+          id: crypto.randomUUID(),
+          conversationId: liveConversationId ?? "pending",
+          role: "assistant",
+          content: `Hi ${draft.name.trim()}. I’m ${draft.companionName.trim() || "Mira"}. We can start with whatever feels easy—even a quiet hello.`,
+          createdAt: new Date().toISOString(),
+          status: "sent",
+        },
+      ],
     };
-    if (!liveConversationId) nextState.messages[0]!.conversationId = nextState.activeConversationId;
+    if (!liveConversationId)
+      nextState.messages[0]!.conversationId = nextState.activeConversationId;
     if (accountMode) {
-      const created = await accountClient.signup({ email: draft.email, password: draft.password, name: draft.name.trim(), state: nextState });
+      const created = await accountClient.signup({
+        email: draft.email,
+        password: draft.password,
+        name: draft.name.trim(),
+        state: nextState,
+      });
       accountReady.current = true;
       setState(created.state);
     } else {
@@ -417,18 +697,35 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     router.replace(forceDemo ? "/demo" : "/app");
   };
 
-  const createCompanionTurn = (content: string, messages: ChatMessage[], now: Date, delivery: "text" | "voice" | "video" = "text"): CompanionTurn => {
-    const conversationMessages = messagesForConversation(messages, state.activeConversationId);
-    const currentMemories = state.memoryEnabled ? currentMemoryRecords(activeMemories) : [];
+  const createCompanionTurn = (
+    content: string,
+    messages: ChatMessage[],
+    now: Date,
+    delivery: "text" | "voice" | "video" = "text",
+  ): CompanionTurn => {
+    const conversationMessages = messagesForConversation(
+      messages,
+      state.activeConversationId,
+    );
+    const currentMemories = state.memoryEnabled
+      ? currentMemoryRecords(activeMemories)
+      : [];
     const relevantContents = relevantMemoryContents(currentMemories, messages);
     const relevantMemories = relevantContents.flatMap((memoryContent) => {
-      const memory = currentMemories.find((candidate) => candidate.content === memoryContent);
+      const memory = currentMemories.find(
+        (candidate) => candidate.content === memoryContent,
+      );
       return memory ? [memory] : [];
     });
     const context = buildCompanionContext({
       user: state.user,
       companion: state.companion,
-      relationship: { mode: state.companion.relationshipMode, startedAt: state.companion.createdAt, interactionCount: conversationMessages.length, sharedExperiences: state.moments.map((moment) => moment.title) },
+      relationship: {
+        mode: state.companion.relationshipMode,
+        startedAt: state.companion.createdAt,
+        interactionCount: conversationMessages.length,
+        sharedExperiences: state.moments.map((moment) => moment.title),
+      },
       memories: relevantMemories,
       messages: conversationMessages,
       timezone: state.user.timezone,
@@ -440,35 +737,65 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     return planCompanionTurn(content, context);
   };
 
-  const generateDemoReply = async (messages: ChatMessage[], delivery: "text" | "voice" | "video", fallback: CompanionTurn) => {
-    const immediateCallIntent = delivery !== "text" && ["greeting", "self", "memory", "choice"].includes(fallback.intent);
-    if (immediateCallIntent || fallback.adaptations.includes("safety-support") || fallback.adaptations.includes("contextual-direct-answer") || fallback.intent === "repair") return fallback.text;
+  const generateDemoReply = async (
+    messages: ChatMessage[],
+    delivery: "text" | "voice" | "video",
+    fallback: CompanionTurn,
+  ) => {
+    const replyStartedAt = performance.now();
+    const immediateCallIntent =
+      delivery !== "text" &&
+      ["greeting", "self"].includes(fallback.intent);
+    if (immediateCallIntent || fallback.adaptations.includes("safety-support"))
+      return fallback.text;
     try {
-      const currentMemories = state.memoryEnabled ? currentMemoryRecords(activeMemories) : [];
-      const lexicalMemories = state.memoryEnabled ? relevantMemoryContents(currentMemories, messages) : [];
+      const currentMemories = state.memoryEnabled
+        ? currentMemoryRecords(activeMemories)
+        : [];
+      const lexicalMemories = state.memoryEnabled
+        ? relevantMemoryContents(currentMemories, messages)
+        : [];
       // Demo calls must not wait on a second remote model before chat inference.
       // The deterministic lexical retriever already selects relevant approved memories.
       const recalledMemories = lexicalMemories;
-      return await companionApi.demoReply({
+      const reply = await companionApi.demoReply({
         messages: messagesForConversation(messages, state.activeConversationId)
-          .filter((message) => message.role === "user" || message.role === "assistant")
-          .slice(-16)
-          .map((message) => ({ role: message.role as "user" | "assistant", content: message.content })),
-        companion: { name: state.companion.name, backstory: state.companionBackstory, personality: { ...state.companion.personality } },
+          .filter(
+            (message) =>
+              message.role === "user" || message.role === "assistant",
+          )
+          .slice(-48)
+          .map((message) => ({
+            role: message.role as "user" | "assistant",
+            content: message.content,
+          })),
+        companion: {
+          name: state.companion.name,
+          backstory: state.companionBackstory,
+          personality: { ...state.companion.personality },
+        },
         user: { name: state.user.name },
         relationshipMode: state.companion.relationshipMode,
         memories: recalledMemories,
         responsePreferences: state.responsePreferences,
         delivery,
       });
+      trackEvent("reply_received", Math.round(performance.now() - replyStartedAt));
+      return reply;
     } catch {
-      return fallback.text;
+      trackEvent("reply_failed", Math.round(performance.now() - replyStartedAt));
+      // A provider outage must not masquerade as misunderstanding the speaker.
+      const latest = messages.filter(message => message.role === "user").at(-1)?.content ?? "";
+      if (/\p{Script=Devanagari}/u.test(latest)) return "अभी reply service से connection नहीं बन पा रहा। थोड़ी देर में फिर कोशिश कर सकते हैं।";
+      if (/\b(?:aaj|yaar|yar|hai|kya|mein|mujhe|tum|nahi|meri|uske)\b/i.test(latest)) return "Abhi reply service se connection nahi ban raha. Thodi der mein phir try kar sakte hain.";
+      return "I can’t reach the reply service right now. Please try again in a moment.";
     }
   };
 
   const sendMessage = async (content: string) => {
     if (!processingAllowed()) return;
     if (streaming) return;
+    trackEvent("chat_send");
     setStreaming(true);
     const now = new Date();
     const userMessage: ChatMessage = {
@@ -486,55 +813,141 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
 
     if (liveMode) {
       const assistantId = `pending:${crypto.randomUUID()}`;
-      setState((current) => ({ ...current, messages: [...current.messages, { id: assistantId, conversationId: current.activeConversationId, role: "assistant", content: "", createdAt: new Date().toISOString(), status: "sending" }] }));
+      setState((current) => ({
+        ...current,
+        messages: [
+          ...current.messages,
+          {
+            id: assistantId,
+            conversationId: current.activeConversationId,
+            role: "assistant",
+            content: "",
+            createdAt: new Date().toISOString(),
+            status: "sending",
+          },
+        ],
+      }));
       try {
-        const result = await companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: userMessage.id, content, memoryEnabled: state.memoryEnabled, responsePreferences: state.responsePreferences }, (delta) => {
-          setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: `${message.content}${delta}` } : message) }));
-        });
-        const memories = state.memoryEnabled ? await optional(companionApi.memories(), state.memories) : state.memories;
-        setState((current) => ({ ...current, memories, messages: current.messages.map((message) => message.id === assistantId ? { ...message, id: result.assistantMessageId || assistantId, status: "sent" } : message) }));
+        const result = await companionApi.streamChat(
+          {
+            conversationId: state.activeConversationId,
+            companionId: state.companion.id,
+            clientMessageId: userMessage.id,
+            content,
+            memoryEnabled: state.memoryEnabled,
+            responsePreferences: state.responsePreferences,
+          },
+          (delta) => {
+            setState((current) => ({
+              ...current,
+              messages: current.messages.map((message) =>
+                message.id === assistantId
+                  ? { ...message, content: `${message.content}${delta}` }
+                  : message,
+              ),
+            }));
+          },
+        );
+        const memories = state.memoryEnabled
+          ? await optional(companionApi.memories(), state.memories)
+          : state.memories;
+        setState((current) => ({
+          ...current,
+          memories,
+          messages: current.messages.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  id: result.assistantMessageId || assistantId,
+                  status: "sent",
+                }
+              : message,
+          ),
+        }));
       } catch (cause) {
-        setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: cause instanceof Error ? cause.message : `${current.companion.name} could not respond just now.`, status: "failed" } : message) }));
+        setState((current) => ({
+          ...current,
+          messages: current.messages.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  content:
+                    cause instanceof Error
+                      ? cause.message
+                      : `${current.companion.name} could not respond just now.`,
+                  status: "failed",
+                }
+              : message,
+          ),
+        }));
       } finally {
         setStreaming(false);
       }
       return;
     }
 
-    const conversation = [...messagesForConversation(state.messages, state.activeConversationId), userMessage];
+    const conversation = [
+      ...messagesForConversation(state.messages, state.activeConversationId),
+      userMessage,
+    ];
     const turn = createCompanionTurn(content, conversation, now);
     const reply = await generateDemoReply(conversation, "text", turn);
-    const beats = reply.split(/\n\n+/).map((beat) => beat.trim()).filter(Boolean);
-    await pause(chooseTypingDelay(content));
+    const beats = reply
+      .split(/\n\n+/)
+      .map((beat) => beat.trim())
+      .filter(Boolean);
 
     for (let beatIndex = 0; beatIndex < beats.length; beatIndex += 1) {
       const assistantId = crypto.randomUUID();
       const beat = beats[beatIndex]!;
-      setState((current) => ({ ...current, messages: [...current.messages, {
-        id: assistantId,
-        conversationId: current.activeConversationId,
-        role: "assistant",
-        content: "",
-        createdAt: new Date(now.getTime() + beatIndex + 1).toISOString(),
-        status: "sending",
-        explanation: turn.explanation,
-      }] }));
+      setState((current) => ({
+        ...current,
+        messages: [
+          ...current.messages,
+          {
+            id: assistantId,
+            conversationId: current.activeConversationId,
+            role: "assistant",
+            content: "",
+            createdAt: new Date(now.getTime() + beatIndex + 1).toISOString(),
+            status: "sending",
+            explanation: turn.explanation,
+          },
+        ],
+      }));
       for (const token of beat.split(/(\s+)/).filter(Boolean)) {
         await pause(6);
         setState((current) => ({
           ...current,
-          messages: current.messages.map((message) => message.id === assistantId ? { ...message, content: `${message.content}${token}` } : message),
+          messages: current.messages.map((message) =>
+            message.id === assistantId
+              ? { ...message, content: `${message.content}${token}` }
+              : message,
+          ),
         }));
       }
-      setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === assistantId ? { ...message, status: "sent" } : message) }));
+      setState((current) => ({
+        ...current,
+        messages: current.messages.map((message) =>
+          message.id === assistantId ? { ...message, status: "sent" } : message,
+        ),
+      }));
       if (beatIndex < beats.length - 1) await pause(320);
     }
 
     setState((current) => {
       return {
         ...current,
-        memories: rememberConversationMessage(current, content, userMessage.id, now),
-        relationship: { ...current.relationship, progress: Math.min(100, current.relationship.progress + 1) },
+        memories: rememberConversationMessage(
+          current,
+          content,
+          userMessage.id,
+          now,
+        ),
+        relationship: {
+          ...current.relationship,
+          progress: Math.min(100, current.relationship.progress + 1),
+        },
         messages: current.messages,
       };
     });
@@ -542,50 +955,136 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   };
 
   const newConversation = async () => {
-    const conversationId = liveMode ? (await companionApi.createConversation(state.companion.id)).id : crypto.randomUUID();
+    const conversationId = liveMode
+      ? (await companionApi.createConversation(state.companion.id)).id
+      : crypto.randomUUID();
     setState((current) => ({
       ...current,
       activeConversationId: conversationId,
-      messages: [...current.messages, {
-        id: crypto.randomUUID(),
-        conversationId,
-        role: "assistant",
-        content: "Fresh chat. What are we getting into?",
-        createdAt: new Date().toISOString(),
-        status: "sent",
-      }],
+      messages: [
+        ...current.messages,
+        {
+          id: crypto.randomUUID(),
+          conversationId,
+          role: "assistant",
+          content: "Fresh chat. What are we getting into?",
+          createdAt: new Date().toISOString(),
+          status: "sent",
+        },
+      ],
     }));
   };
 
   const deleteConversation = async () => {
     const deletedId = state.activeConversationId;
     if (liveMode) await companionApi.deleteConversation(deletedId);
-    const conversationId = liveMode ? (await companionApi.createConversation(state.companion.id)).id : crypto.randomUUID();
-    setState((current) => ({ ...current, activeConversationId: conversationId, messages: [...current.messages.filter((message) => message.conversationId !== deletedId), { id: crypto.randomUUID(), conversationId, role: "assistant", content: "Fresh start. Batao, abhi kya baat karni hai?", createdAt: new Date().toISOString(), status: "sent" }] }));
+    const conversationId = liveMode
+      ? (await companionApi.createConversation(state.companion.id)).id
+      : crypto.randomUUID();
+    setState((current) => ({
+      ...current,
+      activeConversationId: conversationId,
+      messages: [
+        ...current.messages.filter(
+          (message) => message.conversationId !== deletedId,
+        ),
+        {
+          id: crypto.randomUUID(),
+          conversationId,
+          role: "assistant",
+          content: "Fresh start. Batao, abhi kya baat karni hai?",
+          createdAt: new Date().toISOString(),
+          status: "sent",
+        },
+      ],
+    }));
   };
 
-  const addMockExchange = (userMessage: ChatMessage, assistantMessage: ChatMessage) => setState((current) => ({ ...current, messages: [...current.messages, userMessage, assistantMessage] }));
+  const addMockExchange = (
+    userMessage: ChatMessage,
+    assistantMessage: ChatMessage,
+  ) =>
+    setState((current) => ({
+      ...current,
+      messages: [...current.messages, userMessage, assistantMessage],
+    }));
 
   const sendVoiceNote = async (transcript: string) => {
     if (!processingAllowed()) return;
-    if (!featureEntitlements.has(state.subscription.planId, "voiceNotes")) { setPlansOpen(true); return; }
-    if (liveMode) { await sendMessage(transcript); return; }
+    if (!featureEntitlements.has(state.subscription.planId, "voiceNotes")) {
+      setPlansOpen(true);
+      return;
+    }
+    if (liveMode) {
+      await sendMessage(transcript);
+      return;
+    }
     const now = new Date();
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "user", content: transcript, createdAt: now.toISOString(), status: "sent", attachments: [{ id: crypto.randomUUID(), type: "audio", url: "browser://voice-transcript", name: "Voice note", transcript, durationMs: Math.max(1_000, transcript.split(/\s+/).length * 420) }] };
-    const turn = createCompanionTurn(transcript, [...messagesForConversation(state.messages, state.activeConversationId), userMessage], now, "voice");
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      conversationId: state.activeConversationId,
+      role: "user",
+      content: transcript,
+      createdAt: now.toISOString(),
+      status: "sent",
+      attachments: [
+        {
+          id: crypto.randomUUID(),
+          type: "audio",
+          url: "browser://voice-transcript",
+          name: "Voice note",
+          transcript,
+          durationMs: Math.max(1_000, transcript.split(/\s+/).length * 420),
+        },
+      ],
+    };
+    const turn = createCompanionTurn(
+      transcript,
+      [
+        ...messagesForConversation(state.messages, state.activeConversationId),
+        userMessage,
+      ],
+      now,
+      "voice",
+    );
     const reply = turn.text;
     await pause(250);
-    const assistantMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "assistant", content: reply, createdAt: new Date().toISOString(), status: "sent", explanation: turn.explanation, attachments: [{ id: crypto.randomUUID(), type: "audio", url: "browser://speech-synthesis", name: `${state.companion.name} voice reply`, transcript: reply, durationMs: Math.max(1_500, reply.split(/\s+/).length * 360) }] };
+    const assistantMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      conversationId: state.activeConversationId,
+      role: "assistant",
+      content: reply,
+      createdAt: new Date().toISOString(),
+      status: "sent",
+      explanation: turn.explanation,
+      attachments: [
+        {
+          id: crypto.randomUUID(),
+          type: "audio",
+          url: "browser://speech-synthesis",
+          name: `${state.companion.name} voice reply`,
+          transcript: reply,
+          durationMs: Math.max(1_500, reply.split(/\s+/).length * 360),
+        },
+      ],
+    };
     addMockExchange(userMessage, assistantMessage);
   };
 
-  const sendVoiceRecording = async (audioBase64: string, contentType: string) => {
+  const sendVoiceRecording = async (
+    audioBase64: string,
+    contentType: string,
+  ) => {
     if (!processingAllowed()) return;
-    if (!featureEntitlements.has(state.subscription.planId, "voiceNotes")) { setPlansOpen(true); return; }
+    if (!featureEntitlements.has(state.subscription.planId, "voiceNotes")) {
+      setPlansOpen(true);
+      return;
+    }
     const transcription = liveMode
       ? await companionApi.transcribe(audioBase64, contentType)
       : await companionApi.edgeTranscribe(audioBase64, contentType);
-    if (!transcription.text.trim()) throw new Error("I couldn’t hear words in that voice note.");
+    if (!transcription.text.trim())
+      throw new Error("I couldn’t hear words in that voice note.");
     await sendMessage(transcription.text);
   };
 
@@ -595,163 +1094,654 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
 
   const uploadImage = async (file: File) => {
     if (!processingAllowed()) return;
-    if (!file.type.match(/^image\/(jpeg|png|webp)$/)) throw new Error("Choose a JPEG, PNG, or WebP image.");
-    if (file.size > 8_000_000) throw new Error("Choose an image smaller than 8 MB.");
-    const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
+    if (!file.type.match(/^image\/(jpeg|png|webp)$/))
+      throw new Error("Choose a JPEG, PNG, or WebP image.");
+    if (file.size > 8_000_000)
+      throw new Error("Choose an image smaller than 8 MB.");
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
     if (liveMode) {
       const dataBase64 = dataUrl.split(",")[1] ?? "";
       const [asset, analysis] = await Promise.all([
         companionApi.uploadImage(file.name, file.type, dataBase64),
-        companionApi.analyzeImage(dataBase64, file.type, "Describe what is visible and respond naturally to the person who shared it."),
+        companionApi.analyzeImage(
+          dataBase64,
+          file.type,
+          "Describe what is visible and respond naturally to the person who shared it.",
+        ),
       ]);
       const now = new Date().toISOString();
-      setState((current) => ({ ...current, mediaLibrary: [...current.mediaLibrary, { id: asset.id, type: "image", name: file.name, url: asset.url, createdAt: now }], photos: [{ id: asset.id, imageUrl: asset.url, caption: file.name, createdAt: now, kind: "shared" }, ...current.photos], messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "user", content: "Look at this.", createdAt: now, status: "sent", attachments: [{ id: asset.id, type: "image", url: asset.url, name: file.name }] }, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: analysis.description, createdAt: new Date().toISOString(), status: "sent" }] }));
+      setState((current) => ({
+        ...current,
+        mediaLibrary: [
+          ...current.mediaLibrary,
+          {
+            id: asset.id,
+            type: "image",
+            name: file.name,
+            url: asset.url,
+            createdAt: now,
+          },
+        ],
+        photos: [
+          {
+            id: asset.id,
+            imageUrl: asset.url,
+            caption: file.name,
+            createdAt: now,
+            kind: "shared",
+          },
+          ...current.photos,
+        ],
+        messages: [
+          ...current.messages,
+          {
+            id: crypto.randomUUID(),
+            conversationId: current.activeConversationId,
+            role: "user",
+            content: "Look at this.",
+            createdAt: now,
+            status: "sent",
+            attachments: [
+              { id: asset.id, type: "image", url: asset.url, name: file.name },
+            ],
+          },
+          {
+            id: crypto.randomUUID(),
+            conversationId: current.activeConversationId,
+            role: "assistant",
+            content: analysis.description,
+            createdAt: new Date().toISOString(),
+            status: "sent",
+          },
+        ],
+      }));
       return;
     }
     const now = new Date().toISOString();
     const attachmentId = crypto.randomUUID();
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "user", content: "Look at this.", createdAt: now, status: "sent", attachments: [{ id: attachmentId, type: "image", url: dataUrl, name: file.name }] };
-    const assistantMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "assistant", content: "Okay, I’m looking. I won’t guess who anyone is or infer sensitive details—what do you want me to notice?", createdAt: new Date(Date.now() + 1).toISOString(), status: "sent" };
-    setState((current) => ({ ...current, mediaLibrary: [...current.mediaLibrary, { id: attachmentId, type: "image", name: file.name, url: dataUrl, createdAt: now }], photos: [{ id: attachmentId, imageUrl: dataUrl, caption: file.name, createdAt: now, kind: "shared" }, ...current.photos], messages: [...current.messages, userMessage, assistantMessage] }));
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      conversationId: state.activeConversationId,
+      role: "user",
+      content: "Look at this.",
+      createdAt: now,
+      status: "sent",
+      attachments: [
+        { id: attachmentId, type: "image", url: dataUrl, name: file.name },
+      ],
+    };
+    const assistantMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      conversationId: state.activeConversationId,
+      role: "assistant",
+      content:
+        "Okay, I’m looking. I won’t guess who anyone is or infer sensitive details—what do you want me to notice?",
+      createdAt: new Date(Date.now() + 1).toISOString(),
+      status: "sent",
+    };
+    setState((current) => ({
+      ...current,
+      mediaLibrary: [
+        ...current.mediaLibrary,
+        {
+          id: attachmentId,
+          type: "image",
+          name: file.name,
+          url: dataUrl,
+          createdAt: now,
+        },
+      ],
+      photos: [
+        {
+          id: attachmentId,
+          imageUrl: dataUrl,
+          caption: file.name,
+          createdAt: now,
+          kind: "shared",
+        },
+        ...current.photos,
+      ],
+      messages: [...current.messages, userMessage, assistantMessage],
+    }));
   };
 
   const generateImage = async (prompt: string) => {
     if (!processingAllowed()) return;
-    if (!featureEntitlements.has(state.subscription.planId, "imageGeneration")) { setPlansOpen(true); return; }
+    if (
+      !featureEntitlements.has(state.subscription.planId, "imageGeneration")
+    ) {
+      setPlansOpen(true);
+      return;
+    }
     if (liveMode) {
-      const result = await companionApi.generateImage(prompt, `${state.companion.name}, ${state.companion.presentation}, original stylized-realistic 3D companion`);
-      const imageUrl = result.artifactBase64 ? `data:${result.contentType};base64,${result.artifactBase64}` : result.assetUrl;
+      const result = await companionApi.generateImage(
+        prompt,
+        `${state.companion.name}, ${state.companion.presentation}, original stylized-realistic 3D companion`,
+      );
+      const imageUrl = result.artifactBase64
+        ? `data:${result.contentType};base64,${result.artifactBase64}`
+        : result.assetUrl;
       const now = new Date().toISOString();
       const attachmentId = crypto.randomUUID();
-      setState((current) => ({ ...current, mediaLibrary: [{ id: attachmentId, type: "generated-image", name: prompt, url: imageUrl, createdAt: now }, ...current.mediaLibrary], photos: [{ id: attachmentId, imageUrl, caption: prompt, createdAt: now, kind: "selfie" }, ...current.photos], messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: `I made this for you—“${prompt}.”`, createdAt: now, status: "sent", attachments: [{ id: attachmentId, type: "generated-image", url: imageUrl, name: prompt }] }] }));
+      setState((current) => ({
+        ...current,
+        mediaLibrary: [
+          {
+            id: attachmentId,
+            type: "generated-image",
+            name: prompt,
+            url: imageUrl,
+            createdAt: now,
+          },
+          ...current.mediaLibrary,
+        ],
+        photos: [
+          {
+            id: attachmentId,
+            imageUrl,
+            caption: prompt,
+            createdAt: now,
+            kind: "selfie",
+          },
+          ...current.photos,
+        ],
+        messages: [
+          ...current.messages,
+          {
+            id: crypto.randomUUID(),
+            conversationId: current.activeConversationId,
+            role: "assistant",
+            content: `I made this for you—“${prompt}.”`,
+            createdAt: now,
+            status: "sent",
+            attachments: [
+              {
+                id: attachmentId,
+                type: "generated-image",
+                url: imageUrl,
+                name: prompt,
+              },
+            ],
+          },
+        ],
+      }));
       return;
     }
     const now = new Date().toISOString();
     const attachmentId = crypto.randomUUID();
-    const imageUrl = prompt.toLowerCase().includes("rooftop") ? "/assets/mira/rooftop-evening.png" : "/assets/mira/rainy-cafe.png";
-    const assistantMessage: ChatMessage = { id: crypto.randomUUID(), conversationId: state.activeConversationId, role: "assistant", content: `I took this for you—“${prompt}.”`, createdAt: now, status: "sent", attachments: [{ id: attachmentId, type: "generated-image", url: imageUrl, name: prompt }] };
-    setState((current) => ({ ...current, mediaLibrary: [{ id: attachmentId, type: "generated-image", name: prompt, url: imageUrl, createdAt: now }, ...current.mediaLibrary], photos: [{ id: attachmentId, imageUrl, caption: prompt, createdAt: now, kind: "selfie" }, ...current.photos], messages: [...current.messages, assistantMessage] }));
+    const imageUrl = prompt.toLowerCase().includes("rooftop")
+      ? "/assets/mira/rooftop-evening.png"
+      : "/assets/mira/rainy-cafe.png";
+    const assistantMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      conversationId: state.activeConversationId,
+      role: "assistant",
+      content: `I took this for you—“${prompt}.”`,
+      createdAt: now,
+      status: "sent",
+      attachments: [
+        {
+          id: attachmentId,
+          type: "generated-image",
+          url: imageUrl,
+          name: prompt,
+        },
+      ],
+    };
+    setState((current) => ({
+      ...current,
+      mediaLibrary: [
+        {
+          id: attachmentId,
+          type: "generated-image",
+          name: prompt,
+          url: imageUrl,
+          createdAt: now,
+        },
+        ...current.mediaLibrary,
+      ],
+      photos: [
+        {
+          id: attachmentId,
+          imageUrl,
+          caption: prompt,
+          createdAt: now,
+          kind: "selfie",
+        },
+        ...current.photos,
+      ],
+      messages: [...current.messages, assistantMessage],
+    }));
   };
 
   const addSelfie = () => {
     if (!processingAllowed()) return;
-    if (!featureEntitlements.has(state.subscription.planId, "aiSelfies")) { setPlansOpen(true); return; }
+    if (!featureEntitlements.has(state.subscription.planId, "aiSelfies")) {
+      setPlansOpen(true);
+      return;
+    }
     if (liveMode) {
-      runAction(generateImage(`A warm, candid selfie from ${state.companion.name} during a quiet coffee break, natural expression, private companion moment`).then(() => setMomentsTab("photos")), "The selfie could not be created.");
+      runAction(
+        generateImage(
+          `A warm, candid selfie from ${state.companion.name} during a quiet coffee break, natural expression, private companion moment`,
+        ).then(() => setMomentsTab("photos")),
+        "The selfie could not be created.",
+      );
       return;
     }
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
     setState((current) => ({
       ...current,
-      photos: [{ id, imageUrl: "/assets/mira/rainy-cafe.png", caption: "Rainy coffee break—just for you", createdAt: now, kind: "selfie" }, ...current.photos],
-      mediaLibrary: [{ id, type: "generated-image", name: `${current.companion.name} coffee selfie`, url: "/assets/mira/rainy-cafe.png", createdAt: now }, ...current.mediaLibrary],
+      photos: [
+        {
+          id,
+          imageUrl: "/assets/mira/rainy-cafe.png",
+          caption: "Rainy coffee break—just for you",
+          createdAt: now,
+          kind: "selfie",
+        },
+        ...current.photos,
+      ],
+      mediaLibrary: [
+        {
+          id,
+          type: "generated-image",
+          name: `${current.companion.name} coffee selfie`,
+          url: "/assets/mira/rainy-cafe.png",
+          createdAt: now,
+        },
+        ...current.mediaLibrary,
+      ],
     }));
     setMomentsTab("photos");
   };
 
-  const recordFeedback = (messageId: string, feedback: "up" | "down", reason?: FeedbackReason) => {
+  const recordFeedback = (
+    messageId: string,
+    feedback: "up" | "down",
+    reason?: FeedbackReason,
+  ) => {
+    if (feedback === "down" && reason === "missed-what-i-said") trackEvent("reply_misunderstood");
     setState((current) => ({
       ...current,
-      messages: current.messages.map((message) => message.id === messageId ? { ...message, feedback } : message),
-      feedbackSignals: [...current.feedbackSignals, { id: crypto.randomUUID(), messageId, rating: feedback, ...(reason ? { reason } : {}), createdAt: new Date().toISOString() }],
-      responsePreferences: feedback === "down" ? {
-        ...current.responsePreferences,
-        listeningFirst: reason === "wrong-tone" ? current.responsePreferences.listeningFirst : true,
-        responseLength: reason === "too-scripted" || reason === "too-many-questions" ? "short" : current.responsePreferences.responseLength,
-        adviceStyle: reason === "wrong-tone" ? "gentle" : "ask-first",
-        questionFrequency: reason === "too-many-questions" ? "rare" : current.responsePreferences.questionFrequency,
-      } : current.responsePreferences,
+      messages: current.messages.map((message) =>
+        message.id === messageId ? { ...message, feedback } : message,
+      ),
+      feedbackSignals: [
+        ...current.feedbackSignals,
+        {
+          id: crypto.randomUUID(),
+          messageId,
+          rating: feedback,
+          ...(reason ? { reason } : {}),
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      responsePreferences:
+        feedback === "down"
+          ? {
+              ...current.responsePreferences,
+              listeningFirst:
+                reason === "wrong-tone"
+                  ? current.responsePreferences.listeningFirst
+                  : true,
+              responseLength:
+                reason === "too-scripted" || reason === "too-many-questions"
+                  ? "short"
+                  : current.responsePreferences.responseLength,
+              adviceStyle: reason === "wrong-tone" ? "gentle" : "ask-first",
+              questionFrequency:
+                reason === "too-many-questions"
+                  ? "rare"
+                  : current.responsePreferences.questionFrequency,
+            }
+          : current.responsePreferences,
     }));
-    if (liveMode) runAction(companionApi.feedback(state.activeConversationId, messageId, feedback, reason), "Your feedback could not be saved.");
+    if (liveMode)
+      runAction(
+        companionApi.feedback(
+          state.activeConversationId,
+          messageId,
+          feedback,
+          reason,
+        ),
+        "Your feedback could not be saved.",
+      );
   };
 
   const regenerateResponse = async (messageId: string) => {
-    const source = previousUserMessage(state.messages, messageId, state.activeConversationId);
+    const source = previousUserMessage(
+      state.messages,
+      messageId,
+      state.activeConversationId,
+    );
     if (!source) return;
     if (liveMode) {
-      const updated = await companionApi.regenerate(state.activeConversationId, messageId, state.memoryEnabled, state.responsePreferences);
-      setState((current) => ({ ...current, messages: current.messages.map((message) => message.id === messageId ? updated : message) }));
+      const updated = await companionApi.regenerate(
+        state.activeConversationId,
+        messageId,
+        state.memoryEnabled,
+        state.responsePreferences,
+      );
+      setState((current) => ({
+        ...current,
+        messages: current.messages.map((message) =>
+          message.id === messageId ? updated : message,
+        ),
+      }));
       return;
     }
     const now = new Date();
-    const activeMessages = messagesForConversation(state.messages, state.activeConversationId);
-    const sourceIndex = activeMessages.findIndex((message) => message.id === source.id);
-    const turn = createCompanionTurn(source.content, activeMessages.slice(0, sourceIndex + 1), now);
+    const activeMessages = messagesForConversation(
+      state.messages,
+      state.activeConversationId,
+    );
+    const sourceIndex = activeMessages.findIndex(
+      (message) => message.id === source.id,
+    );
+    const turn = createCompanionTurn(
+      source.content,
+      activeMessages.slice(0, sourceIndex + 1),
+      now,
+    );
     setState((current) => ({
       ...current,
       messages: current.messages.map((message) => {
         if (message.id !== messageId) return message;
-        const next = { ...message, content: turn.text.replace(/\n\n+/g, " "), explanation: turn.explanation, status: "sent" as const };
+        const next = {
+          ...message,
+          content: turn.text.replace(/\n\n+/g, " "),
+          explanation: turn.explanation,
+          status: "sent" as const,
+        };
         delete next.feedback;
         return next;
       }),
     }));
   };
 
-  const purchaseItem = async (item: StoreItemRecord): Promise<string | null> => {
-    if (!canAccessItem(state.subscription.planId, item)) { setPlansOpen(true); return `${item.tierRequired[0]?.toUpperCase()}${item.tierRequired.slice(1)} is required for this item.`; }
-    if (currencyBalance(item, state.wallet) < item.price) return `Not enough ${item.currency}. Try an activity together to earn more.`;
+  const purchaseItem = async (
+    item: StoreItemRecord,
+  ): Promise<string | null> => {
+    if (!canAccessItem(state.subscription.planId, item)) {
+      setPlansOpen(true);
+      return `${item.tierRequired[0]?.toUpperCase()}${item.tierRequired.slice(1)} is required for this item.`;
+    }
+    if (currencyBalance(item, state.wallet) < item.price)
+      return `Not enough ${item.currency}. Try an activity together to earn more.`;
     if (liveMode) {
       const result = await companionApi.purchaseItem(item.id);
-      setState((current) => ({ ...current, wallet: result.wallet, ownedItems: current.ownedItems.some((owned) => owned.itemId === result.owned.itemId) ? current.ownedItems : [...current.ownedItems, result.owned] }));
+      setState((current) => ({
+        ...current,
+        wallet: result.wallet,
+        ownedItems: current.ownedItems.some(
+          (owned) => owned.itemId === result.owned.itemId,
+        )
+          ? current.ownedItems
+          : [...current.ownedItems, result.owned],
+      }));
       return null;
     }
     const now = new Date().toISOString();
     setState((current) => {
-      if (current.ownedItems.some((owned) => owned.itemId === item.id)) return current;
-      const wallet = item.currency === "free" ? current.wallet : { ...current.wallet, [item.currency]: current.wallet[item.currency] - item.price };
-      const transactions = item.currency === "free" ? current.walletTransactions : [...current.walletTransactions, { id: crypto.randomUUID(), userId: current.user.id, type: "purchase" as const, currency: item.currency, amount: -item.price, balanceAfter: wallet[item.currency], referenceId: item.id, idempotencyKey: `web:${item.id}:${now}`, createdAt: now }];
-      return { ...current, wallet, walletTransactions: transactions, ownedItems: [...current.ownedItems, { itemId: item.id, purchasedAt: now, equipped: false }] };
+      if (current.ownedItems.some((owned) => owned.itemId === item.id))
+        return current;
+      const wallet =
+        item.currency === "free"
+          ? current.wallet
+          : {
+              ...current.wallet,
+              [item.currency]: current.wallet[item.currency] - item.price,
+            };
+      const transactions =
+        item.currency === "free"
+          ? current.walletTransactions
+          : [
+              ...current.walletTransactions,
+              {
+                id: crypto.randomUUID(),
+                userId: current.user.id,
+                type: "purchase" as const,
+                currency: item.currency,
+                amount: -item.price,
+                balanceAfter: wallet[item.currency],
+                referenceId: item.id,
+                idempotencyKey: `web:${item.id}:${now}`,
+                createdAt: now,
+              },
+            ];
+      return {
+        ...current,
+        wallet,
+        walletTransactions: transactions,
+        ownedItems: [
+          ...current.ownedItems,
+          { itemId: item.id, purchasedAt: now, equipped: false },
+        ],
+      };
     });
     return null;
   };
 
   const equipItem = async (item: StoreItemRecord) => {
-    const liveOwnedItems = liveMode ? await companionApi.equipItem(item.id) : null;
+    const liveOwnedItems = liveMode
+      ? await companionApi.equipItem(item.id)
+      : null;
     setState((current) => {
       const environment = environmentForItem(item) as EnvironmentId | null;
       return {
         ...current,
         ...(environment ? { activeEnvironment: environment } : {}),
-        ownedItems: liveOwnedItems ?? current.ownedItems.map((owned) => {
-          const ownedItem = current.storeItems.find((candidate) => candidate.id === owned.itemId);
-          return ownedItem?.metadata.slot === item.metadata.slot ? { ...owned, equipped: owned.itemId === item.id } : owned;
-        }),
+        ownedItems:
+          liveOwnedItems ??
+          current.ownedItems.map((owned) => {
+            const ownedItem = current.storeItems.find(
+              (candidate) => candidate.id === owned.itemId,
+            );
+            return ownedItem?.metadata.slot === item.metadata.slot
+              ? { ...owned, equipped: owned.itemId === item.id }
+              : owned;
+          }),
       };
     });
   };
 
   const choosePlan = async (planId: PlanId) => {
-    const subscription = liveMode ? (await companionApi.mockUpgrade(planId)).subscription : { planId, status: "active" as const, testMode: true, renewsAt: new Date(Date.now() + 30 * 86_400_000).toISOString() };
+    const subscription = liveMode
+      ? (await companionApi.mockUpgrade(planId)).subscription
+      : {
+          planId,
+          status: "active" as const,
+          testMode: true,
+          renewsAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        };
     setState((current) => ({ ...current, subscription }));
     setPlansOpen(false);
   };
 
-  const addJournal = async (entry: { title: string; content: string; mood: CompanionMood }) => {
-    const created = liveMode ? await companionApi.addJournal(entry) : { id: crypto.randomUUID(), userId: state.user.id, ...entry, tags: [], reflected: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    setState((current) => ({ ...current, journalEntries: [created, ...current.journalEntries] }));
+  const addJournal = async (entry: {
+    title: string;
+    content: string;
+    mood: CompanionMood;
+  }) => {
+    const created = liveMode
+      ? await companionApi.addJournal(entry)
+      : {
+          id: crypto.randomUUID(),
+          userId: state.user.id,
+          ...entry,
+          tags: [],
+          reflected: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+    setState((current) => ({
+      ...current,
+      journalEntries: [created, ...current.journalEntries],
+    }));
   };
-  const deleteJournal = async (entryId: string) => { if (liveMode) await companionApi.deleteJournal(entryId); setState((current) => ({ ...current, journalEntries: current.journalEntries.filter((entry) => entry.id !== entryId) })); };
-  const reflectOnJournal = async (entry: DemoState["journalEntries"][number]) => {
-    const reflection = liveMode ? (await companionApi.reflectJournal(entry.id)).reflection : `I notice ${entry.mood} energy in “${entry.title}.” What part would you like me to sit with?`;
-    setState((current) => ({ ...current, currentView: "chat", journalEntries: current.journalEntries.map((candidate) => candidate.id === entry.id ? { ...candidate, reflected: true, updatedAt: new Date().toISOString() } : candidate), messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: reflection, createdAt: new Date().toISOString(), status: "sent" }] }));
+  const deleteJournal = async (entryId: string) => {
+    if (liveMode) await companionApi.deleteJournal(entryId);
+    setState((current) => ({
+      ...current,
+      journalEntries: current.journalEntries.filter(
+        (entry) => entry.id !== entryId,
+      ),
+    }));
   };
-  const addFutureEvent = async (event: { description: string; eventDate: string }) => {
+  const reflectOnJournal = async (
+    entry: DemoState["journalEntries"][number],
+  ) => {
+    const reflection = liveMode
+      ? (await companionApi.reflectJournal(entry.id)).reflection
+      : `I notice ${entry.mood} energy in “${entry.title}.” What part would you like me to sit with?`;
+    setState((current) => ({
+      ...current,
+      currentView: "chat",
+      journalEntries: current.journalEntries.map((candidate) =>
+        candidate.id === entry.id
+          ? {
+              ...candidate,
+              reflected: true,
+              updatedAt: new Date().toISOString(),
+            }
+          : candidate,
+      ),
+      messages: [
+        ...current.messages,
+        {
+          id: crypto.randomUUID(),
+          conversationId: current.activeConversationId,
+          role: "assistant",
+          content: reflection,
+          createdAt: new Date().toISOString(),
+          status: "sent",
+        },
+      ],
+    }));
+  };
+  const addFutureEvent = async (event: {
+    description: string;
+    eventDate: string;
+  }) => {
     if (liveMode) {
-      const result = await companionApi.addEvent(event.description, event.eventDate);
-      setState((current) => ({ ...current, futureEvents: [result.event, ...current.futureEvents], nudges: result.nudge ? [result.nudge, ...current.nudges] : current.nudges }));
+      const result = await companionApi.addEvent(
+        event.description,
+        event.eventDate,
+      );
+      setState((current) => ({
+        ...current,
+        futureEvents: [result.event, ...current.futureEvents],
+        nudges: result.nudge
+          ? [result.nudge, ...current.nudges]
+          : current.nudges,
+      }));
       return;
     }
-    setState((current) => { const eventId = crypto.randomUUID(); const scheduled = new Date(new Date(event.eventDate).getTime() - 3_600_000); if (scheduled.getHours() >= 22 || scheduled.getHours() < 8) scheduled.setHours(8, 0, 0, 0); return { ...current, futureEvents: [{ id: eventId, userId: current.user.id, companionId: current.companion.id, ...event, status: "confirmed", createdAt: new Date().toISOString() }, ...current.futureEvents], nudges: current.notifications.frequency === "off" ? current.nudges : [{ id: crypto.randomUUID(), userId: current.user.id, eventId, content: `You mentioned ${event.description}. Want a calm check-in before it?`, scheduledFor: scheduled.toISOString(), status: "planned" }, ...current.nudges] }; });
+    setState((current) => {
+      const eventId = crypto.randomUUID();
+      const scheduled = new Date(
+        new Date(event.eventDate).getTime() - 3_600_000,
+      );
+      if (scheduled.getHours() >= 22 || scheduled.getHours() < 8)
+        scheduled.setHours(8, 0, 0, 0);
+      return {
+        ...current,
+        futureEvents: [
+          {
+            id: eventId,
+            userId: current.user.id,
+            companionId: current.companion.id,
+            ...event,
+            status: "confirmed",
+            createdAt: new Date().toISOString(),
+          },
+          ...current.futureEvents,
+        ],
+        nudges:
+          current.notifications.frequency === "off"
+            ? current.nudges
+            : [
+                {
+                  id: crypto.randomUUID(),
+                  userId: current.user.id,
+                  eventId,
+                  content: `You mentioned ${event.description}. Want a calm check-in before it?`,
+                  scheduledFor: scheduled.toISOString(),
+                  status: "planned",
+                },
+                ...current.nudges,
+              ],
+      };
+    });
   };
-  const updateMemory = async (updated: MemoryRecord) => { const saved = liveMode ? await companionApi.updateMemory(updated.id, { content: updated.content, pinned: updated.pinned, status: updated.status }) : updated; setState((current) => ({ ...current, memories: current.memories.map((memory) => memory.id === saved.id ? saved : memory) })); };
-  const deleteMemory = async (memoryId: string) => { if (liveMode) await companionApi.deleteMemory(memoryId); setState((current) => ({ ...current, memories: current.memories.map((memory) => memory.id === memoryId ? { ...memory, status: "deleted", updatedAt: new Date().toISOString() } : memory) })); };
-  const addMemory = async (content: string, type: MemoryType) => { const now = new Date().toISOString(); const memory = liveMode ? await companionApi.createMemory(state.companion.id, type, content) : { id: crypto.randomUUID(), userId: state.user.id, companionId: state.companion.id, type, content, normalizedContent: content.toLowerCase(), importance: 0.8, confidence: 1, sourceMessageIds: [], createdAt: now, updatedAt: now, retrievalCount: 0, status: "active" as const, pinned: false }; setState((current) => ({ ...current, memories: [...current.memories, memory] })); };
+  const updateMemory = async (updated: MemoryRecord) => {
+    const saved = liveMode
+      ? await companionApi.updateMemory(updated.id, {
+          content: updated.content,
+          pinned: updated.pinned,
+          status: updated.status,
+        })
+      : updated;
+    setState((current) => ({
+      ...current,
+      memories: current.memories.map((memory) =>
+        memory.id === saved.id ? saved : memory,
+      ),
+    }));
+  };
+  const deleteMemory = async (memoryId: string) => {
+    if (liveMode) await companionApi.deleteMemory(memoryId);
+    setState((current) => ({
+      ...current,
+      memories: current.memories.map((memory) =>
+        memory.id === memoryId
+          ? {
+              ...memory,
+              status: "deleted",
+              updatedAt: new Date().toISOString(),
+            }
+          : memory,
+      ),
+    }));
+  };
+  const addMemory = async (content: string, type: MemoryType) => {
+    const now = new Date().toISOString();
+    const memory = liveMode
+      ? await companionApi.createMemory(state.companion.id, type, content)
+      : {
+          id: crypto.randomUUID(),
+          userId: state.user.id,
+          companionId: state.companion.id,
+          type,
+          content,
+          normalizedContent: content.toLowerCase(),
+          importance: 0.8,
+          confidence: 1,
+          sourceMessageIds: [],
+          createdAt: now,
+          updatedAt: now,
+          retrievalCount: 0,
+          status: "active" as const,
+          pinned: false,
+        };
+    setState((current) => ({
+      ...current,
+      memories: [...current.memories, memory],
+    }));
+  };
 
   const completeActivity = async (activity: ActivityDefinition) => {
     if (state.completedActivityIds.includes(activity.id)) return;
-    const liveWallet = liveMode ? await companionApi.completeActivity(activity.id) : null;
+    const liveWallet = liveMode
+      ? await companionApi.completeActivity(activity.id)
+      : null;
     setState((current) => {
       if (current.completedActivityIds.includes(activity.id)) return current;
       const xp = current.wallet.xp + activity.xp;
@@ -761,27 +1751,82 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
         ...current,
         currentView: "chat",
         completedActivityIds: [...current.completedActivityIds, activity.id],
-        wallet: liveWallet ?? { ...current.wallet, xp, level: Math.max(current.wallet.level, Math.floor(xp / 100) + 1), coins },
-        walletTransactions: liveMode ? current.walletTransactions : [...current.walletTransactions,
-          { id: crypto.randomUUID(), userId: current.user.id, type: "earn", currency: "xp", amount: activity.xp, balanceAfter: xp, referenceId: activity.id, idempotencyKey: `activity:${activity.id}:xp`, createdAt: completedAt },
-          { id: crypto.randomUUID(), userId: current.user.id, type: "earn", currency: "coins", amount: activity.coinReward, balanceAfter: coins, referenceId: activity.id, idempotencyKey: `activity:${activity.id}:coins`, createdAt: completedAt },
+        wallet: liveWallet ?? {
+          ...current.wallet,
+          xp,
+          level: Math.max(current.wallet.level, Math.floor(xp / 100) + 1),
+          coins,
+        },
+        walletTransactions: liveMode
+          ? current.walletTransactions
+          : [
+              ...current.walletTransactions,
+              {
+                id: crypto.randomUUID(),
+                userId: current.user.id,
+                type: "earn",
+                currency: "xp",
+                amount: activity.xp,
+                balanceAfter: xp,
+                referenceId: activity.id,
+                idempotencyKey: `activity:${activity.id}:xp`,
+                createdAt: completedAt,
+              },
+              {
+                id: crypto.randomUUID(),
+                userId: current.user.id,
+                type: "earn",
+                currency: "coins",
+                amount: activity.coinReward,
+                balanceAfter: coins,
+                referenceId: activity.id,
+                idempotencyKey: `activity:${activity.id}:coins`,
+                createdAt: completedAt,
+              },
+            ],
+        messages: [
+          ...current.messages,
+          {
+            id: crypto.randomUUID(),
+            conversationId: current.activeConversationId,
+            role: "assistant",
+            content: `Let’s do “${activity.title}.” ${activity.description} I’ll go first.`,
+            createdAt: completedAt,
+            status: "sent",
+          },
         ],
-        messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: `Let’s do “${activity.title}.” ${activity.description} I’ll go first.`, createdAt: completedAt, status: "sent" }],
       };
     });
   };
 
   const startDate = (environment: EnvironmentId, title: string) => {
-    const environmentItem = state.storeItems.find((item) => environmentForItem(item) === environment);
-    if (environmentItem && !state.ownedItems.some((owned) => owned.itemId === environmentItem.id)) {
-      setActionError(`Unlock ${environmentItem.name} in Companion before starting this date.`);
+    const environmentItem = state.storeItems.find(
+      (item) => environmentForItem(item) === environment,
+    );
+    if (
+      environmentItem &&
+      !state.ownedItems.some((owned) => owned.itemId === environmentItem.id)
+    ) {
+      setActionError(
+        `Unlock ${environmentItem.name} in Companion before starting this date.`,
+      );
       navigate("companion");
       return;
     }
     setState((current) => ({
       ...current,
       activeEnvironment: environment,
-      messages: [...current.messages, { id: crypto.randomUUID(), conversationId: current.activeConversationId, role: "assistant", content: `${title}. Give me one second to change the scene… okay, ready?`, createdAt: new Date().toISOString(), status: "sent" }],
+      messages: [
+        ...current.messages,
+        {
+          id: crypto.randomUUID(),
+          conversationId: current.activeConversationId,
+          role: "assistant",
+          content: `${title}. Give me one second to change the scene… okay, ready?`,
+          createdAt: new Date().toISOString(),
+          status: "sent",
+        },
+      ],
     }));
     setVideoCallOpen(true);
   };
@@ -790,8 +1835,23 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     const now = new Date().toISOString();
     setState((current) => ({
       ...current,
-      calls: [{ id: crypto.randomUUID(), type, startedAt: now, durationSeconds, summary: type === "video" ? "A warm visual check-in with one shared activity." : "A quick voice check-in and a calm reset." }, ...current.calls],
-      relationship: { ...current.relationship, progress: Math.min(100, current.relationship.progress + 3) },
+      calls: [
+        {
+          id: crypto.randomUUID(),
+          type,
+          startedAt: now,
+          durationSeconds,
+          summary:
+            type === "video"
+              ? "A warm visual check-in with one shared activity."
+              : "A quick voice check-in and a calm reset.",
+        },
+        ...current.calls,
+      ],
+      relationship: {
+        ...current.relationship,
+        progress: Math.min(100, current.relationship.progress + 3),
+      },
     }));
     setVoiceCallOpen(false);
     setVideoCallOpen(false);
@@ -799,24 +1859,56 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
 
   const openVoiceCall = () => {
     if (!processingAllowed()) return;
-    if (!featureEntitlements.has(state.subscription.planId, "voiceCalls")) setPlansOpen(true);
-    else setVoiceCallOpen(true);
+    if (!featureEntitlements.has(state.subscription.planId, "voiceCalls"))
+      setPlansOpen(true);
+    else {
+      trackEvent("voice_call_start");
+      setVoiceCallOpen(true);
+    }
   };
   const openVideoCall = () => {
     if (!processingAllowed()) return;
-    if (!featureEntitlements.has(state.subscription.planId, "videoCalls")) setPlansOpen(true);
-    else setVideoCallOpen(true);
+    if (!featureEntitlements.has(state.subscription.planId, "videoCalls"))
+      setPlansOpen(true);
+    else {
+      trackEvent("video_call_start");
+      setVideoCallOpen(true);
+    }
   };
-  const analyzeSharedCallFrame = async (dataBase64: string, contentType: string) => {
-    if (liveMode) return (await companionApi.analyzeImage(dataBase64, contentType, "React naturally to the single camera frame the user explicitly shared during a video call. Describe only visible, non-sensitive details and do not identify people.")).description;
+  const analyzeSharedCallFrame = async (
+    dataBase64: string,
+    contentType: string,
+  ) => {
+    if (liveMode)
+      return (
+        await companionApi.analyzeImage(
+          dataBase64,
+          contentType,
+          "React naturally to the single camera frame the user explicitly shared during a video call. Describe only visible, non-sensitive details and do not identify people.",
+        )
+      ).description;
     await pause(280);
-    return "Okay, I can see the frame you chose to share. I won’t guess anything sensitive about you, but I’m here for the story behind what you’re showing me.";
+    return "Camera-frame understanding is not available in this beta. You can describe what you want to show me, and we can talk about it.";
   };
 
   const replyDuringCall = (content: string, delivery: "voice" | "video") => {
     if (liveMode) {
       let reply = "";
-      return companionApi.streamChat({ conversationId: state.activeConversationId, companionId: state.companion.id, clientMessageId: crypto.randomUUID(), content, memoryEnabled: state.memoryEnabled, responsePreferences: state.responsePreferences }, (delta) => { reply += delta; }).then(() => reply);
+      return companionApi
+        .streamChat(
+          {
+            conversationId: state.activeConversationId,
+            companionId: state.companion.id,
+            clientMessageId: crypto.randomUUID(),
+            content,
+            memoryEnabled: state.memoryEnabled,
+            responsePreferences: state.responsePreferences,
+          },
+          (delta) => {
+            reply += delta;
+          },
+        )
+        .then(() => reply);
     }
     const now = new Date();
     const userTurn: ChatMessage = {
@@ -827,7 +1919,10 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
       createdAt: now.toISOString(),
       status: "sent",
     };
-    const conversation = [...messagesForConversation(state.messages, state.activeConversationId), userTurn];
+    const conversation = [
+      ...messagesForConversation(state.messages, state.activeConversationId),
+      userTurn,
+    ];
     const turn = createCompanionTurn(content, conversation, now, delivery);
     return generateDemoReply(conversation, delivery, turn).then((reply) => {
       const assistantTurn: ChatMessage = {
@@ -840,7 +1935,12 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
       };
       setState((current) => ({
         ...current,
-        memories: rememberConversationMessage(current, content, userTurn.id, now),
+        memories: rememberConversationMessage(
+          current,
+          content,
+          userTurn.id,
+          now,
+        ),
         messages: [...current.messages, userTurn, assistantTurn],
       }));
       return reply;
@@ -848,12 +1948,24 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
   };
 
   const exportData = async () => {
-    const payload = accountMode ? await accountClient.exportData() : liveMode ? await companionApi.exportData() : { exportedAt: new Date().toISOString(), source: "companaro-demo", ...state };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const payload = accountMode
+      ? await accountClient.exportData()
+      : liveMode
+        ? await companionApi.exportData()
+        : {
+            exportedAt: new Date().toISOString(),
+            source: "companaro-demo",
+            ...state,
+          };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = cloudBacked ? "companaro-account-export.json" : "companaro-demo-export.json";
+    anchor.download = cloudBacked
+      ? "companaro-account-export.json"
+      : "companaro-demo-export.json";
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -870,7 +1982,10 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
       return;
     }
     window.localStorage.removeItem(storageKey);
-    setState({ ...initialState, firstMeetingComplete: false });
+    setState(freshDemo());
+    setLegacyDemo(false);
+    setResetDemoOpen(false);
+    trackEvent("demo_reset");
   };
 
   const logout = async () => {
@@ -879,32 +1994,425 @@ export function CompanionApp({ forceDemo = false, productionAccount = false }: {
     router.replace("/login");
   };
 
-  if (!hydrated) return <div className="app-loader"><span /><p>Opening Mira’s room…</p></div>;
-  if (hydrationError) return <div className="app-loader"><p>{hydrationError}</p><button type="button" className="button button--primary" onClick={() => window.location.reload()}>Try again</button></div>;
-  if (!state.onboardingComplete) return <Onboarding onComplete={completeOnboarding} />;
-  if (!state.firstMeetingComplete) return <FirstMeeting userName={state.user.name} companionName={state.companion.name} onComplete={() => setState((current) => ({ ...current, firstMeetingComplete: true }))} />;
+  if (!hydrated)
+    return (
+      <div className="app-loader">
+        <span />
+        <p>Opening Mira’s room…</p>
+      </div>
+    );
+  if (hydrationError)
+    return (
+      <div className="app-loader">
+        <p>{hydrationError}</p>
+        <button
+          type="button"
+          className="button button--primary"
+          onClick={() => window.location.reload()}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  if (!state.onboardingComplete)
+    return <Onboarding onComplete={completeOnboarding} />;
+  if (!state.firstMeetingComplete)
+    return (
+      <FirstMeeting
+        userName={state.user.name}
+        companionName={state.companion.name}
+        onComplete={() =>
+          setState((current) => ({ ...current, firstMeetingComplete: true }))
+        }
+      />
+    );
 
   const renderView = () => {
     switch (state.currentView) {
-      case "home": return <HomeView state={state} onChat={() => navigate("chat")} onCall={openVoiceCall} onVideoCall={openVideoCall} onMoments={() => openMoments("moments")} onMemory={() => navigate("memory")} onCompanion={() => navigate("companion")} onSpendTime={() => openMoments("together")} onEnvironmentChange={(activeEnvironment) => setState((current) => ({ ...current, activeEnvironment }))} onAmbienceChange={() => setState((current) => ({ ...current, ambienceEnabled: !current.ambienceEnabled }))} />;
-      case "chat": return <ChatView state={state} streaming={streaming} processingEnabled={state.aiProcessingConsent} liveMode={cloudBacked} onSend={sendMessage} onNewConversation={() => runAction(newConversation(), "A new conversation could not be started.")} onDeleteConversation={deleteConversation} onBack={() => navigate("home")} onCall={openVoiceCall} onVideoCall={openVideoCall} onVoiceNote={sendVoiceNote} onVoiceRecording={sendVoiceRecording} onSpeak={(content: string) => speakWithProvider(content).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Speech playback failed."))} onImageUpload={uploadImage} onGenerateImage={generateImage} onFeedback={recordFeedback} onRegenerate={(messageId) => runAction(regenerateResponse(messageId), "The response could not be regenerated.")} onUpgrade={() => setPlansOpen(true)} onCamera={() => { if (!processingAllowed()) return; if (!featureEntitlements.has(state.subscription.planId, "cameraConversation")) setPlansOpen(true); else setCameraOpen(true); }} />;
-      case "moments": return <MomentsView key={momentsTab} defaultTab={momentsTab} state={state} liveMode={cloudBacked} onCompleteActivity={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onStartDate={startDate} onGenerateSelfie={addSelfie} onVideoCall={openVideoCall} />;
-      case "companion": return <CompanionView companion={state.companion} backstory={state.companionBackstory} storeItems={state.storeItems} ownedItems={state.ownedItems} wallet={state.wallet} subscription={state.subscription} onChange={changeCompanion} onBackstoryChange={(companionBackstory) => setState((current) => ({ ...current, companionBackstory }))} onPurchase={purchaseItem} onEquip={equipItem} onUpgrade={() => setPlansOpen(true)} />;
-      case "memory": return <MemoryView memories={state.memories} enabled={state.memoryEnabled} companionName={state.companion.name} onToggle={() => setState((current) => ({ ...current, memoryEnabled: !current.memoryEnabled }))} onUpdate={(memory) => runAction(updateMemory(memory), "The memory could not be updated.")} onDelete={(memoryId) => runAction(deleteMemory(memoryId), "The memory could not be deleted.")} onAdd={(content, type) => runAction(addMemory(content, type), "The memory could not be added.")} />;
-      case "activities": return <ActivitiesView activities={state.activities} completedIds={state.completedActivityIds} wallet={state.wallet} journalEntries={state.journalEntries} futureEvents={state.futureEvents} nudges={state.nudges} companionName={state.companion.name} liveMode={cloudBacked} onComplete={(activity) => runAction(completeActivity(activity), "The activity could not be completed.")} onAddJournal={(entry) => runAction(addJournal(entry), "The journal entry could not be saved.")} onDeleteJournal={(entryId) => runAction(deleteJournal(entryId), "The journal entry could not be deleted.")} onReflect={(entry) => runAction(reflectOnJournal(entry), "The reflection could not be created.")} onAddEvent={(event) => runAction(addFutureEvent(event), "The future plan could not be saved.")} />;
-      case "profile": return <ProfileView state={state} liveMode={cloudBacked} onChange={changeProfile} onExport={() => runAction(exportData(), "Your data export could not be created.")} onDelete={() => runAction(deleteDemo(), "Your account could not be deleted.")} {...(cloudBacked ? { onLogout: () => runAction(logout(), "You could not be signed out.") } : {})} onUpgrade={() => setPlansOpen(true)} onOpenMemory={() => navigate("memory")} onOpenActivities={() => openMoments("together")} />;
+      case "home":
+        return (
+          <HomeView
+            state={state}
+            onChat={() => navigate("chat")}
+            onCall={openVoiceCall}
+            onVideoCall={openVideoCall}
+            onMoments={() => openMoments("moments")}
+            onMemory={() => navigate("memory")}
+            onCompanion={() => navigate("companion")}
+            onSpendTime={() => openMoments("together")}
+            onEnvironmentChange={(activeEnvironment) =>
+              setState((current) => ({ ...current, activeEnvironment }))
+            }
+            onAmbienceChange={() =>
+              setState((current) => ({
+                ...current,
+                ambienceEnabled: !current.ambienceEnabled,
+              }))
+            }
+          />
+        );
+      case "chat":
+        return (
+          <ChatView
+            state={state}
+            streaming={streaming}
+            processingEnabled={state.aiProcessingConsent}
+            liveMode={cloudBacked}
+            onSend={sendMessage}
+            onNewConversation={() =>
+              runAction(
+                newConversation(),
+                "A new conversation could not be started.",
+              )
+            }
+            onDeleteConversation={deleteConversation}
+            onBack={() => navigate("home")}
+            onCall={openVoiceCall}
+            onVideoCall={openVideoCall}
+            onVoiceNote={sendVoiceNote}
+            onVoiceRecording={sendVoiceRecording}
+            onSpeak={(content: string) =>
+              speakWithProvider(content).catch((cause) =>
+                setActionError(
+                  cause instanceof Error
+                    ? cause.message
+                    : "Speech playback failed.",
+                ),
+              )
+            }
+            onImageUpload={uploadImage}
+            onGenerateImage={generateImage}
+            onFeedback={recordFeedback}
+            onRegenerate={(messageId) =>
+              runAction(
+                regenerateResponse(messageId),
+                "The response could not be regenerated.",
+              )
+            }
+            onUpgrade={() => setPlansOpen(true)}
+            onCamera={() => {
+              if (!processingAllowed()) return;
+              if (
+                !featureEntitlements.has(
+                  state.subscription.planId,
+                  "cameraConversation",
+                )
+              )
+                setPlansOpen(true);
+              else setCameraOpen(true);
+            }}
+          />
+        );
+      case "moments":
+        return (
+          <MomentsView
+            key={momentsTab}
+            defaultTab={momentsTab}
+            state={state}
+            liveMode={cloudBacked}
+            onCompleteActivity={(activity) =>
+              runAction(
+                completeActivity(activity),
+                "The activity could not be completed.",
+              )
+            }
+            onStartDate={startDate}
+            onGenerateSelfie={addSelfie}
+            onVideoCall={openVideoCall}
+          />
+        );
+      case "companion":
+        return (
+          <CompanionView
+            companion={state.companion}
+            backstory={state.companionBackstory}
+            storeItems={state.storeItems}
+            ownedItems={state.ownedItems}
+            wallet={state.wallet}
+            subscription={state.subscription}
+            onChange={changeCompanion}
+            onBackstoryChange={(companionBackstory) =>
+              setState((current) => ({ ...current, companionBackstory }))
+            }
+            onPurchase={purchaseItem}
+            onEquip={equipItem}
+            onUpgrade={() => setPlansOpen(true)}
+          />
+        );
+      case "memory":
+        return (
+          <MemoryView
+            memories={state.memories}
+            enabled={state.memoryEnabled}
+            companionName={state.companion.name}
+            onToggle={() =>
+              setState((current) => ({
+                ...current,
+                memoryEnabled: !current.memoryEnabled,
+              }))
+            }
+            onUpdate={(memory) =>
+              runAction(
+                updateMemory(memory),
+                "The memory could not be updated.",
+              )
+            }
+            onDelete={(memoryId) =>
+              runAction(
+                deleteMemory(memoryId),
+                "The memory could not be deleted.",
+              )
+            }
+            onAdd={(content, type) =>
+              runAction(
+                addMemory(content, type),
+                "The memory could not be added.",
+              )
+            }
+          />
+        );
+      case "activities":
+        return (
+          <ActivitiesView
+            activities={state.activities}
+            completedIds={state.completedActivityIds}
+            wallet={state.wallet}
+            journalEntries={state.journalEntries}
+            futureEvents={state.futureEvents}
+            nudges={state.nudges}
+            companionName={state.companion.name}
+            liveMode={cloudBacked}
+            onComplete={(activity) =>
+              runAction(
+                completeActivity(activity),
+                "The activity could not be completed.",
+              )
+            }
+            onAddJournal={(entry) =>
+              runAction(
+                addJournal(entry),
+                "The journal entry could not be saved.",
+              )
+            }
+            onDeleteJournal={(entryId) =>
+              runAction(
+                deleteJournal(entryId),
+                "The journal entry could not be deleted.",
+              )
+            }
+            onReflect={(entry) =>
+              runAction(
+                reflectOnJournal(entry),
+                "The reflection could not be created.",
+              )
+            }
+            onAddEvent={(event) =>
+              runAction(
+                addFutureEvent(event),
+                "The future plan could not be saved.",
+              )
+            }
+          />
+        );
+      case "profile":
+        return (
+          <ProfileView
+            state={state}
+            liveMode={cloudBacked}
+            onChange={changeProfile}
+            onExport={() =>
+              runAction(exportData(), "Your data export could not be created.")
+            }
+            onDelete={() =>
+              runAction(deleteDemo(), "Your account could not be deleted.")
+            }
+            {...(cloudBacked
+              ? {
+                  onLogout: () =>
+                    runAction(logout(), "You could not be signed out."),
+                }
+              : {})}
+            onUpgrade={() => setPlansOpen(true)}
+            onOpenMemory={() => navigate("memory")}
+            onOpenActivities={() => openMoments("together")}
+          />
+        );
     }
   };
 
-  return (
+  const appContent = (
     <>
-      <AppShell active={state.currentView} onNavigate={navigate} onCall={openVoiceCall} companionName={state.companion.name} relationshipStage={state.relationship.stage} relationshipLevel={state.relationship.level} immersive={state.currentView === "home"}>{renderView()}</AppShell>
-      {voiceCallOpen ? <VoiceCallModal companionName={state.companion.name} userName={state.user.name} onUserTurn={(content) => replyDuringCall(content, "voice")} onClose={(seconds) => finishCall("voice", seconds)} /> : null}
-      {videoCallOpen ? <VideoCallModal companionName={state.companion.name} userName={state.user.name} initialEnvironment={state.activeEnvironment} onUserTurn={(content) => replyDuringCall(content, "video")} onAnalyzeFrame={analyzeSharedCallFrame} onClose={(seconds) => finishCall("video", seconds)} /> : null}
-      {cameraOpen ? <CameraConversationModal companionName={state.companion.name} onSessionStart={liveMode ? companionApi.startCameraSession : async () => ({ mock: true })} onAnalyzeFrame={liveMode ? async (dataBase64: string, contentType: string) => (await companionApi.analyzeImage(dataBase64, contentType, "Discuss the visible object or surroundings naturally and safely.")).description : async () => { await pause(280); return "I can see the frame you chose to share. Tell me what matters about it to you, and I’ll stay with that rather than making assumptions."; }} onClose={() => setCameraOpen(false)} /> : null}
-      {plansOpen ? <PlanModal current={state.subscription.planId} onSelect={(planId) => runAction(choosePlan(planId), "The plan could not be changed.")} onClose={() => setPlansOpen(false)} /> : null}
-      {processingNoticeOpen ? <Modal title="AI processing is paused" description="Turn processing consent back on before starting chat, voice, video, camera, or image features." onClose={() => setProcessingNoticeOpen(false)}><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setProcessingNoticeOpen(false)}>Keep paused</button><button type="button" className="button button--primary" onClick={() => { setState((current) => ({ ...current, aiProcessingConsent: true })); setProcessingNoticeOpen(false); }}>Enable AI features</button></div></Modal> : null}
-      {actionError ? <Modal title="That didn’t work" description={actionError} onClose={() => setActionError("")}><button type="button" className="button button--primary" onClick={() => setActionError("")}>Okay</button></Modal> : null}
+      <AppShell
+        active={state.currentView}
+        onNavigate={navigate}
+        onCall={openVoiceCall}
+        companionName={state.companion.name}
+        relationshipStage={state.relationship.stage}
+        relationshipLevel={state.relationship.level}
+        immersive={state.currentView === "home"}
+      >
+        {legacyDemo ? (
+          <aside className="demo-migration-notice" role="status">
+            Your saved conversation is from an earlier Mira version. Old replies
+            are history, not new responses.{" "}
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setResetDemoOpen(true)}
+            >
+              Reset demo
+            </button>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setLegacyDemo(false)}
+            >
+              Keep history
+            </button>
+          </aside>
+        ) : null}
+        {renderView()}
+        {!cloudBacked ? (
+          <footer className="demo-migration-notice">
+            <span>
+              Private browser demo · <Link href="/privacy">Privacy</Link>
+            </span>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setResetDemoOpen(true)}
+            >
+              Reset demo
+            </button>
+          </footer>
+        ) : null}
+      </AppShell>
+      {resetDemoOpen ? (
+        <Modal
+          title="Reset this browser demo?"
+          description="This removes local chats, memories and preferences. It does not delete an online account. Export first if you want to keep your history."
+          onClose={() => setResetDemoOpen(false)}
+        >
+          <div className="modal-actions">
+            <button
+              className="button button--ghost"
+              onClick={() => void exportData()}
+            >
+              Export first
+            </button>
+            <button
+              className="button button--ghost"
+              onClick={() => setResetDemoOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="button button--danger"
+              onClick={() => void deleteDemo()}
+            >
+              Reset demo
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+      {voiceCallOpen ? (
+        <VoiceCallModal
+          companionName={state.companion.name}
+          userName={state.user.name}
+          onUserTurn={(content) => replyDuringCall(content, "voice")}
+          onClose={(seconds) => finishCall("voice", seconds)}
+        />
+      ) : null}
+      {videoCallOpen ? (
+        <VideoCallModal
+          companionName={state.companion.name}
+          userName={state.user.name}
+          initialEnvironment={state.activeEnvironment}
+          onUserTurn={(content) => replyDuringCall(content, "video")}
+          onAnalyzeFrame={analyzeSharedCallFrame}
+          onClose={(seconds) => finishCall("video", seconds)}
+        />
+      ) : null}
+      {cameraOpen ? (
+        <CameraConversationModal
+          companionName={state.companion.name}
+          onSessionStart={
+            liveMode
+              ? companionApi.startCameraSession
+              : async () => ({ mock: true })
+          }
+          onAnalyzeFrame={
+            liveMode
+              ? async (dataBase64: string, contentType: string) =>
+                  (
+                    await companionApi.analyzeImage(
+                      dataBase64,
+                      contentType,
+                      "Discuss the visible object or surroundings naturally and safely.",
+                    )
+                  ).description
+              : async () => {
+                  return "Camera-frame understanding is not available in this beta. You can describe what you want to show me, and we can talk about it.";
+                }
+          }
+          onClose={() => setCameraOpen(false)}
+        />
+      ) : null}
+      {plansOpen ? (
+        <PlanModal
+          current={state.subscription.planId}
+          onSelect={(planId) =>
+            runAction(choosePlan(planId), "The plan could not be changed.")
+          }
+          onClose={() => setPlansOpen(false)}
+        />
+      ) : null}
+      {processingNoticeOpen ? (
+        <Modal
+          title="AI processing is paused"
+          description="Turn processing consent back on before starting chat, voice, video, camera, or image features."
+          onClose={() => setProcessingNoticeOpen(false)}
+        >
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setProcessingNoticeOpen(false)}
+            >
+              Keep paused
+            </button>
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={() => {
+                setState((current) => ({
+                  ...current,
+                  aiProcessingConsent: true,
+                }));
+                setProcessingNoticeOpen(false);
+              }}
+            >
+              Enable AI features
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+      {actionError ? (
+        <Modal
+          title="That didn’t work"
+          description={actionError}
+          onClose={() => setActionError("")}
+        >
+          <button
+            type="button"
+            className="button button--primary"
+            onClick={() => setActionError("")}
+          >
+            Okay
+          </button>
+        </Modal>
+      ) : null}
     </>
   );
+  return forceDemo ? <AdultDemoGate>{appContent}</AdultDemoGate> : appContent;
 }

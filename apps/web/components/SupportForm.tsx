@@ -13,6 +13,7 @@ export function SupportForm() {
     setSubmitting(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
     try {
       const response = await fetch("/api/support", {
         method: "POST",
@@ -27,7 +28,7 @@ export function SupportForm() {
       const result = await response.json() as { ticketId?: string; error?: string };
       if (!response.ok || !result.ticketId) throw new Error(result.error || "Your report could not be submitted.");
       setTicketId(result.ticketId);
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Your report could not be submitted.");
     } finally {

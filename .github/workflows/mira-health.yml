@@ -1,0 +1,26 @@
+name: Mira availability monitor
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check application and database
+        run: |
+          curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 3 'https://luma-companion.prakhargupta267.workers.dev/api/health'
+          curl --fail --silent --show-error --max-time 15 'https://luma-companion.prakhargupta267.workers.dev/demo' -o /dev/null
+      - name: Notify configured incident channel on failure
+        if: failure()
+        env:
+          MIRA_ALERT_WEBHOOK: ${{ secrets.MIRA_ALERT_WEBHOOK }}
+        run: |
+          if [ -n "$MIRA_ALERT_WEBHOOK" ]; then
+            curl --fail --silent --show-error --max-time 15 -X POST -H 'Content-Type: application/json' --data '{"text":"Mira availability check failed. Investigate the Mira availability monitor in GitHub Actions; see docs/LAUNCH-OPERATIONS.md."}' "$MIRA_ALERT_WEBHOOK"
+          else
+            echo 'No alert channel configured. Enable Actions failure notifications for the operator.'
+          fi

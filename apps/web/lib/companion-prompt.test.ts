@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompanionSystemPrompt, buildContextualDirectReply, buildIdentityReply, buildMemoryRecallReply, detectCompanionLanguage, detectCompanionRequestLanguage, isGenericCompanionReply, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, sanitizeCompanionReplyForDelivery } from "./companion-prompt";
+import { buildCompanionSystemPrompt, buildContextualDirectReply, buildDayCheckInReply, buildIdentityReply, buildMemoryRecallReply, canUseSavedMemoryReply, detectCompanionLanguage, detectCompanionRequestLanguage, isGenericCompanionReply, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReply, sanitizeCompanionReplyForDelivery } from "./companion-prompt";
 
 const request = {
   messages: [{ role: "user" as const, content: "nothing just monotonous" }],
@@ -12,6 +12,7 @@ const request = {
 };
 
 describe("edge companion prompting", () => {
+  it("answers simple day check-ins without depending on provider availability",()=>{expect(buildDayCheckInReply("आज तुम्हारा दिन कैसा था?")).toContain("तुम्हारे साथ");expect(buildDayCheckInReply("How was your day?")).toContain("conversation");expect(buildDayCheckInReply("tumhara din kaisa tha")).toContain("tumhare saath");expect(buildDayCheckInReply("My day was rough")).toBeNull();});
   it("forbids the canned listener language seen in the failed call", () => {
     const prompt = buildCompanionSystemPrompt(request);
     expect(prompt).toContain("Ordinary statements deserve ordinary conversation");
@@ -24,6 +25,8 @@ describe("edge companion prompting", () => {
   });
 
   it("detects each input language and validates matching replies", () => {
+    expect(detectCompanionLanguage("yar ofis mein boss ne sabke samne daant dia")).toBe("hinglish");
+    expect(detectCompanionLanguage("The main road is closed")).toBe("en");
     expect(detectCompanionLanguage("How are you today?")).toBe("en");
     expect(detectCompanionLanguage("आज तुम कैसी हो?" )).toBe("hi");
     expect(detectCompanionLanguage("yaar aaj kaafi busy tha")).toBe("hinglish");
@@ -116,6 +119,8 @@ describe("edge companion prompting", () => {
   });
 
   it("answers memory requests in the user's current language", () => {
+    expect(canUseSavedMemoryReply({...request,messages:[{role:"user",content:"What do you remember about me?"}]})).toBe(true);
+    expect(canUseSavedMemoryReply({...request,messages:[{role:"user",content:"My cat is named Sona."},{role:"assistant",content:"Sona is a lovely name."},{role:"user",content:"Do you remember what my cat is called?"}]})).toBe(false);
     expect(isMemoryRecallRequest("maine pehle kya bataya tha?")).toBe(true);
     expect(isMemoryRecallRequest("मैंने पहले क्या बताया था?" )).toBe(true);
     expect(buildMemoryRecallReply({ ...request, messages: [{ role: "user", content: "maine pehle kya bataya tha?" }], memories: ["Prakhar said: “I work from a small studio in Pune”"] })).toContain("I work from a small studio in Pune");

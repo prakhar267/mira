@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BellRing, BookHeart, BrainCircuit, CalendarDays, Check, CreditCard, Database, Download, FileJson, Heart, LogOut, Moon, ShieldCheck, Sparkles, Sun, Trash2, UserRound, UsersRound, Volume2 } from "lucide-react";
 import type { DemoState } from "@/lib/state";
 import { Modal } from "./Modal";
+import { AnalyticsConsent } from "./AnalyticsConsent";
 
 export function ProfileView({ state, liveMode = false, onChange, onExport, onDelete, onLogout, onUpgrade, onOpenMemory, onOpenActivities }: { state: DemoState; liveMode?: boolean; onChange: (next: DemoState) => void; onExport: () => void | Promise<void>; onDelete: () => void | Promise<void>; onLogout?: () => void | Promise<void>; onUpgrade: () => void; onOpenMemory: () => void; onOpenActivities: () => void }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -16,6 +17,7 @@ export function ProfileView({ state, liveMode = false, onChange, onExport, onDel
     <section className="workspace profile-view" aria-labelledby="profile-title">
       <header className="workspace-header workspace-header--text"><div><span className="eyebrow">Your story</span><h1 id="profile-title">You</h1><p>What {state.companion.name} knows, how your relationship feels, and the boundaries you control.</p></div><div className="profile-summary"><img src="/assets/mira/portrait.png" alt="" /><span><strong>{state.user.name}</strong><small>With {state.companion.name} since {companionSince}</small></span></div></header>
       <div className="settings-grid">
+        <section className="settings-section"><AnalyticsConsent/></section>
         <section className="settings-section"><div className="settings-section__heading"><UserRound aria-hidden="true" /><div><h2>Account</h2><p>Basic profile information</p></div></div><label className="field">Name<input value={state.user.name} onChange={(event) => onChange({ ...state, user: { ...state.user, name: event.target.value } })} /></label><label className="field">Pronouns<select value={state.user.pronouns} onChange={(event) => onChange({ ...state, user: { ...state.user, pronouns: event.target.value as DemoState["user"]["pronouns"] } })}><option>she/her</option><option>he/him</option><option>they/them</option></select></label></section>
 
         <section className="settings-section subscription-card"><div className="settings-section__heading"><CreditCard aria-hidden="true" /><div><h2>{state.subscription.testMode ? "Free public beta" : `${state.subscription.planId[0]?.toUpperCase()}${state.subscription.planId.slice(1)} plan`}</h2><p>{state.subscription.testMode ? "No payment details required" : "Subscription managed securely"}</p></div></div><p>Text chat, voice, avatar calls, inspectable memory, and activities are included during the beta.</p><button type="button" className="button button--primary" onClick={onUpgrade}><Sparkles aria-hidden="true" /> See beta access</button></section>

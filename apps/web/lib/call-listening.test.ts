@@ -12,18 +12,20 @@ describe("call speech evidence", () => {
     expect(hasUsableCallSpeech({ peakLevel: .045, voicedFrames: 14, voicedSpanMs: 320 })).toBe(true);
   });
 
-  it("prefers multilingual server recognition but keeps a clearly fuller browser transcript", () => {
+  it("prefers multilingual recognition even when English-only recognition is longer", () => {
     expect(preferredCallTranscript("  wrong browser text ", "aaj   kaafi tired hoon")).toBe("aaj kaafi tired hoon");
     expect(preferredCallTranscript("", "  meri sister Aisha hai ")).toBe("meri sister Aisha hai");
     expect(preferredCallTranscript("  browser fallback ", "")).toBe("browser fallback");
-    expect(preferredCallTranscript("my manager blamed me in front of the whole team", "manager blamed me")).toBe("my manager blamed me in front of the whole team");
+    expect(preferredCallTranscript("my manager blamed me in front of the whole team", "manager blamed me")).toBe("manager blamed me");
     expect(preferredCallTranscript("mera dost kal aa raha hai", "मेरा दोस्त कल आ रहा है")).toBe("मेरा दोस्त कल आ रहा है");
-    expect(preferredCallTranscript("my sister Priya has an interview tomorrow and she is nervous", "बहन का इंटरव्यू है")).toBe("my sister Priya has an interview tomorrow and she is nervous");
+    expect(preferredCallTranscript("my sister Priya has an interview tomorrow and she is nervous", "बहन का इंटरव्यू है")).toBe("बहन का इंटरव्यू है");
   });
 
   it("uses browser recognition early only for complete phrases", () => {
-    expect(isConfidentBrowserTranscript("yaar main usko kya bolun")).toBe(true);
-    expect(isConfidentBrowserTranscript("I had a bad meeting today")).toBe(true);
+    expect(isConfidentBrowserTranscript("yaar main usko kya bolun",.95)).toBe(true);
+    expect(isConfidentBrowserTranscript("I had a bad meeting today",.92)).toBe(true);
+    expect(isConfidentBrowserTranscript("I had a bad meeting today")).toBe(false);
+    expect(isConfidentBrowserTranscript("I had a bad meeting today",.6)).toBe(false);
     expect(isConfidentBrowserTranscript("kya yaar")).toBe(false);
     expect(isConfidentBrowserTranscript("thanks for watching")).toBe(false);
   });

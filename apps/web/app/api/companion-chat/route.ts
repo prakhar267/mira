@@ -1,15 +1,12 @@
-import { buildCompanionSystemPrompt, buildContextualDirectReply, buildIdentityReply, buildMemoryRecallReply, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, isMemoryRecallRequest, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type CompanionLanguage, type EdgeCompanionRequest } from "@/lib/companion-prompt";
+import { buildDayCheckInReply, buildIdentityReply, buildMemoryRecallReply, canUseSavedMemoryReply, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "@/lib/companion-prompt";
 import { assessSafety } from "@companion/ai";
 import { assertEdgeSameOrigin, containsDisallowedAbuse, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
-import { createFreeChatRequest, FREE_CHAT_ENDPOINT, FREE_CHAT_MODEL, readFreeChatResponse, type FreeChatMessage } from "@/lib/free-chat";
+import { buildFreeChatSystemPrompt, type FreeChatMessage } from "@/lib/free-chat";
+import { withProviderDeadline } from "@/lib/provider-resilience";
+import { consumeCapacity } from "@/lib/capacity";
+import { readChatStream } from "@/lib/chat-stream";
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-
-function rewriteLanguageInstruction(language: CompanionLanguage) {
-  if (language === "hi") return "Reply only in natural conversational Hindi using Devanagari.";
-  if (language === "hinglish") return "Reply only in natural Indian Roman-script Hinglish, with a genuine Hindi-English mix and no Devanagari.";
-  return "Reply only in natural conversational English, without adding Hindi or Hinglish words.";
-}
 
 function readModelText(result: unknown) {
   if (typeof result === "string") return result;
@@ -39,7 +36,7 @@ function parseRequest(value: unknown): EdgeCompanionRequest | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
   if (!Array.isArray(raw.messages) || !raw.companion || !raw.user) return null;
-  const messages = raw.messages.slice(-20).flatMap((message) => {
+  const messages = raw.messages.slice(-48).flatMap((message) => {
     if (!message || typeof message !== "object") return [];
     const item = message as Record<string, unknown>;
     if ((item.role !== "user" && item.role !== "assistant") || typeof item.content !== "string") return [];
@@ -72,7 +69,7 @@ export async function POST(request: Request) {
   try {
     assertEdgeSameOrigin(request);
     if (await edgeRateLimited(request, "companion-chat", 24)) return respond({ error: "Please give Mira a moment before sending more." }, 429, { limited: true });
-    const input = parseRequest(await readEdgeJson(request, 55_000));
+    const input = parseRequest(await readEdgeJson(request, 110_000));
     if (!input) return respond({ error: "Invalid conversation request." }, 400);
     const latestUserMessage = input.messages.at(-1)?.content ?? "";
     const expectedLanguage = detectCompanionRequestLanguage(input);
@@ -80,49 +77,41 @@ export async function POST(request: Request) {
     if (safety.level !== "safe" && safety.response) return respond({ reply: "Ismein main help nahi kar sakti. Agar kisi ko immediate danger hai, abhi local emergency support ya kisi trusted person se contact karo.", model: "safety" }, 200, { guard: safety.category });
     if (containsDisallowedAbuse(latestUserMessage)) return respond({ reply: "Minors, bina consent, ya exploitation wali sexual cheezon mein main help nahi kar sakti. Hum consenting adults ke beech safe baat rakh sakte hain.", model: "safety" }, 200, { guard: "exploitation" });
     if (isIdentityRequest(latestUserMessage)) return respond({ reply: buildIdentityReply(input.companion.name, expectedLanguage), model: "identity" }, 200, { model: "identity", language: expectedLanguage });
-    if (isMemoryRecallRequest(latestUserMessage)) return respond({ reply: buildMemoryRecallReply(input), model: "memory" }, 200, { model: "memory" });
-    const contextualReply = buildContextualDirectReply(input, expectedLanguage);
-    if (contextualReply) return respond({ reply: contextualReply, model: "context" }, 200, { model: "context", language: expectedLanguage });
+    if (canUseSavedMemoryReply(input)) return respond({ reply: buildMemoryRecallReply(input), model: "memory" }, 200, { model: "memory" });
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
+    const dayReply = buildDayCheckInReply(latestUserMessage, expectedLanguage);
+    if (dayReply && !suppressQuestions) return respond({reply:dayReply,model:"day-check-in"},200,{model:"day-check-in",language:expectedLanguage});
+    await consumeCapacity("chat");
     const messages: FreeChatMessage[] = [
-      { role: "system", content: buildCompanionSystemPrompt(input) },
+      { role: "system", content: buildFreeChatSystemPrompt(input) },
       ...input.messages,
     ];
     const validReply = (reply: string) => !isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions, expectedLanguage);
-    try {
-      const response = await fetch(FREE_CHAT_ENDPOINT, {
-        ...createFreeChatRequest(messages, input.delivery),
-        signal: AbortSignal.any([request.signal, AbortSignal.timeout(5_000)]),
-      });
-      if (!response.ok) throw new Error(`Free chat returned ${response.status}.`);
-      const generated = readFreeChatResponse(await response.json());
-      const reply = sanitizeCompanionReplyForDelivery(generated.text, input.delivery);
-      if (validReply(reply)) {
-        const selectedModel = generated.model || FREE_CHAT_MODEL;
-        return respond({ reply, model: selectedModel }, 200, { model: selectedModel, provider: "llm7", language: expectedLanguage, delivery: input.delivery ?? "text" });
-      }
-      console.warn("Free chat reply missed conversation requirements.");
-    } catch (cause) {
-      console.warn("Free chat unavailable; trying Cloudflare", cause instanceof Error ? cause.message : "unknown");
-    }
-
-    const runCloudflare = async (promptMessages: typeof messages) => sanitizeCompanionReplyForDelivery(readModelText(await env.AI.run(MODEL as never, {
+    // Anonymous LLM7 is not an approved downstream production service. Use the
+    // project's existing Workers AI binding without exposing conversations to it.
+    const runCloudflare = async (promptMessages: typeof messages) => sanitizeCompanionReplyForDelivery(readModelText(await withProviderDeadline("cloudflare-chat", async (signal) => {
+      const generated: unknown = await env.AI.run(MODEL as never, {
         messages: promptMessages,
+        stream: true,
         max_tokens: input.delivery === "text" ? 260 : 190,
         temperature: 0.68,
         top_p: 0.86,
         top_k: 40,
         repetition_penalty: 1.1,
-      } as never)), input.delivery);
+      } as never);
+      return generated instanceof ReadableStream ? readChatStream(generated, signal, input.delivery !== "text") : generated;
+    }, Math.max(500, Math.min(8_000, 8_500 - (Date.now() - startedAt))), request.signal)), input.delivery);
     let reply = await runCloudflare(messages);
-    if (!validReply(reply)) {
+    if (!validReply(reply) && Date.now() - startedAt < 5_000) {
+      // One bounded repair for a wrong-script/style draft, never a retry loop.
+      // It uses the same approved provider and counts against the upstream cap.
+      await consumeCapacity("chat");
+      const language = expectedLanguage === "hi" ? "Hindi in Devanagari" : expectedLanguage === "hinglish" ? "Hindi mixed with English, using Roman letters ONLY" : "English ONLY";
       reply = await runCloudflare([
-        {
-          role: "system",
-          content: `${buildCompanionSystemPrompt(input)}\n\nCRITICAL REWRITE: Start with the concrete subject of the user's last message. Preserve every relevant person, fact, pronoun referent, correction, and language change from recent turns. ${rewriteLanguageInstruction(expectedLanguage)} Do not start with empathy, agreement, acknowledgment, or any version of “I’m here/listening,” “I hear you,” or “that sounds.” Write an actual conversational reaction, not a supportive holding statement.${suppressQuestions ? " This reply must be a complete statement with no question, no question mark, and no request to tell or share more." : ""}`,
-        },
-        ...input.messages,
+        ...messages,
+        {role:"assistant",content:reply},
+        {role:"user",content:`Rewrite your last reply in ${language}. Preserve its concrete meaning and the people from our conversation. Use feminine first-person grammar for Mira. ${suppressQuestions ? "No questions or requests for more information." : "One or two short sentences."} Only the rewritten reply, no explanation.`},
       ]);
     }
     if (!validReply(reply)) return respond({ error: "The generated reply missed the conversation style." }, 503, { model: MODEL, language: expectedLanguage });

@@ -7,6 +7,20 @@ declare module "cloudflare:workers" {
   }
 
   export const env: {
+    MIRA_STORE?: { idFromName(name: string): string; get(id: string): { fetch(url: string, init?: RequestInit): Promise<Response> } };
+    MIRA_ADMIN_KEY?: string;
+    RESEND_API_KEY?: string;
+    EMAIL_FROM?: string;
+    SITE_ORIGIN?: string;
+    DODO_PAYMENTS_API_KEY?: string;
+    DODO_PAYMENTS_WEBHOOK_KEY?: string;
+    DODO_PAYMENTS_ENVIRONMENT?: string;
+    DODO_PRODUCT_ID?: string;
+    BILLING_ENABLED?: string;
+    BILLING_PRICE_LABEL?: string;
+    CHAT_DAILY_LIMIT?:string;
+    SPEECH_DAILY_LIMIT?:string;
+    TRANSCRIBE_DAILY_LIMIT?:string;
     LUMA_ACCOUNTS?: KVNamespace;
     CF_VERSION_METADATA?: { id?: string; tag?: string; timestamp?: string };
     AI: {

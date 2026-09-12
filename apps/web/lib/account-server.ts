@@ -1,3 +1,5 @@
+import { cloudStore, storeAction } from "./cloud-store";
+import { edgeRateLimited } from "./edge-security";
 const sessionCookie = "__Host-companaro_session";
 const sessionSeconds = 60 * 60 * 24 * 30;
 // Cloudflare Workers WebCrypto currently caps a PBKDF2 call at 100,000 rounds.
@@ -12,6 +14,7 @@ interface AccountRecord {
   passwordSalt: string;
   createdAt: string;
   updatedAt: string;
+  passwordChangedAt?: string;
 }
 
 interface SessionRecord {
@@ -20,17 +23,7 @@ interface SessionRecord {
 }
 
 async function store() {
-  const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-  if (!env.LUMA_ACCOUNTS) throw new Error("Production account storage is unavailable.");
-  return env.LUMA_ACCOUNTS;
-}
-
-function stateCache() {
-  return (caches as CacheStorage & { default: Cache }).default;
-}
-
-function stateCacheRequest(userId: string) {
-  return new Request(`https://state.companaro.internal/${encodeURIComponent(userId)}`);
+  return cloudStore;
 }
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -90,7 +83,7 @@ export class AccountError extends Error {
 }
 
 export function accountErrorResponse(cause: unknown) {
-  const error = cause instanceof AccountError ? cause : new AccountError(cause instanceof Error ? cause.message : "Account service unavailable.", 503);
+  const error = cause instanceof AccountError ? cause : new AccountError("Account service unavailable. Please try again.", 503);
   return Response.json({ error: error.message }, { status: error.status, headers: { "cache-control": "no-store", "x-content-type-options": "nosniff" } });
 }
 
@@ -106,12 +99,7 @@ export async function parseJsonObject(request: Request, maximumBytes = 2_000_000
 }
 
 export async function throttle(request: Request, scope: "login" | "signup", identity: string, maximum: number) {
-  const kv = await store();
-  const ip = request.headers.get("cf-connecting-ip") ?? "local";
-  const key = `limit:${scope}:${await sha256(`${ip}:${identity}`)}`;
-  const current = Number(await kv.get(key) ?? 0);
-  if (current >= maximum) throw new AccountError("Too many attempts. Please wait fifteen minutes and try again.", 429);
-  await kv.put(key, String(current + 1), { expirationTtl: 15 * 60 });
+  if (await edgeRateLimited(request, `account:${scope}`, maximum, 900) || await storeAction<{limited:boolean}>({action:"rate",key:`identity:${scope}:${await sha256(identity)}`,max:maximum,seconds:900}).then(r=>r.limited)) throw new AccountError("Too many attempts. Please wait fifteen minutes and try again.", 429);
 }
 
 export async function createAccount(input: Record<string, unknown>) {
@@ -136,10 +124,8 @@ export async function createAccount(input: Record<string, unknown>) {
     createdAt: now,
     updatedAt: now,
   };
-  await Promise.all([
-    kv.put(`account:${account.id}`, JSON.stringify(account)),
-    kv.put(`email:${emailKey}`, account.id),
-  ]);
+  const claimed = await storeAction<{created:boolean}>({action:"claimEmail",key:`email:${emailKey}`,account});
+  if (!claimed.created) throw new AccountError("An account with that email already exists.", 409);
   return account;
 }
 
@@ -181,16 +167,14 @@ export async function requireAccount(request: Request) {
   const session = JSON.parse(sessionRaw) as SessionRecord;
   const accountRaw = await kv.get(`account:${session.userId}`);
   if (!accountRaw) throw new AccountError("Your account could not be found.", 401);
-  return { account: JSON.parse(accountRaw) as AccountRecord, tokenHash };
+  const account = JSON.parse(accountRaw) as AccountRecord;
+  if (account.passwordChangedAt && session.createdAt <= account.passwordChangedAt) throw new AccountError("Please sign in again after changing your password.", 401);
+  return { account, tokenHash };
 }
 
 export async function readState(userId: string) {
-  const cacheKey = stateCacheRequest(userId);
-  const cached = await stateCache().match(cacheKey);
-  if (cached) return await cached.json() as unknown;
   const raw = await (await store()).get(`state:${userId}`);
   if (!raw) throw new AccountError("Your companion profile could not be found.", 404);
-  await stateCache().put(cacheKey, new Response(raw, { headers: { "cache-control": "max-age=600", "content-type": "application/json" } }));
   return JSON.parse(raw) as unknown;
 }
 
@@ -204,7 +188,6 @@ export async function writeState(userId: string, state: unknown) {
     kv.put(`state:${userId}`, encoded),
     kv.put(`backup:${userId}:${backupDate}`, encoded, { expirationTtl: 60 * 60 * 24 * 30 }),
   ]);
-  await stateCache().put(stateCacheRequest(userId), new Response(encoded, { headers: { "cache-control": "max-age=600", "content-type": "application/json" } }));
 }
 
 export async function revokeSession(tokenHash: string) {
@@ -220,16 +203,16 @@ export async function deleteAccount(account: AccountRecord, tokenHash: string) {
     backupKeys.push(...page.keys.map((key) => key.name));
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
-  await Promise.all([
-    kv.delete(`session:${tokenHash}`),
-    kv.delete(`state:${account.id}`),
-    kv.delete(`email:${account.emailKey}`),
-    kv.delete(`account:${account.id}`),
-    stateCache().delete(stateCacheRequest(account.id)),
-    ...backupKeys.map((key) => kv.delete(key)),
-  ]);
+  await storeAction({action:"eraseAccount",userId:account.id,emailKey:account.emailKey,keys:[`session:${tokenHash}`,...backupKeys]});
 }
 
 export function publicAccount(account: AccountRecord) {
   return { id: account.id, email: account.email, name: account.name, createdAt: account.createdAt };
+}
+
+export async function resetPasswordWithToken(token: string, password: string) {
+  if (token.length < 32 || password.length < 12 || password.length > 200) throw new AccountError("Use the link from your email and a password of at least 12 characters.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const result = await storeAction<{reset:boolean}>({action:"resetPassword", key:`recovery:${await sha256(token)}`,hash:await passwordHash(password,salt),salt:bytesToBase64Url(salt)});
+  if (!result.reset) throw new AccountError("This reset link expired or has already been used.");
 }

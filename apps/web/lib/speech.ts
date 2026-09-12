@@ -84,6 +84,7 @@ export function stopCompanionSpeech() {
 export function playCompanionSpeech(text: string, options: {
   onStart?: () => void;
   onBoundary?: (boundary: { charIndex: number; charLength: number; elapsedTime: number; name: string }) => void;
+  onAudioLevel?: (level:number) => void;
   onEnd?: () => void;
   onError?: (message: string) => void;
 } = {}): CompanionSpeechPlayback {
@@ -92,6 +93,7 @@ export function playCompanionSpeech(text: string, options: {
   let audio: HTMLAudioElement | null = null;
   let objectUrl: string | null = null;
   let boundaryTimer: number | null = null;
+  let decodedAudio: AudioBuffer | null = null;
   let canceled = false;
   let finished = false;
   let started = false;
@@ -100,6 +102,8 @@ export function playCompanionSpeech(text: string, options: {
     if (finished) return;
     finished = true;
     if (boundaryTimer !== null) window.clearInterval(boundaryTimer);
+    decodedAudio=null;
+    options.onAudioLevel?.(0);
     if (objectUrl) window.URL.revokeObjectURL(objectUrl);
     if (activePlayback === playback) activePlayback = null;
     if (notify) options.onEnd?.();
@@ -118,14 +122,14 @@ export function playCompanionSpeech(text: string, options: {
 
   void (async () => {
     let response: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       response = await fetch("/api/companion-speech", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text: text.replace(/\s+/g, " ").trim() }),
-        signal: abortController.signal,
+        signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(12_000)]),
       });
-      if (response.ok || ![429, 502, 503, 504].includes(response.status) || attempt === 2) break;
+      if (response.ok || ![502, 504].includes(response.status) || attempt === 1) break;
       await new Promise((resolve) => window.setTimeout(resolve, 180 * (attempt + 1)));
     }
     if (!response) throw new Error("Mira’s voice is temporarily unavailable.");
@@ -138,8 +142,14 @@ export function playCompanionSpeech(text: string, options: {
     if (canceled || finished) return;
     objectUrl = window.URL.createObjectURL(blob);
     audio = new Audio(objectUrl);
+    // Decode a separate copy for animation; never route audible playback through
+    // a new AudioContext (which can silently suspend audio on mobile Safari).
+    if(options.onAudioLevel && typeof OfflineAudioContext!=="undefined") {
+      void blob.arrayBuffer().then(data=>new OfflineAudioContext(1,1,44100).decodeAudioData(data)).then(buffer=>{if(!finished&&!canceled)decodedAudio=buffer;}).catch(()=>undefined);
+    }
     audio.preload = "auto";
     audio.onplaying = () => {
+      if (boundaryTimer !== null) window.clearInterval(boundaryTimer);
       if (!started) {
         started = true;
         options.onStart?.();
@@ -147,13 +157,16 @@ export function playCompanionSpeech(text: string, options: {
       let previous = -1;
       boundaryTimer = window.setInterval(() => {
         if (!audio || canceled || finished) return;
+        if(decodedAudio){const samples=decodedAudio.getChannelData(0);const offset=Math.floor(audio.currentTime*decodedAudio.sampleRate);const end=Math.min(samples.length,offset+2048);let sum=0;for(let i=offset;i<end;i++)sum+=samples[i]!**2;options.onAudioLevel?.(audio.paused?0:Math.min(1,Math.sqrt(sum/Math.max(1,end-offset))*5));}
         const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : Math.max(1, text.length / 13);
         const charIndex = Math.max(0, Math.min(text.length - 1, Math.floor((audio.currentTime / duration) * text.length)));
         if (charIndex === previous) return;
         previous = charIndex;
         options.onBoundary?.({ charIndex, charLength: 1, elapsedTime: audio.currentTime * 1_000, name: "word" });
-      }, 110);
+      }, 80);
     };
+    audio.onwaiting=()=>{if(boundaryTimer!==null)window.clearInterval(boundaryTimer);options.onAudioLevel?.(0);};
+    audio.onpause=()=>options.onAudioLevel?.(0);
     audio.onended = () => finish();
     audio.onerror = () => {
       options.onError?.("Mira’s voice could not play. Please try again.");

@@ -2423,3 +2423,12 @@ select {
   .chat__composer { border-radius: 22px; }
   .chat__composer textarea { font-size: 13px; }
 }
+
+.demo-migration-notice { padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--surface, #f7f2ec); color: var(--text, #2e2424); font-size: 13px; line-height: 1.6; border: 1px solid rgba(150,120,110,.2); border-radius: 16px; }
+.operations-page { max-width: 1080px; margin: auto; padding: 28px; }
+.operations-page form { max-width: 600px; margin-bottom: 24px; }
+.operations-page td, .operations-page th { padding: 10px; text-align: left; border-bottom: 1px solid #bca9a933; }
+.operations-page pre { overflow-x: auto; }
+.legal-details { max-width: 760px; text-align: left; margin: 40px auto; }
+.legal-details h2 { font-size: 25px; margin: 28px 0 10px; }
+.legal-details p { font-size: 15px; line-height: 1.8; margin: 12px 0; }

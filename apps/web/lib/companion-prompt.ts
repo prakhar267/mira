@@ -28,7 +28,7 @@ const danglingReplyPattern = /\b(?:a|an|the|to|and|or|but|because|with|for|of|an
 const memoryRecallPattern = /\b(?:what do you remember|do you remember|remember about me|what did i (?:say|tell you)|told you earlier|recall|maine (?:pehle )?kya (?:bola|bataya)|yaad hai)\b/i;
 const devanagariMemoryRecallPattern = /(?:तुम्हें याद है|मैंने (?:पहले )?क्या (?:कहा|बताया)|मेरे बारे में क्या याद|क्या याद (?:है|हैं))/u;
 const identityPattern = /\b(?:what(?:'s| is) your name|who are you|what do you do|tum(?:hara)? naam kya hai|tum kaun ho|tum kya karti ho|tum kya karte ho)\b|(?:तुम्हारा नाम क्या है|तुम कौन हो|तुम क्या करती हो|तुम क्या करते हो)/iu;
-const hinglishPattern = /\b(?:aaj|abhi|acha|accha|arey|aur|bahut|bas|batao|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karta|karti|kya|kyun|lekin|liye|main|matlab|mera|meri|mere|mujhe|nahi|nhi|par|sakta|sakti|sach|samajh|theek|thik|thoda|tum|tumhara|uske|usko|yaar)\b/i;
+const hinglishPattern = /\b(?:aaj|abhi|acha|accha|arey|aur|bahut|bas|batao|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karun|karta|karti|kya|kyun|lekin|liye|matlab|mein|mera|meri|mere|mujhe|nahi|nhi|sakta|sakti|sach|samajh|shaam|theek|thik|thoda|tum|tumhara|uske|usko|yaar|yar|daant|sabke|samne)\b/i;
 const naturalHinglishReplyPattern = /\b(?:aaj|abhi|accha|arey|aur|bas|haan|hai|hoon|kaafi|kar|karo|karti|kya|kyun|lekin|main|matlab|mera|meri|mujhe|nahi|par|sach|theek|thoda|toh|tum|tumhara|uske|yaar)\b/i;
 const listenOnlyPattern = /\b(?:just listen|only listen|don['’]?t (?:advise|fix|ask)|no advice|no questions?|(?:bas|sirf)\s+(?:(?:meri|meri baat)\s+)?sun(?:o|na)|(?:advice|salah|salaah)\s+mat\s+(?:do|dena)|(?:sawal|question)\s+mat\s+(?:puch|pooch)\w*)\b|(?:बस सुनो|सिर्फ सुनो|मेरी बात सुनो|सलाह मत|सवाल मत)/iu;
 const providerClaimPattern = /\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b.{0,28}\b(?:made|built|created|designed|trained|model|basis)\b|\b(?:made|built|created|designed|trained)\b.{0,28}\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b/i;
@@ -199,8 +199,22 @@ export function isMemoryRecallRequest(value: string) {
   return memoryRecallPattern.test(value) || devanagariMemoryRecallPattern.test(value);
 }
 
+/** Saved-memory inventory is different from remembering the current conversation. */
+export function canUseSavedMemoryReply(input: EdgeCompanionRequest) {
+  if (!isMemoryRecallRequest(input.messages.at(-1)?.content ?? "")) return false;
+  return !input.messages.slice(0, -1).some(message => message.role === "user");
+}
+
 export function isIdentityRequest(value: string) {
   return identityPattern.test(value);
+}
+
+export function buildDayCheckInReply(value: string, language = detectCompanionLanguage(value)) {
+  const asksAboutDay = /\b(?:how (?:was|is|has).{0,12}your (?:day|evening)|how(?:'s| is) your day|tumhara din (?:kaisa|kaisi|kaise))\b|(?:तुम्हारा|आपका).{0,6}दिन.{0,6}कैसा/u.test(value.toLowerCase());
+  if (!asksAboutDay) return null;
+  if (language === "hi") return "अभी तो तुम्हारे साथ बात करके अच्छा लग रहा है। तुम्हारा दिन कैसा रहा?";
+  if (language === "hinglish") return "Abhi toh tumhare saath baat karke accha lag raha hai. Tumhara din kaisa raha?";
+  return "This conversation is a nice part of my day. How has yours been?";
 }
 
 export function buildIdentityReply(companionName: string, language: CompanionLanguage = "hinglish") {
@@ -302,13 +316,15 @@ export function isGenericCompanionReply(value: string) {
 
 export function isInvalidCompanionReply(value: string, latestUserMessage: string, suppressQuestions = false, expectedLanguage = detectCompanionLanguage(latestUserMessage)) {
   const reply = sanitizeCompanionReply(value);
-  if (isGenericCompanionReply(reply) || providerClaimPattern.test(reply) || roboticSelfDescriptionPattern.test(reply) || /\p{Script=Han}|\p{Script=Arabic}/u.test(reply)) return true;
+  if (!reply || providerClaimPattern.test(reply) || roboticSelfDescriptionPattern.test(reply) || /\p{Script=Han}|\p{Script=Arabic}/u.test(reply)) return true;
+  // Reject empty holding statements, not useful answers which happen to start with empathy.
+  if (/^(?:I(?:['’]m| am) (?:here|listening)|I hear you|take your time)[.!\s]*$/i.test(reply)) return true;
   if ((suppressQuestions || requestsListeningOnly(latestUserMessage)) && /[?？]/u.test(reply)) return true;
   if ((suppressQuestions || requestsListeningOnly(latestUserMessage)) && /\b(?:batao|bata do|bol do|share karo|tell me)\b/i.test(reply)) return true;
   if (expectedLanguage === "hi" && !/\p{Script=Devanagari}/u.test(reply)) return true;
   if (expectedLanguage !== "hi" && /\p{Script=Devanagari}/u.test(reply)) return true;
+  if (expectedLanguage === "en" && (reply.match(/\b(?:aaj|abhi|hoon|haan|mujhe|tumhara|tumhari|kaafi|nahi|yaar|karti|rahi)\b/gi)?.length ?? 0) >= 2) return true;
   if (expectedLanguage === "hinglish" && !naturalHinglishReplyPattern.test(reply)) return true;
-  if (expectedLanguage === "en" && naturalHinglishReplyPattern.test(reply)) return true;
   if (expectedLanguage !== "en" && (/\bmain\b.{0,36}\b(?:karta|raha|gaya|tha|chahta)\b/i.test(reply) || /(?:मैं|मुझे)[^।!?]{0,36}(?:करता|रहा|गया|था|चाहता)/u.test(reply))) return true;
   if (/\b(?:karti|rahi|gayi|thi)\b/i.test(latestUserMessage) && /\b(?:karta|kar raha|gaya|tha)\b/i.test(reply)) return true;
   return false;

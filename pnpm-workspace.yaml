@@ -2,6 +2,9 @@ packages:
   - apps/*
   - packages/*
 
+overrides:
+  'postcss@<8.5.23': 8.5.23
+
 allowBuilds:
   '@prisma/engines': true
   esbuild: true

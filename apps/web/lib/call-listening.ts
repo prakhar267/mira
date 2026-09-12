@@ -16,7 +16,8 @@ export interface CallSpeechEvidence {
 }
 
 interface BrowserSpeechRecognitionResult {
-  0?: { transcript?: string };
+  isFinal?: boolean;
+  0?: { transcript?: string; confidence?: number };
 }
 
 interface BrowserSpeechRecognitionEvent {
@@ -50,18 +51,17 @@ export function preferredCallTranscript(browserTranscript: string, serverTranscr
   const server = serverTranscript.trim().replace(/\s+/g, " ");
   if (!server) return browser;
   if (!browser) return server;
-  const browserWords = browser.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
-  const serverWords = server.match(/[\p{L}\p{N}]+/gu)?.length ?? 0;
-  if (browserWords >= serverWords + 2) return browser;
-  if (/\p{Script=Devanagari}/u.test(server)) return server;
+  // Longer is not necessarily more accurate: en-IN recognition often invents
+  // English words for Hindi. Prefer multilingual STT unless it is empty.
   return server;
 }
 
 /** Browser recognition is useful as a fast path only for a complete conversational phrase. */
-export function isConfidentBrowserTranscript(value: string) {
+export function isConfidentBrowserTranscript(value: string, confidence = 0) {
   const clean = value.trim().replace(/\s+/g, " ");
   const words = clean.match(/[\p{L}\p{N}]+/gu) ?? [];
   if (clean.length < 14 || words.length < 4) return false;
+  if (confidence < .88) return false;
   if (/^(?:thank you|thanks for watching|please subscribe|hmm+|uh+)[.!?\s]*$/i.test(clean)) return false;
   const uniqueWords = new Set(words.map((word) => word.toLowerCase()));
   return uniqueWords.size >= Math.min(3, words.length);
@@ -106,6 +106,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
   const mimeType = recorderMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const context = new AudioContextConstructor();
+  await context.resume();
   const source = context.createMediaStreamSource(stream);
   const analyser = context.createAnalyser();
   analyser.fftSize = 512;
@@ -128,6 +129,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
   let quietSince = 0;
   let noiseFloor = .007;
   let browserTranscript = "";
+  let browserConfidence = 0;
   let recognitionEnded = true;
   let recognitionEndResolver: (() => void) | null = null;
   const transcriptionController = new AbortController();
@@ -147,6 +149,8 @@ export async function startCallListening(options: CallListeningOptions): Promise
     recognition.interimResults = true;
     recognition.lang = "en-IN";
     recognition.onresult = (event) => {
+      const alternatives = Array.from(event.results).map((result) => result[0]);
+      browserConfidence = Math.min(...alternatives.map((result) => result?.confidence ?? 0));
       browserTranscript = Array.from(event.results)
         .map((result) => result[0]?.transcript ?? "")
         .join(" ")
@@ -225,17 +229,17 @@ export async function startCallListening(options: CallListeningOptions): Promise
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ audioBase64, contentType: blob.type }),
-          signal: transcriptionController.signal,
+          signal: AbortSignal.any([transcriptionController.signal, AbortSignal.timeout(7_000)]),
         }).then(async (response) => ({
           response,
           body: await response.json().catch(() => null) as { text?: string; error?: string } | null,
         })).catch(() => null);
         const nativeTranscript = await finishBrowserRecognition(260);
         let serverResult: Awaited<typeof responsePromise> | "pending" = "pending";
-        if (isConfidentBrowserTranscript(nativeTranscript)) {
+        if (isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) {
           serverResult = await Promise.race([
             responsePromise,
-            new Promise<"pending">((resolve) => window.setTimeout(() => resolve("pending"), 420)),
+            new Promise<"pending">((resolve) => window.setTimeout(() => resolve("pending"), 1_600)),
           ]);
           if (serverResult === "pending") {
             transcriptionController.abort();

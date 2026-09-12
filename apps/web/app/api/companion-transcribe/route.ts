@@ -1,6 +1,8 @@
 import { detectCompanionLanguage } from "@/lib/companion-prompt";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
 import { createInworldTranscriptionRequest, INWORLD_STT_ENDPOINT, INWORLD_STT_MODEL, isUsableInworldTranscript, preserveSpokenLanguage, readInworldTranscript } from "@/lib/inworld-transcription";
+import { withProviderDeadline } from "@/lib/provider-resilience";
+import { consumeCapacity } from "@/lib/capacity";
 
 const CLOUDFLARE_MODEL = "@cf/openai/whisper-large-v3-turbo";
 
@@ -35,15 +37,18 @@ export async function POST(request: Request) {
     }
 
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
+    await consumeCapacity("transcribe");
     const apiKey = (env as typeof env & { INWORLD_API_KEY?: string }).INWORLD_API_KEY?.trim();
     if (apiKey) {
       try {
+        const text = await withProviderDeadline("inworld-transcribe",async signal=>{
         const response = await fetch(INWORLD_STT_ENDPOINT, {
           ...createInworldTranscriptionRequest(audioBase64, contentType, apiKey),
-          signal: AbortSignal.any([request.signal, AbortSignal.timeout(45_000)]),
+          signal,
         });
         if (!response.ok) throw new Error(`Inworld transcription returned ${response.status}.`);
-        const text = preserveSpokenLanguage(readInworldTranscript(await response.json()));
+        return preserveSpokenLanguage(readInworldTranscript(await response.json()));
+        },4000,request.signal);
         if (isUsableInworldTranscript(text)) {
           const language = detectCompanionLanguage(text);
           return respond({ text, language }, 200, { provider: "inworld", model: INWORLD_STT_MODEL, language });
@@ -54,14 +59,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const result = await env.AI.run(CLOUDFLARE_MODEL as never, {
+    const result = await withProviderDeadline("cloudflare",()=>env.AI.run(CLOUDFLARE_MODEL as never, {
       audio: audioBase64,
       task: "transcribe",
       vad_filter: true,
       condition_on_previous_text: false,
       no_speech_threshold: .62,
       initial_prompt: "Natural Indian conversation that may switch between English, Hindi in Devanagari, and Roman-script Hinglish. Preserve the speaker's actual language, English words, and names.",
-    } as never);
+    } as never),2500,request.signal);
     const text = preserveSpokenLanguage(readTranscript(result));
     if (!text) return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "cloudflare", model: CLOUDFLARE_MODEL });
     const language = detectCompanionLanguage(text);

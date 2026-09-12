@@ -1,4 +1,5 @@
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
+import { cloudStore } from "@/lib/cloud-store";
 
 function parseSupportRequest(value: unknown) {
   if (!value || typeof value !== "object") return null;
@@ -20,10 +21,8 @@ export async function POST(request: Request) {
     if (await edgeRateLimited(request, "support", 4, 3_600)) throw new EdgeRequestError("Too many reports were submitted. Please try again later.", 429);
     const report = parseSupportRequest(await readEdgeJson(request, 8_000));
     if (!report) throw new EdgeRequestError("Please check the summary, details, and email fields.");
-    const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    if (!env.LUMA_ACCOUNTS) throw new EdgeRequestError("Support is temporarily unavailable.", 503);
     const ticketId = `MIRA-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
-    await env.LUMA_ACCOUNTS.put(`support:${ticketId}`, JSON.stringify({ ticketId, ...report, status: "new", createdAt: new Date().toISOString() }), { expirationTtl: 90 * 86_400 });
+    await cloudStore.put(`support:${ticketId}`, JSON.stringify({ ticketId, ...report, status: "new", createdAt: new Date().toISOString() }), { expirationTtl: 90 * 86_400 });
     return edgeJson(requestId, "support", startedAt, { ticketId }, 201, { ticketId });
   } catch (cause) {
     return edgeError(requestId, "support", startedAt, cause);

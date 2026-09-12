@@ -1,4 +1,11 @@
-const localWindows = new Map<string, { count: number; expiresAt: number }>();
+import { storeAction } from "./cloud-store";
+import { after } from "next/server";
+
+export function recordServiceMetric(route:string,failed:boolean,duration:number) {
+  // waitUntil-backed post-response work: observability must not delay speech.
+  const write=()=>storeAction({action:"metric",name:`api:${route}`,failed,duration}).catch(()=>undefined);
+  try {after(write);}catch {void write();}
+}
 
 export class EdgeRequestError extends Error {
   constructor(message: string, readonly status = 400) {
@@ -13,7 +20,7 @@ function base64Url(bytes: Uint8Array) {
 }
 
 export async function anonymousClientKey(request: Request) {
-  const input = `${request.headers.get("cf-connecting-ip") ?? "local"}:${request.headers.get("user-agent")?.slice(0, 80) ?? "unknown"}`;
+  const input = request.headers.get("cf-connecting-ip") ?? "local";
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return base64Url(new Uint8Array(digest)).slice(0, 22);
 }
@@ -35,35 +42,20 @@ export async function readEdgeJson(request: Request, maximumBytes: number) {
 
 export async function edgeRateLimited(request: Request, scope: string, maximum: number, windowSeconds = 60) {
   const client = await anonymousClientKey(request);
-  const bucket = Math.floor(Date.now() / (windowSeconds * 1_000));
-  const key = `${scope}:${client}:${bucket}`;
-  const now = Date.now();
-  const local = localWindows.get(key);
-  if (!local || local.expiresAt <= now) localWindows.set(key, { count: 1, expiresAt: now + windowSeconds * 1_000 });
-  else {
-    local.count += 1;
-    if (local.count > maximum) return true;
-  }
-  try {
-    const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    if (!env.LUMA_ACCOUNTS) return false;
-    const storageKey = `edge-limit:${key}`;
-    const count = Number(await env.LUMA_ACCOUNTS.get(storageKey) ?? 0) + 1;
-    await env.LUMA_ACCOUNTS.put(storageKey, String(count), { expirationTtl: windowSeconds * 2 });
-    return count > maximum;
-  } catch {
-    return false;
-  }
+  const result = await storeAction<{limited:boolean}>({ action: "rate", key: `${scope}:${client}`, max: maximum, seconds: windowSeconds });
+  return result.limited;
 }
 
-export function edgeJson(requestId: string, route: string, startedAt: number, body: unknown, status = 200, details: Record<string, unknown> = {}, extraHeaders: Record<string, string> = {}) {
+export async function edgeJson(requestId: string, route: string, startedAt: number, body: unknown, status = 200, details: Record<string, unknown> = {}, extraHeaders: Record<string, string> = {}) {
   console.log(JSON.stringify({ event: "edge_request", requestId, route, status, latencyMs: Date.now() - startedAt, ...details }));
+  recordServiceMetric(route,status>=500 || status===429,Date.now()-startedAt);
   return Response.json(body, {
     status,
     headers: {
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
       "x-request-id": requestId,
+      ...(status === 429 ? { "retry-after": "60" } : {}),
       ...extraHeaders,
     },
   });

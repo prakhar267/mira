@@ -67,9 +67,9 @@ await run("authenticated app gate", async () => {
 await run("operational health and backup policy", async () => {
   const { response, body } = await json("/api/health");
   expect(response.ok && body.status === "ok", `health returned ${response.status}`);
-  expect(body.services?.inference === "configured" && body.services?.accountStorage === "configured", "production bindings missing");
+  expect(body.services?.inference === "configured-not-probed" && body.services?.accountStorage === "sqlite-reachable", "production database not reachable");
   expect(body.dataProtection?.rollingBackups === true && body.dataProtection?.backupRetentionDays === 30, "backup policy missing");
-  return "AI/KV healthy, 30-day rolling backups enabled";
+  return "SQLite reachable, AI binding configured (not probed), 30-day rolling snapshots enabled";
 });
 
 await run("avatar delivery cache", async () => {
@@ -216,7 +216,7 @@ await run("account create, sync, export, and delete", async () => {
   const nonce = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const email = `production-smoke-${nonce}@example.invalid`;
   const password = `Companaro-${nonce}-Strong`;
-  const state = { user: { id: "pending", name: "Production QA" }, companion: { name: "Mira" }, messages: [], memories: [] };
+  const state = { user: { id: "pending", name: "Production QA", adultConfirmed: true }, companion: { name: "Mira" }, messages: [], memories: [] };
   const signup = await json("/api/account/signup", {
     method: "POST",
     headers: { "content-type": "application/json", origin: baseUrl },
@@ -239,7 +239,7 @@ await run("account create, sync, export, and delete", async () => {
   expect(removed.response.ok && removed.body.deleted === true, `delete returned ${removed.response.status}`);
   const afterDelete = await json("/api/account/state", { headers: { cookie } });
   expect(afterDelete.response.status === 401, `deleted session remained valid (${afterDelete.response.status})`);
-  return "secure cookie, KV persistence, checksummed export, backup cleanup and deletion verified";
+  return "secure cookie, database persistence, checksummed export, backup cleanup and deletion verified";
 });
 
 const failures = results.filter((result) => !result.passed);

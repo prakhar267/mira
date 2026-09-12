@@ -72,8 +72,8 @@ export function VideoCallModal({
   const activeRef = useRef(true);
   const speakingRef = useRef(false);
   const thinkingRef = useRef(false);
-  const lastMouthBoundaryRef = useRef(0);
-  const mouthSequenceRef = useRef(0);
+  const audioLevelRef = useRef(0);
+  const expectedMouthRef = useRef<AvatarMouthPose>(1);
   const listeningAttemptRef = useRef(0);
 
   const changeSpeaking = useCallback((next: boolean) => {
@@ -132,15 +132,15 @@ export function VideoCallModal({
         if (speechTurn.current !== turn) return;
         setSpeechError("");
         setPreparingSpeech(false);
-        lastMouthBoundaryRef.current = performance.now();
-        setMouthPose(1);
+        setMouthPose(0);
         changeSpeaking(true);
       },
       onBoundary: ({ charIndex }) => {
         if (speechTurn.current !== turn) return;
-        lastMouthBoundaryRef.current = performance.now();
-        setMouthPose(mouthPoseForText(text, charIndex));
+        expectedMouthRef.current=mouthPoseForText(text,charIndex);
+        setMouthPose(audioLevelRef.current>.05 ? expectedMouthRef.current : 0);
       },
+      onAudioLevel:(level)=>{if(speechTurn.current!==turn||!activeRef.current)return;audioLevelRef.current=level;setMouthPose(level>.05?expectedMouthRef.current:0);},
       onEnd: () => {
         if (speechTurn.current !== turn || !activeRef.current) return;
         setPreparingSpeech(false);
@@ -190,17 +190,6 @@ export function VideoCallModal({
       window.clearTimeout(releaseTimer);
     };
   }, []);
-
-  useEffect(() => {
-    if (!speaking) return;
-    const poses = [1, 2, 1, 3, 1, 2] as const;
-    const timer = window.setInterval(() => {
-      if (performance.now() - lastMouthBoundaryRef.current < 170) return;
-      mouthSequenceRef.current = (mouthSequenceRef.current + 1) % poses.length;
-      setMouthPose(poses[mouthSequenceRef.current]!);
-    }, 125);
-    return () => window.clearInterval(timer);
-  }, [speaking]);
 
   useEffect(() => {
     if (greetingSpoken.current) return;

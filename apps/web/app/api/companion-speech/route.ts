@@ -1,5 +1,7 @@
 import { createInworldSpeechRequest, decodeInworldAudio, fitInworldSpeechPrompt, INWORLD_TTS_ENDPOINT } from "@/lib/inworld-speech";
-import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
+import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson, recordServiceMetric } from "@/lib/edge-security";
+import { withProviderDeadline } from "@/lib/provider-resilience";
+import { consumeCapacity } from "@/lib/capacity";
 
 const VOICE = {
   model: "inworld-tts-2-flash",
@@ -8,25 +10,14 @@ const VOICE = {
   language: "hinglish",
 } as const;
 
-async function fetchWithDeadline(input: string, init: RequestInit, timeoutMs: number, requestSignal: AbortSignal) {
-  const controller = new AbortController();
-  const abortFromRequest = () => controller.abort(requestSignal.reason);
-  requestSignal.addEventListener("abort", abortFromRequest, { once: true });
-  const timer = setTimeout(() => controller.abort(new Error("Voice generation timed out.")), timeoutMs);
-  try {
-    return await fetch(input, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-    requestSignal.removeEventListener("abort", abortFromRequest);
-  }
-}
-
 async function generateInworldSpeech(prompt: string, apiKey: string, requestSignal: AbortSignal) {
-  const response = await fetchWithDeadline(INWORLD_TTS_ENDPOINT, createInworldSpeechRequest(prompt, apiKey), 45_000, requestSignal);
+  return withProviderDeadline("inworld-speech", async (signal) => {
+  const response = await fetch(INWORLD_TTS_ENDPOINT, {...createInworldSpeechRequest(prompt, apiKey),signal});
   if (!response.ok) throw new Error(`Inworld generation returned ${response.status}.`);
   const body = await response.json() as { audioContent?: unknown };
   if (typeof body.audioContent !== "string") throw new Error("Inworld returned no audio.");
   return decodeInworldAudio(body.audioContent);
+  },10000,requestSignal);
 }
 
 function audioResponse(audio: Uint8Array, requestId: string, startedAt: number) {
@@ -69,18 +60,10 @@ export async function POST(request: Request) {
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const apiKey = (env as typeof env & { INWORLD_API_KEY?: string }).INWORLD_API_KEY?.trim();
     if (!apiKey) return respond({ error: "Mira's selected Priya voice is not configured yet." }, 503, { provider: VOICE.provider, model: VOICE.model, configuration: "missing" });
+    await consumeCapacity("speech");
 
-    let audio: Uint8Array | undefined;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        audio = await generateInworldSpeech(prompt, apiKey, request.signal);
-        break;
-      } catch (cause) {
-        if (attempt === 1 || request.signal.aborted) throw cause;
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-    }
-    if (!audio) throw new Error("Inworld returned no audio.");
+    const audio = await generateInworldSpeech(prompt, apiKey, request.signal);
+    recordServiceMetric("companion-speech",false,Date.now()-startedAt);
     return audioResponse(audio, requestId, startedAt);
   } catch (cause) {
     console.error("Mira Inworld speech failed", cause instanceof Error ? cause.message : "unknown");

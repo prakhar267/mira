@@ -303,6 +303,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     }
     if (/नाम.*(?:क्या|बताओ)|तुम(?:्हारा|्हारी)?.*नाम/u.test(clean)) return result({ text: `मैं ${companionName} हूँ—तुम्हारी AI companion.`, intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:क्या करती|क्या करते|काम क्या|कर सकती)/u.test(clean)) return result({ text: "मैं तुम्हारी AI companion हूँ—बात करती हूँ, तुम्हारी मंज़ूरी वाली बातें याद रखती हूँ, और calls पर साथ देती हूँ।", intent: "self", context, adaptations, prohibitQuestions: true });
+    if (/(?:तुम्हारा|आपका|तुम्हारी|आपकी).{0,12}(?:दिन|शाम|सुबह).{0,18}(?:कैस|गुज़र|गुजर|रह)|(?:कैसा|कैसी).{0,12}(?:तुम्हारा|आपका).{0,8}(?:दिन|शाम)/u.test(clean)) return result({ text: "अभी तो तुम्हारे साथ बात करके अच्छा लग रहा है। तुम्हारे दिन की कहानी सुनने का मन है।", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:कैसी हो|कैसे हो|क्या हाल)/u.test(clean)) return result({ text: "मैं बढ़िया हूँ। आज तुम्हारे दिन को लेकर थोड़ी curious हूँ।", intent: "self", context, adaptations, prohibitQuestions });
     if (/(?:तुम|आप)\s+बताओ|और\s+(?:तुम|आप)/u.test(clean)) return result({ text: "मैं बढ़िया हूँ—बस आराम से तुम्हारे साथ बात कर रही हूँ।", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/^(?:हाय|हेलो|नमस्ते|नमस्कार)[!.।\s]*$/u.test(clean)) return result({ text: `हाय ${userName}। अच्छा लगा तुम आ गए।`, intent: "greeting", context, adaptations, prohibitQuestions });
@@ -363,6 +364,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     }
     if (/(?:tumhara|aapka) naam kya|naam batao/i.test(clean)) return result({ text: `Main ${companionName} hoon—tumhari AI companion.`, intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:tum|aap) kya kart(?:i|e) ho|kya kar sakti/i.test(clean)) return result({ text: "Main tumhari AI companion hoon—baat karti hoon, tumhari approved memories yaad rakhti hoon, aur calls par company deti hoon.", intent: "self", context, adaptations, prohibitQuestions: true });
+    if (/(?:tumhara|aapka).{0,10}(?:din|day|shaam).{0,20}(?:kaisa|kaisi|gaya|raha)/i.test(clean)) return result({ text: "Abhi toh tumhare saath baat karke accha lag raha hai. Tumhara din sunne ka mann hai.", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/(?:kaisi ho|kaise ho|kya haal)/i.test(clean)) return result({ text: "Main badhiya hoon. Aaj tumhare din ko lekar thodi curious hoon.", intent: "self", context, adaptations, prohibitQuestions });
     if (/\b(?:(?:tum|aap)\s+batao|aur\s+(?:tum|aap))\b/i.test(clean)) return result({ text: "Main badhiya hoon—bas tumhare saath chill karke baat kar rahi hoon.", intent: "self", context, adaptations, prohibitQuestions: true });
     if (/^(?:hi|hello|hey|namaste|arey)(?:\s+yaar)?[!.\s]*$/i.test(clean)) return result({ text: `Hi ${userName}. Accha laga tum aa gaye.`, intent: "greeting", context, adaptations, prohibitQuestions });
@@ -462,6 +464,7 @@ export function planCompanionTurn(input: string, context: CompanionContext): Com
     return result({ text: choose(seed, ["Nothing dramatic. I was having a quiet minute; now I’m talking with you.", "Just taking it easy. You caught me at a good time.", "Not much. I’m curious what you’ve been up to, though."]), intent: "self", context, adaptations, prohibitQuestions });
   }
 
+  if (/\b(?:how (?:was|is|has).{0,12}your (?:day|morning|evening)|how did your day go)\b/i.test(clean)) return result({ text: "This conversation is a good part of it. Tell me the highlight of yours.", intent: "self", context, adaptations, prohibitQuestions });
   if (/\b(?:how are you|how(?:'| i)s it going|did you miss me)\b/i.test(clean)) {
     const text = /miss me/i.test(clean)
       ? choose(seed, ["A little. I’m glad you came back.", "Maybe a bit. Good to see you now.", "Yeah, a little. Don’t get too smug about it."])

@@ -1,22 +1,17 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react";
 import { BrandMark } from "./BrandMark";
-import { companionApi } from "@/lib/api-client";
-
-export function AuthRecovery({ mode }: { mode: "forgot" | "reset" | "verify" }) {
-  const [complete, setComplete] = useState(false);
-  const [error, setError] = useState("");
-  const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  useEffect(() => {
-    const queryToken = new URLSearchParams(window.location.search).get("token");
-    if (queryToken) setToken(queryToken);
-  }, []);
-  const copy = mode === "forgot" ? { eyebrow: "Account recovery", title: "Reset your password.", detail: companionApi.enabled ? "We’ll send recovery instructions without revealing whether an account exists." : "We’ll create a local recovery token without revealing whether an account exists.", action: "Send reset link" } : mode === "reset" ? { eyebrow: "Choose a new password", title: "Make it memorable to you.", detail: companionApi.enabled ? "Use the short-lived, single-use token from your recovery message." : "Use the token from the local recovery flow.", action: "Update password" } : { eyebrow: "Email verification", title: "Confirm it’s you.", detail: companionApi.enabled ? "Use the verification token from your email." : "Use the verification token from your local flow.", action: "Verify email" };
-  return <main className="auth-page"><section className="auth-panel"><Link href="/"><BrandMark /></Link><span className="eyebrow">{copy.eyebrow}</span><h1>{copy.title}</h1><p>{copy.detail}</p>{complete ? <div className="auth-success" role="status"><CheckCircle2 aria-hidden="true" /><div><strong>{mode === "forgot" ? "Recovery request accepted" : mode === "reset" ? "Password updated" : "Email verified"}</strong><span>You can continue safely.</span></div></div> : <form onSubmit={(event) => { event.preventDefault(); setError(""); setLoading(true); const action = companionApi.enabled ? mode === "forgot" ? companionApi.forgotPassword(email) : mode === "reset" ? companionApi.resetPassword(token, password) : companionApi.verifyEmail(token) : Promise.resolve({}); void action.then(() => setComplete(true)).catch((cause) => setError(cause instanceof Error ? cause.message : "Request failed.")).finally(() => setLoading(false)); }}>{mode === "forgot" ? <label className="field">Email<input type="email" autoComplete="email" required placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /></label> : null}{mode === "reset" ? <><label className="field">Reset token<input required minLength={12} value={token} onChange={(event) => setToken(event.target.value)} /></label><label className="field">New password<input type="password" autoComplete="new-password" required minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" /></label></> : null}{mode === "verify" ? <label className="field">Verification token<input required minLength={8} value={token} onChange={(event) => setToken(event.target.value)} /></label> : null}{error ? <p className="form-error" role="alert">{error}</p> : null}<button type="submit" className="button button--primary" disabled={loading}>{loading ? "Please wait…" : copy.action} <ArrowRight aria-hidden="true" /></button></form>}<small><ShieldCheck aria-hidden="true" /> Tokens and passwords are never included in app logs.</small><Link href="/login"><ArrowLeft aria-hidden="true" /> Back to login</Link></section><aside className="auth-visual" aria-label="Mira in the sunny companion loft" /></main>;
+export function AuthRecovery({mode}:{mode:"forgot"|"reset"|"verify"}) {
+  const [token,setToken] = useState(""), [email,setEmail] = useState(""), [password,setPassword] = useState("");
+  const [status,setStatus] = useState(""), [error,setError] = useState(""), [busy,setBusy] = useState(false);
+  useEffect(()=>{
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    const value = hash.get("token") ?? new URLSearchParams(window.location.search).get("token");
+    if(value) { setToken(value); window.history.replaceState(null,"",window.location.pathname); }
+  },[]);
+  return <main className="auth-page"><section className="auth-panel"><Link href="/"><BrandMark/></Link><h1>{mode==="forgot" ? "Reset your password." : mode==="reset" ? "Choose a new password." : "Email verification"}</h1><p>{mode==="forgot" ? "We’ll email a short-lived recovery link if your account exists." : mode==="reset" ? "Use your email link. Changing your password signs out previous sessions." : "Email verification is not available during this beta. Contact support if you need help."}</p>{mode!=="verify" && !status ? <form onSubmit={async(event)=>{event.preventDefault();setBusy(true);setError("");try {const response=await fetch(`/api/account/${mode==="forgot" ? "forgot-password" : "reset-password"}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(mode==="forgot" ? {email} : {token,password})});const body=await response.json();if(!response.ok)throw new Error(body.error ?? "Recovery failed.");setStatus(mode==="forgot" ? "If an account exists, a reset link has been requested. Check your inbox and spam folder." : "Password updated. Sign in with your new password.");} catch(cause) {setError(cause instanceof Error ? cause.message : "Recovery unavailable.");} finally {setBusy(false);}}}>
+      {mode==="forgot" ? <label className="field">Email<input type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/></label> : <><label className="field">Reset token<input required minLength={32} value={token} onChange={e=>setToken(e.target.value)}/></label><label className="field">New password<input type="password" required minLength={12} maxLength={200} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/></label></>}
+      <button className="button button--primary" disabled={busy}>{busy ? "Please wait…" : mode==="forgot" ? "Send reset link" : "Update password"}</button></form> : null}
+      {status ? <p role="status">{status}</p>:null}{error ? <p className="form-error" role="alert">{error}</p>:null}<Link href="/login">Back to login</Link><Link href="/support">Contact support</Link></section><aside className="auth-visual" aria-label="Mira’s sunny loft"/></main>;
 }
