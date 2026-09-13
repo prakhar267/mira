@@ -26,9 +26,10 @@ test("three cold mobile-emulated landing loads record vitals and asset costs", a
       });
       await page.goto("http://127.0.0.1:4397/", { waitUntil: "load", timeout: 90_000 });
       await page.evaluate(() => document.fonts.ready);
-      // CSS background discovery can occur after load during hydration. Do not
-      // report an incomplete, deceptively tiny transfer total as an improvement.
-      await expect.poll(() => page.evaluate(() => performance.getEntriesByType("resource").some(entry => entry.name.endsWith("/assets/mira/loft-morning.png") && entry.decodedBodySize > 0)), { timeout: 90_000 }).toBe(true);
+      // Wait for the actual critical image, not only load or text paint. A
+      // partial transfer would produce deceptively small loading measurements.
+      await expect.poll(() => page.evaluate(() => performance.getEntriesByType("resource").some(entry => entry.name.endsWith("/assets/mira/loft-morning-delivery.webp") && entry.decodedBodySize > 0)), { timeout: 90_000 }).toBe(true);
+      await page.locator(".marketing-hero__scene").evaluate(image => image.decode());
       // Fixed observation tail after all initial assets load; no user interaction.
       await page.waitForTimeout(1000);
       const result = await page.evaluate(() => ({ ...window.__miraPerf,
@@ -39,8 +40,14 @@ test("three cold mobile-emulated landing loads record vitals and asset costs", a
       measurements.push({ sample: sample + 1, ...result, scriptDecodedBytes: scripts.reduce((total, asset) => total + asset.decodedBytes, 0) });
       expect(result.lcp).toBeGreaterThan(0);
       expect(result.overflow).toBe(false);
+      const hero = result.assets.filter(asset => asset.path.endsWith("/loft-morning-delivery.webp"));
+      expect(hero).toHaveLength(1);
+      expect(hero[0].decodedBytes).toBeLessThanOrEqual(260_000);
+      expect(result.assets.filter(asset => /\/(?:loft-morning|portrait)\.png$/.test(asset.path))).toEqual([]);
+      expect(scripts.reduce((total, asset) => total + asset.decodedBytes, 0)).toBeLessThan(400_000);
       // 3D belongs to an explicit call, not the public landing critical path.
       expect(result.assets.filter(asset => /\.(?:vrm|glb)(?:$|\?)/i.test(asset.path))).toEqual([]);
+      if (sample === 0) await page.screenshot({ path: testInfo.outputPath("landing-mobile.png") });
     } finally { await context.close(); }
   }
   await testInfo.attach("mobile-emulation-measurements", { body: JSON.stringify({ measuredAt: new Date().toISOString(), conditions: "Local compiled Worker, Chromium, 393x851, cold cache, 4x CPU throttle, 1.6Mbps/150ms; not physical phone or production field data", measurements }, null, 2), contentType: "application/json" });

@@ -4,6 +4,8 @@ The public resource remains [luma-companion](https://luma-companion.prakhargupta
 
 The [latest follow-through](READINESS-FOLLOWTHROUGH.md) records subsequent streaming, archive and accessibility work. Browser and smoke runners use the installed vinext/Wrangler CLIs directly under the pinned Node runtime, preserving the isolated credentials/cache/state boundary without downloading a duplicate package-manager runtime per test. `playwright.baseline.config.mjs` is explicitly local diagnostic-only and refuses CI use; normal CI always rebuilds current source. Optional measured mobile emulation: `pnpm --filter @companion/web exec playwright test --config playwright.performance.config.mjs` (synthetic, not physical-device acceptance).
 
+The [continuation](READINESS-CONTINUATION.md) records measured compressed-asset delivery. Run `pnpm --filter @companion/web assets:check` to verify committed image budgets (also required by CI); use `assets:marketing` only when deliberately regenerating derivatives. Browser and performance runs retain separate artifact directories under `apps/web/test-results` so their reports do not erase one another.
+
 ## Verify locally without production access
 
 Use Node24.18.0 / pnpm11.19.0 and the lockfile:

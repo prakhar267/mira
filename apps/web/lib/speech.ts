@@ -132,6 +132,7 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
   let audio: HTMLAudioElement | null = null;
   let objectUrl: string | null = null;
   let boundaryTimer: number | null = null;
+  let retryDelay: { timer: number; resolve: () => void } | null = null;
   let decodedAudio: AudioBuffer | null = null;
   let canceled = false;
   let finished = false;
@@ -141,6 +142,16 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
     if (finished) return;
     finished = true;
     if (boundaryTimer !== null) window.clearInterval(boundaryTimer);
+    boundaryTimer = null;
+    if (retryDelay) {
+      window.clearTimeout(retryDelay.timer);
+      retryDelay.resolve();
+      retryDelay = null;
+    }
+    if (audio) {
+      audio.onplaying = audio.onwaiting = audio.onpause = audio.onended = audio.onerror = null;
+      audio = null;
+    }
     decodedAudio=null;
     options.onAudioLevel?.(0);
     if (objectUrl) window.URL.revokeObjectURL(objectUrl);
@@ -162,14 +173,21 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
   void (async () => {
     let response: Response | null = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (canceled || finished) return;
       response = await fetch("/api/companion-speech", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text: text.replace(/\s+/g, " ").trim() }),
         signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(12_000)]),
       });
+      if (canceled || finished) return;
       if (response.ok || ![502, 504].includes(response.status) || attempt === 1) break;
-      await new Promise((resolve) => window.setTimeout(resolve, 180 * (attempt + 1)));
+      await new Promise<void>(resolve => {
+        retryDelay = {
+          timer: window.setTimeout(() => { retryDelay = null; resolve(); }, 180 * (attempt + 1)),
+          resolve,
+        };
+      });
     }
     if (!response) throw new Error("Mira’s voice is temporarily unavailable.");
     if (!response.ok) {
@@ -188,15 +206,20 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
     }
     audio.preload = "auto";
     audio.onplaying = () => {
+      // A browser event may already be queued when cancel detaches handlers.
+      if (canceled || finished) return;
       if (boundaryTimer !== null) window.clearInterval(boundaryTimer);
       if (!started) {
         started = true;
         options.onStart?.();
       }
+      if (canceled || finished) return;
       let previous = -1;
       boundaryTimer = window.setInterval(() => {
         if (!audio || canceled || finished) return;
         if(decodedAudio){const samples=decodedAudio.getChannelData(0);const offset=Math.floor(audio.currentTime*decodedAudio.sampleRate);const end=Math.min(samples.length,offset+2048);let sum=0;for(let i=offset;i<end;i++)sum+=samples[i]!**2;options.onAudioLevel?.(audio.paused?0:Math.min(1,Math.sqrt(sum/Math.max(1,end-offset))*5));}
+        // Consumer callbacks may synchronously hang up and release this audio.
+        if (!audio || canceled || finished) return;
         const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : Math.max(1, text.length / 13);
         const charIndex = Math.max(0, Math.min(text.length - 1, Math.floor((audio.currentTime / duration) * text.length)));
         if (charIndex === previous) return;
@@ -204,18 +227,19 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
         options.onBoundary?.({ charIndex, charLength: 1, elapsedTime: audio.currentTime * 1_000, name: "word" });
       }, 80);
     };
-    audio.onwaiting=()=>{if(boundaryTimer!==null)window.clearInterval(boundaryTimer);options.onAudioLevel?.(0);};
-    audio.onpause=()=>options.onAudioLevel?.(0);
+    audio.onwaiting=()=>{if(canceled||finished)return;if(boundaryTimer!==null)window.clearInterval(boundaryTimer);boundaryTimer=null;options.onAudioLevel?.(0);};
+    audio.onpause=()=>{if(!canceled&&!finished)options.onAudioLevel?.(0);};
     audio.onended = () => finish();
     audio.onerror = () => {
+      if (canceled || finished) return;
       options.onError?.("Mira’s voice could not play. Please try again.");
-      finish();
+      finish(false);
     };
     await audio.play();
   })().catch((cause) => {
     if (canceled || finished) return;
     options.onError?.(cause instanceof Error ? cause.message : "Mira’s voice is temporarily unavailable.");
-    finish();
+    finish(false);
   });
 
   return playback;

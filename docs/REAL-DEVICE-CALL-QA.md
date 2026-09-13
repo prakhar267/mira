@@ -2,6 +2,8 @@
 
 Use only consenting adult testers. Synthetic TTS-to-STT tests are useful diagnostics but cannot establish human accent recognition, perceived voice quality, physical echo rejection or lip-sync quality.
 
+The September 13 [continuation](READINESS-CONTINUATION.md#call-cancellation-and-long-session-lifecycle-fixes) adds deterministic 90-turn voice/video lifecycle soaks and real adapter cleanup regressions using synthetic primitives. Their virtual-time coverage does not sign off the device matrix or acoustic targets below.
+
 ## Device matrix
 
 Run on Android Chrome, iPhone Safari, Windows Chrome and macOS Chrome/Safari. Include one headset and one speakerphone, quiet-room and fan/traffic noise, and a weak built-in microphone. Ask fluent speakers of English, Hindi and Hinglish with at least three regional Indian accents. Record device/browser/version, network, speaker consent and subjective scores. Do not upload a real person's recordings without permission.

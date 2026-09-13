@@ -68,9 +68,51 @@ If the source is lost **before** obtaining current retirement/cutover proof, and
 
 Account backups contain personal data and password verifiers inside encryption. Encryption is not erasure of older physical backup bytes. Access and archive/key-retirement policy need independent legal/security review. Source retirement and target validation do not erase data already processed by chat, speech or email providers. Billing reconciliation, support history and operational monitoring must be restored separately; payments remain disabled.
 
+## Source-loss admission design and indispensable activation decisions
+
+The current implementation does **not** implement the protocol below. This section specifies the missing engineering and owner decisions; it is not a configurable recovery option or an assertion that an independent authority exists.
+
+### Why another signed checkpoint is insufficient
+
+`RecoveryJournal.append` commits only to the source SQLite database. The operator's `ledger` command copies the current journal later. Consider an intact snapshot and ledger ending at sequence N: in one execution no further deletion occurs; in another, the source acknowledges deletion N+1 and then disappears before the next export. Both executions leave exactly the same independently retained archive bytes. No inspection of those bytes—including authenticated encryption, a hash chain, a newly written `latest.json`, or a recent timestamp—distinguishes them. Accepting the archive as current in the first execution would also permit resurrection in the second.
+
+Shorter backup intervals reduce the possible gap, but do not close it. The account-content RPO may be nonzero; the recovery requirement for **acknowledged deletion/suppression** cannot use that same loss allowance. Requiring email reverification or new passwords does not make deleted content safe to restore. A separate object or directory is also not, by itself, proof of a separate disaster/failure domain.
+
+### Required authority contract
+
+An owner-approved independently surviving service must provide durable, linearizable, authenticated operations, not just blob upload or eventual-consistency listing. A possible implementation is a durable coordinator with an append-only encrypted suppression log and atomically maintained writer epoch. Its API and live integration still need to be built and tested:
+
+1. **Establish coverage before claiming protection.** While the existing source is safely fenced against relevant mutations, seed its complete suppression history and source generation into the authority, validate a contiguous head, and atomically activate the protected writer epoch. Deploy and verify the live acknowledgement gate before lifting the fence. A source lost before this coverage barrier remains unrecoverable through this protocol.
+2. **Write ahead of acknowledgement.** Validate ownership, schema, revision and operation ID; durably stage the local mutation and block conflicting operations. Append the content-free suppression intent to the authority using the source generation, writer epoch and an idempotency key. Only after the authority confirms durable persistence may the source finish its local transaction and report deletion/withdrawal completion. Never hold a SQLite transaction open over network I/O. A pending intent must survive retries and crashes; recovery conservatively applies it even if the local commit result is unknown. Corrections suppress old memory without retaining replacement text. Restrictive events are never undone by a later opt-in or by retry reconciliation.
+3. **Cover every mutation path.** Account/conversation deletion, memory forgetting/correction, privacy withdrawal, support/operator erasure and migration/cleanup paths must all use the same gate. Background jobs, old releases, direct store actions and delayed writes cannot bypass it. Re-enabling processing/history/memory must not reuse old data or remove an earlier suppression event. The existing blanket password reset, session invalidation and reverification on restoration must remain in place.
+4. **Fence the lost writer without contacting it.** Recovery calls the surviving authority, which atomically revokes the previous writer epoch and binds a new recovery epoch to the specific source generation, empty target, archive and fresh target challenge. Every serving writer must consult that authority, or a rigorously bounded authority-issued lease, so an old source that later reappears cannot continue serving or acknowledging changes. Routing changes alone are not fencing. Lease expiry/clock assumptions and partitions require explicit tests; no unbounded cached authorization is safe.
+5. **Read the current head from the authority.** The target verifies a fresh, target-bound response through independently configured authority authentication, then reads every suppression event through the fenced final head. Archive-contained assertions, user-supplied head numbers and the archive encryption key alone are not authority authentication. Require contiguous sequence/digest validation and matching generation/epoch; replay all newer suppression before the target can serve. A rollback, gap, unknown epoch or unavailable authority leaves it quarantined.
+6. **Resume protected operation after cutover.** The authority must also receive new target-side suppressions before acknowledgement. A restored account snapshot plus the current authority history establishes a new validated generation/baseline without losing prior tombstones. Only after this handoff and authentication invalidation may a separately reviewed routing change expose the target. Restoring the authority itself from an uncertain old checkpoint must not silently create a new “latest” head.
+
+The failure policy must be designed alongside this protocol:
+
+| Failure point | Required safe behavior |
+| --- | --- |
+| Authority unavailable before an intent is durable | Stop local processing/disclosure for the affected withdrawal; retain a durable pending operation and report pending/unavailable, not completed deletion. Do not silently fall back to a source-only acknowledgement. |
+| Authority persists intent but response or local commit is lost | Retry the same operation ID. Recovery conservatively suppresses the affected data; duplicate or extra suppression is preferable to resurrection. |
+| Source lost after successful acknowledgement | Recover using the independent authority's current fenced head; no call to the lost source may be required. |
+| Old source reappears after cutover | Reject its retired writer epoch for serving and mutations; it must never reclaim authority automatically. |
+| Independent authority is missing, rolled back, or cannot prove its head | Keep historical restores quarantined. A force/resume flag, operator timestamp, or old signed checkpoint must not override this. |
+
+### Owner configuration that code cannot invent
+
+- **Destination and failure domain:** designate an existing or newly approved independently durable authority and separate encrypted archive vaults, with endpoint/binding access and an approved no-spend capacity plan. No such authority, destination or credentials are configured in this repository's current environment; R2 access was not established by the read-only configuration check. A local test directory is not an operational substitute.
+- **Key custody and retention:** designate owners and separately recoverable encryption/authentication keys; define access, rotation and retention for content-free suppression records, encrypted account backups and the authority's own recovery. Never prune a suppression that could apply to a retained archive. Losing both the authority and its trusted latest state must remain an explicit recovery limitation.
+- **Availability tradeoff:** approve whether this strict external acknowledgement/serving dependency is acceptable. Timeouts, bounded retries, backpressure, pending-deletion UX and incident escalation must not be chosen by pretending remote failure is success. An asynchronous mirror alone would not satisfy the deletion guarantee.
+- **Recovery acceptance:** approve account-data RPO, service RTO, operators, tested authority-failure scenarios, credential reset/email delivery and cutover sign-off. Run a new isolated drill that destroys the source **before** retirement, preserves the independently acknowledged authority, includes late deletion and failed acknowledgements, and rejects stale-head/split-brain attempts. The current transfer timing below does not measure that scenario.
+
+These are infrastructure and protocol integration gates, not payment features. Supplying an approved existing free resource could avoid new spending; it would still require the live write-path integration, bootstrap/fencing migration and failure testing above. No production configuration or acknowledgement semantics were changed during this review.
+
 ## Local verification
 
 `lib/backup-recovery.test.ts` uses the actual operator filesystem adapter and AES-GCM implementation to create distinct account/suppression vaults, physically delete the synthetic source SQLite file, then restore another SQLite file using fresh previously captured source-retirement proof. It tests stale-ledger rejection, missing key, tampering, wrong purpose, nonempty targets, unknown tables and lease/quarantine behavior. The timing is local synthetic import/replay/validation, not a production RTO.
+
+The additional pre-retirement-loss regression independently captures authentic snapshot/ledger files, commits a newer account deletion, physically deletes the source SQLite file **without** retirement proof, and invokes the actual restore orchestrator. It verifies that intact ciphertext and `latest.json` do not cause a fallback: the target stays quarantined. Even manually importing the old snapshot/ledger cannot use a ledger as cutover proof. This is evidence of denial safety, **not** a successful source-loss restore; the fixture writes `source-loss-admission-evidence.json` with metadata only.
 
 `tests/worker/backup-recovery.test.mjs` uses actual Worker SQL/actions and the operator route, with mock credentials and forbidden external fetch. It verifies ciphertext transport, default-disabled operator export, quarantine, post-backup memory suppression, preserved transcripts and reset/reverification gates. It is separate from the independent filesystem evidence; its in-memory ciphertext fixture is not an offsite service.
 
@@ -78,12 +120,13 @@ Fresh focused results on 13 September 2026, using Node 24 and the installed lock
 
 | Check | Observed result |
 | --- | --- |
-| Independent filesystem/crypto/CLI recovery tests | 5 / 5 passed |
+| Independent filesystem/crypto/CLI recovery tests | 6 / 6 passed; focused suite duration 1.37 s |
 | Worker backup route/storage tests | 2 / 2 passed before final combined Worker rerun |
 | Earlier combined backup + account-state + store-engine tests | 40 / 40 passed; final fifth backup case then passed separately |
 | TypeScript and scoped backup/Worker/operator lint | Passed |
 | Source-file-loss fixture | 3 accounts; 3,000 original transcript rows; 600 unaffected rows preserved; deleted account/history/memory absent |
 | Snapshot input before encryption | 999,209 bytes; 7 independently archived journal events |
-| Local import/replay/finalization time | 125.22 ms in the final focused run; earlier 127.82 ms run used the same fixture |
+| Local import/replay/finalization time | 126.77 ms in the latest focused run; earlier 125.22 ms / 127.82 ms runs used the same fixture |
+| Source lost before retirement | Authentic archive head 1; acknowledged deletion head 2; source file removed; target remained quarantined |
 
 These timings exclude archive creation, offsite transfer, human coordination, email delivery, deployment and routing cutover. They are neither an approved RTO nor proof of source-loss recovery without fresh cutover evidence. Synthetic encrypted files/evidence are retained in task-specific temporary directories; keys are generated in test memory, not committed fixtures. No production credentials, recipients, conversations or inference providers were used.

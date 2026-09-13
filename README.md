@@ -10,6 +10,8 @@ Mira is an original AI companion, not a real person or a substitute for professi
 
 September 13 hardening is a source update pending verified release; the live link can still run the earlier release. The [latest follow-through](docs/READINESS-FOLLOWTHROUGH.md) separates actual streaming, encrypted archive tooling and accessibility improvements from the external launch gates.
 
+The [continuation](docs/READINESS-CONTINUATION.md) records further loading improvements and source-loss denial evidence, without claiming the outstanding physical-device, independent-review or production gates are complete.
+
 - **Conversation:** context-aware chat, with Cloudflare Llama 3.3 70B inference.
 - **Voice and avatar calls:** shared call controls, automatic listening, Inworld speech recognition and the Priya voice. Cloudflare Whisper provides a transcription fallback. The video companion is an animated, open-licensed avatar; it is not a live human video feed.
 - **Memory:** inspect, edit and delete saved memories; export or delete your data.

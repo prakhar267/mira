@@ -2,6 +2,8 @@
 
 This continues the original [implementation ledger](READINESS-IMPLEMENTATION.md), rather than replacing historical evidence. Payments remain excluded. Implementation and local verification are not deployment, physical-device acceptance, independent review or proof that external delivery works.
 
+The later [continuation](READINESS-CONTINUATION.md) completes the slow-network image optimization identified below and adds a pre-retirement source-loss denial regression. The remaining external/recovery gates are still explicit.
+
 ## Delivered source changes
 
 1. **Genuine incremental text chat.** The actual route streams checked complete-sentence prefixes to the browser over NDJSON. One sentence is retained as lookahead. The real HTTP regression observes the first displayed prefix before the upstream provider completes. Only a validated terminal `done` commits an assistant reply; errors, cancellation and navigation discard the unsaved draft. Consent and selected memories are rechecked at each delivery boundary. Transport/frame limits, eight-prefix cap and a 15-second delivery deadline bound malformed streams and non-reading clients. One-sentence replies can still wait until completion. Voice/video retain the complete-reply path and the existing Priya voice; raw tokens are not played aloud. See [streaming boundaries](INFERENCE-BOUNDARY.md).

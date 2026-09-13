@@ -87,6 +87,49 @@ describe("independent encrypted archive and deletion-safe recovery", () => {
     await expect(target.call({ operation: "restoreFinalize", sealed: proof.sealed })).rejects.toThrow("RESTORE_CURRENT_CUTOVER_PROOF_REQUIRED");
     expect(() => target.backup.assertAvailable()).toThrow("RECOVERY_MAINTENANCE");
   });
+  it("refuses admission when the source disappears before retirement, despite intact independently archived ciphertext", async () => {
+    const sourcePath = join(directory, "lost-before-retirement.sqlite"), source = database(sourcePath);
+    const user = await account(source, "source-loss", 3);
+    const snapshot = await captureArchive(source.call, join(directory, "account-vault"), key);
+    const staleLedger = await captureArchive(source.call, join(directory, "suppression-vault"), key, "ledger");
+    // A real acknowledged local transaction, not a tampered archive. Nothing in
+    // the surviving archive changes when this newer deletion commits locally.
+    source.transaction(() => source.store.eraseAccount(user.id, user.emailKey, []));
+    expect(source.store.get(`account:${user.id}`)).toBeNull();
+    const acknowledgedWatermark = source.backup.status().watermark;
+    expect(acknowledgedWatermark).toBeGreaterThan(staleLedger.manifest.watermark);
+    source.db.close(); await unlink(sourcePath);
+    await expect(readFile(sourcePath)).rejects.toMatchObject({ code: "ENOENT" });
+
+    // Both archives are still authentic and complete, including the atomic local
+    // latest pointer. That establishes integrity, not a current deletion head.
+    expect((await verifyArchive(snapshot.directory, key)).manifest.archiveId).toBe(snapshot.manifest.archiveId);
+    expect((await verifyArchive(staleLedger.directory, key)).manifest.watermark).toBe(staleLedger.manifest.watermark);
+    const head = JSON.parse(await readFile(join(directory, "suppression-vault", "latest.json"), "utf8"));
+    expect(head.watermark).toBe(staleLedger.manifest.watermark);
+
+    const target = database(join(directory, "quarantined.sqlite")), targetName = "mira-recovery-source-loss";
+    const unavailableSource = vi.fn(async () => { throw new Error("SYNTHETIC_SOURCE_LOST"); });
+    const targetCall = vi.fn(target.call);
+    await expect(restoreArchive(unavailableSource, targetCall, snapshot.directory, join(directory, "suppression-vault"), key, targetName, "RETIRE mira-production-v1")).rejects.toThrow("SYNTHETIC_SOURCE_LOST");
+    expect(unavailableSource).toHaveBeenCalledTimes(1);
+    expect(targetCall.mock.calls.map(([input]) => input.operation)).toEqual(["status", "restoreBegin"]);
+    expect(target.backup.status()).toMatchObject({ mode: "restore", next: 0, ledgerNext: 0, legacyImportAllowed: false });
+    expect(() => target.backup.assertAvailable()).toThrow("RECOVERY_MAINTENANCE");
+
+    // Even manually importing the authentic old material cannot substitute a
+    // ledger for target-bound cutover proof or open the quarantined target.
+    await target.call({ operation: "restoreLedger", sealed: staleLedger.sealed });
+    await importArchive(target, snapshot); await importArchive(target, staleLedger);
+    await expect(target.call({ operation: "restoreFinalize", sealed: staleLedger.sealed })).rejects.toThrow("BACKUP_INVALID");
+    expect(() => target.backup.assertAvailable()).toThrow("RECOVERY_MAINTENANCE");
+    await writeFile(join(directory, "source-loss-admission-evidence.json"), JSON.stringify({
+      evidence: "source-lost-before-retirement-admission-denied", sourceFileRemoved: true,
+      snapshotAndLedgerIntegrityVerified: true, archivedWatermark: staleLedger.manifest.watermark,
+      acknowledgedWatermarkBeforeSourceLoss: acknowledgedWatermark, targetMode: target.backup.status().mode,
+      independentLatestAuthorityConfigured: false, sourceLossRecoveryImplemented: false,
+    }), { mode: 0o600 });
+  });
   it("runs the actual vault restore orchestrator and removes corrected memory/deleted conversation while retaining another conversation", async () => {
     const source = database(join(directory, "source.sqlite")), user = await account(source, "correction", 3);
     const initial = source.transaction(() => source.store.readAccountState(user.id))!;

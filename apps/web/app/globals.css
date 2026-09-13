@@ -378,7 +378,7 @@ img { display: block; max-width: 100%; }
 .marketing-header > div { display: flex; justify-content: flex-end; gap: 8px; }
 .marketing-header .button--ghost { border-color: rgba(255,255,255,.25); background: rgba(19,20,18,.18); }
 .marketing-hero { position: relative; min-height: min(900px, 100dvh); overflow: hidden; color: white; }
-.marketing-hero__scene { position: absolute; inset: 0; background: url("/assets/mira/loft-morning.png") center 36% / cover no-repeat; }
+.marketing-hero__scene { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 36%; background: #392d26; }
 .marketing-hero__veil { position: absolute; inset: 0; background: rgba(10,7,16,.52); }
 .marketing-hero__copy { position: relative; z-index: 2; display: flex; width: min(670px, calc(100% - 48px)); min-height: min(900px, 100dvh); flex-direction: column; justify-content: center; margin-left: clamp(24px, 9vw, 138px); padding: 120px 0 60px; }
 .marketing-hero__copy .eyebrow { color: var(--river); }
@@ -2106,7 +2106,6 @@ select {
   --coral-strong: #ffcabc;
   --text-muted: #d2c4bb;
 }
-.marketing-hero__scene { background-image: url("/assets/mira/loft-morning.png"); }
 .auth-visual,
 .companion-preview__scene { background-image: url("/assets/mira/loft-morning.png"); }
 .live-call__backdrop { content: url("/assets/mira/loft-morning.png"); filter: blur(20px) brightness(.48) saturate(.9); }

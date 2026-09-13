@@ -42,6 +42,9 @@ jobs:
       - name: Verify the workspace
         run: pnpm check
 
+      - name: Verify committed marketing image delivery budgets
+        run: pnpm --filter @companion/web assets:check
+
       - name: Worker-runtime route and SQLite integration tests
         run: pnpm --filter @companion/web test:worker
 
