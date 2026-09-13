@@ -10,6 +10,11 @@ declare module "cloudflare:workers" {
     MIRA_STORE?: { idFromName(name: string): string; get(id: string): { fetch(url: string, init?: RequestInit): Promise<Response> } };
     MIRA_RECOVERY_TEST?: { idFromName(name: string): string; get(id: string): { fetch(url: string, init?: RequestInit): Promise<Response> } };
     MIRA_ADMIN_KEY?: string;
+    MIRA_BETA_ACCOUNT_LIMIT?: string;
+    INWORLD_API_KEY?: string;
+    MIRA_LOCAL_TEST?: string;
+    MIRA_INFERENCE_DISABLED?: string;
+    MIRA_TEST_PROVIDERS?: { fetch(request: Request): Promise<Response> };
     MIRA_ALERT_WEBHOOK?: string;
     MIRA_SUPPORT_OWNER?: string;
     RESEND_API_KEY?: string;

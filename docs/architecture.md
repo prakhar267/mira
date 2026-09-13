@@ -1,5 +1,7 @@
 # Companion architecture
 
+> Historical optional Fastify/prototype design. Not the active Cloudflare runtime. Use [CURRENT-ARCHITECTURE.md](CURRENT-ARCHITECTURE.md) and [STORAGE-RECOVERY.md](STORAGE-RECOVERY.md) for current code and limitations. Statements below are retained for provenance, not deployment instructions.
+
 ## Runtime shape
 
 The workspace is organized as a pnpm/Turborepo monorepo. `apps/web` is the responsive Next.js product, `apps/mobile` is the Expo client shell, and `apps/api` is a Fastify service. Domain contracts live in `packages/shared`; configuration, AI behavior, persistence, UI tokens, and analytics are isolated packages.

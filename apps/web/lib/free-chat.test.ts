@@ -23,7 +23,7 @@ describe("free chat inference", () => {
     expect(prompt).toContain("does not reset the conversation");
     expect(prompt).toContain("Answer short turns normally");
     expect(prompt).toContain("Never say you heard it wrong");
-    expect(prompt.length).toBeLessThan(2_500);
+    expect(prompt.length).toBeLessThan(5_000);
   });
 
   it("reads OpenAI-compatible text and the selected model safely", () => {

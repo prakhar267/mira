@@ -81,13 +81,52 @@ export function stopCompanionSpeech() {
   activePlayback = null;
 }
 
-export function playCompanionSpeech(text: string, options: {
+type SpeechOptions = {
   onStart?: () => void;
   onBoundary?: (boundary: { charIndex: number; charLength: number; elapsedTime: number; name: string }) => void;
   onAudioLevel?: (level:number) => void;
   onEnd?: () => void;
   onError?: (message: string) => void;
-} = {}): CompanionSpeechPlayback {
+};
+
+export function speechChunks(text: string, limit = 500): string[] {
+  let remainder = text.replace(/\s+/g, " ").trim();
+  const chunks: string[] = [];
+  while (remainder.length > limit) {
+    const prefix = remainder.slice(0, limit);
+    const sentence = Math.max(prefix.lastIndexOf(". "), prefix.lastIndexOf("? "), prefix.lastIndexOf("! "), prefix.lastIndexOf("। "));
+    const word = prefix.lastIndexOf(" ");
+    const end = sentence >= limit / 2 ? sentence + 1 : word >= limit / 2 ? word : limit;
+    chunks.push(remainder.slice(0, end));
+    remainder = remainder.slice(end).trimStart();
+  }
+  if (remainder) chunks.push(remainder);
+  return chunks;
+}
+
+/** Preserve the same Priya voice while respecting each provider request bound. */
+export function playCompanionSpeech(text: string, options: SpeechOptions = {}): CompanionSpeechPlayback {
+  const chunks = speechChunks(text);
+  if (chunks.length <= 1) return playSpeechChunk(chunks[0] ?? "", options);
+  let index = 0, offset = 0;
+  let cancelled = false;
+  let chunk: CompanionSpeechPlayback | null = null;
+  const next = () => {
+    if (cancelled) return;
+    const value = chunks[index]!;
+    chunk = playSpeechChunk(value, {
+      ...options,
+      onStart: () => { if (index === 0) options.onStart?.(); },
+      onBoundary: boundary => options.onBoundary?.({ ...boundary, charIndex: offset + boundary.charIndex }),
+      onError: message => { cancelled = true; options.onError?.(message); },
+      onEnd: () => { if (cancelled) return; offset += value.length + 1; index++; if (index < chunks.length) next(); else options.onEnd?.(); },
+    });
+  };
+  next();
+  return { cancel: () => { cancelled = true; chunk?.cancel(); } };
+}
+
+function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSpeechPlayback {
   stopCompanionSpeech();
   const abortController = new AbortController();
   let audio: HTMLAudioElement | null = null;

@@ -1,17 +1,22 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-const key = "mira-adult-declaration-v1";
-export function AdultDemoGate({ children }: { children: ReactNode }) {
+import { createDemoSession, fetchCapabilities, type CapabilityContract } from "@/lib/runtime-capabilities";
+export function AdultDemoGate({ children, onConsent, onAccess }: { children: ReactNode; onConsent?: (memoryConsent: boolean) => void; onAccess?: (access: CapabilityContract) => void }) {
   const [accepted, setAccepted] = useState(false),
     [checked, setChecked] = useState(false),
+    [processing, setProcessing] = useState(false),
+    [memory, setMemory] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
     [ready, setReady] = useState(false);
   useEffect(() => {
-    try {
-      setAccepted(localStorage.getItem(key) === "yes");
-    } catch {}
-    setReady(true);
-  }, []);
+    const abort = new AbortController();
+    void fetchCapabilities(abort.signal).then(result => {
+      if (!abort.signal.aborted) { onAccess?.(result); setAccepted(result.mode === "demo" && result.capabilities.chat); }
+    }).catch(() => undefined).finally(() => { if (!abort.signal.aborted) setReady(true); });
+    return () => abort.abort();
+  }, [onAccess]);
   if (!ready) return <div className="app-loader">Opening Mira…</div>;
   if (accepted) return children;
   return (
@@ -47,17 +52,18 @@ export function AdultDemoGate({ children }: { children: ReactNode }) {
             onChange={(e) => setChecked(e.target.checked)}
           />
         </label>
+        <label className="toggle-line"><span>I consent to sending my messages and voice input to the disclosed AI providers. I can pause this in Privacy settings.</span><input type="checkbox" checked={processing} onChange={event => setProcessing(event.target.checked)} /></label>
+        <label className="toggle-line"><span>Also enable inspectable memory for continuity (optional). I can correct, pause or forget it.</span><input type="checkbox" checked={memory} onChange={event => setMemory(event.target.checked)} /></label>
+        {error ? <p role="alert" className="form-error">{error}</p> : null}
         <button
           className="button button--primary"
-          disabled={!checked}
+          disabled={!checked || !processing || busy}
           onClick={() => {
-            try {
-              localStorage.setItem(key, "yes");
-            } catch {}
-            setAccepted(true);
+            setBusy(true); setError("");
+            void createDemoSession(memory).then(access => { onAccess?.(access); onConsent?.(memory); setAccepted(true); }).catch(cause => setError(cause instanceof Error ? cause.message : "The demo could not start.")).finally(() => setBusy(false));
           }}
         >
-          Meet Mira
+          {busy ? "Starting demo…" : "Meet Mira"}
         </button>
         <Link href="/">Go back</Link>
         <small>

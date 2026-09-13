@@ -1,4 +1,4 @@
-type Provider = "llm7" | "cloudflare-chat" | "cloudflare" | "inworld-speech" | "inworld-transcribe";
+type Provider = "llm7" | "cloudflare-chat" | "cloudflare-memory" | "cloudflare" | "inworld-speech" | "inworld-transcribe";
 const circuits = new Map<Provider, { failures: number; retryAt: number }>();
 
 export class ProviderBackoffError extends Error {
@@ -10,11 +10,17 @@ export async function withProviderDeadline<T>(provider: Provider, work: (signal:
   if (state && state.retryAt > Date.now()) throw new Error("Provider cooling down");
   const controller = new AbortController();
   const signal = parent ? AbortSignal.any([parent, controller.signal]) : controller.signal;
+  signal.throwIfAborted();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let abortListener: (() => void) | undefined;
   try {
     const value = await Promise.race([
       work(signal),
-      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("Provider deadline exceeded")); }, timeoutMs); }),
+      new Promise<never>((_, reject) => {
+        abortListener = () => reject(new DOMException("Provider request canceled", "AbortError"));
+        signal.addEventListener("abort", abortListener, { once: true });
+        timer = setTimeout(() => { const timeout = new DOMException("Provider deadline exceeded", "TimeoutError"); reject(timeout); controller.abort(timeout); }, timeoutMs);
+      }),
     ]);
     circuits.delete(provider);
     return value;
@@ -25,7 +31,7 @@ export async function withProviderDeadline<T>(provider: Provider, work: (signal:
       circuits.set(provider, { failures, retryAt: cooldown ? Date.now() + cooldown : 0 });
     }
     throw cause;
-  } finally { if (timer) clearTimeout(timer); }
+  } finally { if (timer) clearTimeout(timer); if (abortListener) signal.removeEventListener("abort", abortListener); }
 }
 
 export function providerCircuitStatus() {

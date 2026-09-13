@@ -18,6 +18,8 @@ type Snapshot = {
   readiness: Record<string, unknown>;
   monitor: Record<string, unknown> | null;
   recentMetrics: Record<string, unknown>[];
+  storageStats: Record<string, unknown>;
+  mailOutbox: Record<string, unknown>;
 };
 export function OperationsDashboard() {
   const [key, setKey] = useState(""),
@@ -121,8 +123,10 @@ export function OperationsDashboard() {
               delivery still requires an approved alert channel.
             </p>
             <pre>{JSON.stringify(data.configuration, null, 2)}</pre>
+            <details><summary>Storage and cleanup backlog (logical, not billed usage)</summary><pre>{JSON.stringify(data.storageStats, null, 2)}</pre></details>
+            <details><summary>Mail queue (provider acceptance is not mailbox delivery)</summary><pre>{JSON.stringify(data.mailOutbox, null, 2)}</pre></details>
             <details><summary>Last scheduled check</summary><pre>{JSON.stringify(data.monitor, null, 2)}</pre></details>
-            <details><summary>Recent latency buckets (P95 is an upper bound)</summary><pre>{JSON.stringify(data.recentMetrics, null, 2)}</pre></details>
+            <details><summary>Recent stage latency buckets (P50/P95/P99 upper bounds, not exact percentiles)</summary><pre>{JSON.stringify(data.recentMetrics, null, 2)}</pre></details>
           </section>
           <section className="settings-section">
             <h2>Launch readiness</h2>

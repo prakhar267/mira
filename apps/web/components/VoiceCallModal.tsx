@@ -13,6 +13,8 @@ import {
   Waveform,
 } from "@phosphor-icons/react";
 import { useCompanionCall } from "./useCompanionCall";
+import type { TurnContext } from "@/lib/conversation-turn";
+import { useCallDialog } from "./useCallDialog";
 
 export function VoiceCallModal({
   companionName,
@@ -22,12 +24,13 @@ export function VoiceCallModal({
 }: {
   companionName: string;
   userName: string;
-  onUserTurn: (content: string) => Promise<string>;
+  onUserTurn: (content: string, context: TurnContext) => Promise<string>;
   onClose: (durationSeconds: number) => void;
 }) {
   const { phase, userLine: heard, companionLine, error: speechError, muted, speaker, talkOver, seconds, call } = useCompanionCall(userName, onUserTurn);
   const [captions, setCaptions] = useState(true);
   const [heartSent, setHeartSent] = useState(false);
+  const dialogRef = useCallDialog(() => { call.current?.close(); onClose(seconds); });
   const phaseCopy: Record<typeof phase, string> = {
     idle: muted ? "Microphone muted" : "Ready to listen",
     "opening-mic": "Opening microphone…",
@@ -46,7 +49,7 @@ export function VoiceCallModal({
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
   return (
-    <motion.div className="live-call live-call--voice" role="dialog" aria-modal="true" aria-label={`Voice call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div ref={dialogRef} className="live-call live-call--voice" role="dialog" aria-modal="true" aria-label={`Voice call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <img className="live-call__backdrop" src="/assets/mira/loft-morning.png" alt="" />
       <div className="live-call__veil" />
       <header className="live-call__header"><span><i className="status-dot" /> {companionName} · Hinglish voice</span><strong>{companionName}</strong><time>{time}</time></header>

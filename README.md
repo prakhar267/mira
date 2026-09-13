@@ -8,6 +8,8 @@ Mira is an original AI companion, not a real person or a substitute for professi
 
 ## Current website
 
+September 13 hardening is a source update pending an explicitly authorized deployment; the live link can still run the earlier release. The [evidence ledger](docs/READINESS-IMPLEMENTATION.md) separates local results from external launch gates.
+
 - **Conversation:** context-aware chat, with Cloudflare Llama 3.3 70B inference.
 - **Voice and avatar calls:** shared call controls, automatic listening, Inworld speech recognition and the Priya voice. Cloudflare Whisper provides a transcription fallback. The video companion is an animated, open-licensed avatar; it is not a live human video feed.
 - **Memory:** inspect, edit and delete saved memories; export or delete your data.
@@ -20,15 +22,15 @@ Billing and transactional recovery-email integrations exist in code but still re
 
 ## Run locally
 
-Prerequisites: Node.js 22+ and pnpm 11.
+Prerequisites: Node.js 24.18.0 (see `.node-version`) and pnpm 11.19.0.
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm db:generate
-pnpm dev:web
+pnpm --filter @companion/web dev:synthetic
 ```
 
-Open [localhost:3001](http://127.0.0.1:3001). Local mock operation and the deployed provider-backed website are different environments; local startup alone does not configure production speech or accounts. Keep credentials in ignored local files or server-side secrets.
+Open [localhost:4397](http://127.0.0.1:4397). This runs the active Worker-shaped app against isolated SQLite storage and deterministic local providers, with no production credentials. Audio fixtures are control-flow tests, not real Priya playback. Do not put real conversations in this environment. The optional Next.js/Fastify path is separate; see [current architecture and configuration](docs/CURRENT-ARCHITECTURE.md).
 
 ## Validate and deploy
 
@@ -36,6 +38,9 @@ Open [localhost:3001](http://127.0.0.1:3001). Local mock operation and the deplo
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm --filter @companion/web test:worker
+pnpm --filter @companion/web exec playwright install chromium firefox webkit
+pnpm --filter @companion/web test:browser
 pnpm --filter @companion/web build:vinext
 ```
 
@@ -68,6 +73,8 @@ The public deployment comes from `apps/web/`. Archived code and dated reports re
 ## Documentation
 
 - [Current deployment](docs/DEPLOYMENT.md)
+- [Current architecture, configuration and capabilities](docs/CURRENT-ARCHITECTURE.md)
+- [September 13 implementation and verification ledger](docs/READINESS-IMPLEMENTATION.md)
 - [Launch operations, providers and remaining gates](docs/LAUNCH-OPERATIONS.md)
 - [Mira brand guide](docs/brand.md)
 - [Security reporting](SECURITY.md)

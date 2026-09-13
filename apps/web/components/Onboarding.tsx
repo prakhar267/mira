@@ -22,6 +22,9 @@ interface Draft {
   birthday: string;
   pronouns: DemoState["user"]["pronouns"];
   adultConfirmed: boolean;
+  policyAccepted: boolean;
+  aiProcessingConsent: boolean;
+  conversationStorageEnabled: boolean;
   intentions: string[];
   interests: string[];
   companionName: string;
@@ -48,6 +51,9 @@ const initialDraft: Draft = {
   birthday: "",
   pronouns: "she/her",
   adultConfirmed: false,
+  policyAccepted: false,
+  aiProcessingConsent: false,
+  conversationStorageEnabled: true,
   intentions: [],
   interests: [],
   companionName: "Mira",
@@ -94,6 +100,7 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
     if (step === 6 && draft.relationshipMode === "romantic" && (!isAdult || !draft.adultConfirmed)) return setError("Romantic mode requires confirmed adult eligibility.");
     if (step === 8 && draft.interests.length === 0) return setError("Choose at least one interest to begin with.");
     if (step === steps - 1) {
+      if (!draft.policyAccepted || !draft.aiProcessingConsent) return setError("Review the Terms, Privacy Policy and AI processing disclosure before creating your companion.");
       setSubmitting(true);
       try { await onComplete(draft); } catch (cause) { setError(cause instanceof Error ? cause.message : "Account setup could not be completed."); } finally { setSubmitting(false); }
       return;
@@ -205,12 +212,8 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
                 <label>Calm <input type="range" min="0" max="100" value={draft.energy} onChange={(event) => setDraft({ ...draft, energy: Number(event.target.value) })} /> Energetic</label>
                 <label>Thoughtful <input type="range" min="0" max="100" value={draft.playfulness} onChange={(event) => setDraft({ ...draft, playfulness: Number(event.target.value) })} /> Spontaneous</label>
                 <label>Serious <input type="range" min="0" max="100" value={draft.humor} onChange={(event) => setDraft({ ...draft, humor: Number(event.target.value) })} /> Humorous</label>
-                <label>Reserved <input type="range" min="0" max="100" value={draft.expressiveness} onChange={(event) => setDraft({ ...draft, expressiveness: Number(event.target.value) })} /> Expressive</label>
-                <label>Low affection <input type="range" min="0" max="100" value={draft.affection} onChange={(event) => setDraft({ ...draft, affection: Number(event.target.value) })} /> Very affectionate</label>
-                <label>Not flirty <input type="range" min="0" max="100" value={draft.flirtiness} onChange={(event) => setDraft({ ...draft, flirtiness: Number(event.target.value) })} /> Very flirty</label>
-                <label>Friendly <input type="range" min="0" max="100" value={draft.romance} onChange={(event) => setDraft({ ...draft, romance: Number(event.target.value) })} /> Romantic</label>
               </div>
-              {draft.relationshipMode === "romantic" ? <label className="check-line"><input type="checkbox" checked={draft.sensuality > 0} onChange={(event) => setDraft({ ...draft, sensuality: event.target.checked ? 20 : 0 })} /><span>I’m an adult and explicitly opt into a lightly sensual/flirty tone. This never overrides safety or boundaries.</span></label> : null}
+              <p>These guide conversation style. Priya remains one consistent voice; separate sensuality, flirtiness and voice-tone controls are not available.</p>
             </>
           )}
 
@@ -231,7 +234,10 @@ export function Onboarding({ onComplete }: { onComplete: (draft: Draft) => void 
               <h1>{draft.companionName || "Mira"} is ready to meet you.</h1>
               <p>Your companion will begin with your chosen relationship style, interests, voice, and personality—without inventing facts about your life.</p>
               <div className="ready-note"><Bot aria-hidden="true" /><span><strong>“Hi {draft.name.trim() || "there"}. I’m {draft.companionName || "Mira"}.”</strong> We can start with whatever feels easy—even a quiet hello.</span></div>
-              <label className="check-line"><input type="checkbox" checked={draft.memoryEnabled} onChange={(event) => setDraft({ ...draft, memoryEnabled: event.target.checked })} /><span>Let {draft.companionName || "Mira"} suggest memories from our conversations. I can review, correct, pause, or delete them anytime.</span></label>
+              <label className="check-line"><input type="checkbox" checked={draft.memoryEnabled} onChange={(event) => setDraft({ ...draft, memoryEnabled: event.target.checked })} /><span>Use memories I explicitly add or confirm in conversation. I can inspect, correct, pause, or forget them anytime.</span></label>
+              <label className="check-line"><input type="checkbox" checked={draft.conversationStorageEnabled} onChange={event => setDraft({ ...draft, conversationStorageEnabled: event.target.checked })} /><span>Save my chat history in my account. Turning this off means new conversations will not be stored as account history.</span></label>
+              <label className="check-line"><input type="checkbox" checked={draft.aiProcessingConsent} onChange={event => setDraft({ ...draft, aiProcessingConsent: event.target.checked })} /><span>I agree to my messages and, when I use voice, audio being processed by Mira’s configured Cloudflare and Inworld services. Mira is AI, can make mistakes and is not emergency or professional care.</span></label>
+              <label className="check-line"><input type="checkbox" checked={draft.policyAccepted} onChange={event => setDraft({ ...draft, policyAccepted: event.target.checked })} /><span>I accept the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and have read the <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a> (disclosure version 2026-09-13). My age declaration is not identity verification.</span></label>
               <div className="trust-note"><ShieldCheck aria-hidden="true" /><span>Memory stays inspectable. You can export or delete everything from Settings.</span></div>
             </>
           )}

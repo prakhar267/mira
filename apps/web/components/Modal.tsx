@@ -11,10 +11,11 @@ export function Modal({ title, description, children, onClose }: { title: string
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog.showModal();
     const first = dialog.querySelector<HTMLElement>("button, input, select, textarea");
     first?.focus();
-    return () => dialog.close();
+    return () => { dialog.close(); if (previous?.isConnected) previous.focus(); };
   }, []);
 
   return (

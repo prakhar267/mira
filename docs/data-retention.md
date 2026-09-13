@@ -1,5 +1,7 @@
 # Data retention and deletion standard
 
+> Historical August prototype proposal, NOT the active Mira retention implementation. In particular, UserStateCoordinator, STATE KV and `/api/v1/data/export` below do not serve the current website. See [CURRENT-ARCHITECTURE.md](CURRENT-ARCHITECTURE.md), [STORAGE-RECOVERY.md](STORAGE-RECOVERY.md), and the current public privacy disclosure. Retained as historical design, not a compliance assertion.
+
 Last reviewed: 18 August 2026  
 Document status: proposed production standard; requires legal approval  
 Implementation status: synthetic-beta controls only

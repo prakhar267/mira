@@ -3,10 +3,11 @@ export interface CallListeningSession {
 }
 
 export interface CallListeningOptions {
+  signal?: AbortSignal;
   /** Headphones-only experimental talk-over. Never enabled by default. */
   interruption?: boolean;
   onSpeechStart?: () => void;
-  onSpeechEnd?: () => void;
+  onSpeechEnd?: (endpointingMs?: number) => void;
   onTranscript: (text: string) => void;
   onSilence: () => void;
   onError: (message: string) => void;
@@ -99,6 +100,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     video: false,
   });
+  if (options.signal?.aborted) { stream.getTracks().forEach(track => track.stop()); throw new DOMException("Call cancelled", "AbortError"); }
   let acquiredContext: AudioContext | undefined;
   try {
   const AudioContextConstructor = window.AudioContext
@@ -113,6 +115,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
   const context = new AudioContextConstructor();
   acquiredContext = context;
   await context.resume();
+  if (options.signal?.aborted) { stream.getTracks().forEach(track => track.stop()); await context.close(); throw new DOMException("Call cancelled", "AbortError"); }
   const source = context.createMediaStreamSource(stream);
   const analyser = context.createAnalyser();
   analyser.fftSize = 512;
@@ -121,6 +124,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
 
   const samples = new Float32Array(analyser.fftSize);
   const chunks: Blob[] = [];
+  let recordedBytes = 0;
   const startedAt = performance.now();
   let frame = 0;
   let canceled = false;
@@ -208,7 +212,9 @@ export async function startCallListening(options: CallListeningOptions): Promise
   };
 
   recorder.ondataavailable = (event) => {
-    if (event.data.size) chunks.push(event.data);
+    recordedBytes += event.data.size;
+    if (recordedBytes > 2_500_000) { if (!canceled) options.onError("This recording is too large. Please try a shorter sentence."); canceled = true; stop(); cleanup(); return; }
+    if (event.data.size && !canceled) chunks.push(event.data);
   };
   recorder.onerror = () => {
     if (!canceled) options.onError("The microphone recording stopped unexpectedly. I’ll try listening again.");
@@ -227,15 +233,16 @@ export async function startCallListening(options: CallListeningOptions): Promise
       options.onSilence();
       return;
     }
-    options.onSpeechEnd?.();
+    options.onSpeechEnd?.(Math.max(0, performance.now() - lastVoicedAt));
 
     const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
     void blobBase64(blob)
       .then(async (audioBase64) => {
+        if (canceled || options.signal?.aborted) return;
         const responsePromise = fetch("/api/companion-transcribe", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ audioBase64, contentType: blob.type }),
+          body: JSON.stringify({ audioBase64, contentType: blob.type, durationMs: Math.min(60_000, Math.round(performance.now() - startedAt)) }),
           signal: AbortSignal.any([transcriptionController.signal, AbortSignal.timeout(7_000)]),
         }).then(async (response) => ({
           response,
@@ -263,6 +270,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
           throw new Error("I couldn’t hear that clearly.");
         }
         const { response, body } = serverResult;
+        if ([401, 403, 429].includes(response.status)) throw new Error(body?.error ?? "Voice processing is unavailable. Check consent or retry after the displayed limit resets.");
         if (isCallSilenceResponse(response.status)) {
           if (!canceled && isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) options.onTranscript(preferredCallTranscript(nativeTranscript));
           else if (!canceled) options.onSilence();

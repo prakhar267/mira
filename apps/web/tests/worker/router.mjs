@@ -1,0 +1,31 @@
+export { MockAI, MockProviders } from "./mock-providers.mjs";
+export { MiraStore } from "../../worker.ts";
+import * as signup from "../../app/api/account/signup/route.ts";
+import * as login from "../../app/api/account/login/route.ts";
+import * as logout from "../../app/api/account/logout/route.ts";
+import * as state from "../../app/api/account/state/route.ts";
+import * as exportAccount from "../../app/api/account/export/route.ts";
+import * as deleteAccount from "../../app/api/account/delete/route.ts";
+import * as forgot from "../../app/api/account/forgot-password/route.ts";
+import * as reset from "../../app/api/account/reset-password/route.ts";
+import * as verify from "../../app/api/account/verify-email/route.ts";
+import * as requestVerification from "../../app/api/account/request-verification/route.ts";
+import * as demo from "../../app/api/demo/session/route.ts";
+import * as capabilities from "../../app/api/capabilities/route.ts";
+import * as chat from "../../app/api/companion-chat/route.ts";
+import * as speech from "../../app/api/companion-speech/route.ts";
+import * as transcription from "../../app/api/companion-transcribe/route.ts";
+import * as memory from "../../app/api/companion-memory/route.ts";
+import * as accountMemory from "../../app/api/account/memory/route.ts";
+import * as accountPolicy from "../../app/api/account/policy/route.ts";
+import * as accountReauth from "../../app/api/account/reauth/route.ts";
+import * as accountMessages from "../../app/api/account/messages/route.ts";
+import * as accountConversation from "../../app/api/account/conversation/route.ts";
+
+const routes={"/api/account/signup":signup,"/api/account/login":login,"/api/account/logout":logout,"/api/account/state":state,"/api/account/export":exportAccount,"/api/account/delete":deleteAccount,"/api/account/forgot-password":forgot,"/api/account/reset-password":reset,"/api/account/verify-email":verify,"/api/account/request-verification":requestVerification,"/api/demo/session":demo,"/api/capabilities":capabilities,"/api/companion-chat":chat,"/api/companion-speech":speech,"/api/companion-transcribe":transcription,"/api/companion-memory":memory};
+const syntheticRouter = { async fetch(request) {
+  const accountRoutes={"/api/account/memory":accountMemory,"/api/account/policy":accountPolicy,"/api/account/reauth":accountReauth,"/api/account/messages":accountMessages,"/api/account/conversation":accountConversation};
+  const route=(accountRoutes[new URL(request.url).pathname]??routes[new URL(request.url).pathname])?.[request.method];
+  return route ? route(request) : new Response("Synthetic harness route not found",{status:404});
+}};
+export default syntheticRouter;

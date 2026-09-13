@@ -8,9 +8,12 @@
     "start": "next start -p 3001",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts --passWithNoTests",
+    "test": "vitest run --config vitest.config.ts",
+    "test:worker": "vitest run --config vitest.worker.config.mjs",
+    "test:browser": "playwright test --config playwright.config.mjs",
     "smoke:production": "node scripts/production-smoke.mjs",
     "dev:vinext": "vinext dev --port 3001",
+    "dev:synthetic": "MIRA_SYNTHETIC=1 CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false vinext dev --host 127.0.0.1 --port 4397 --strictPort",
     "build:vinext": "vinext build",
     "start:vinext": "wrangler dev --config dist/server/wrangler.json",
     "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json"
@@ -33,10 +36,13 @@
     "react-dom": "19.2.8",
     "react-server-dom-webpack": "^19.2.8",
     "three": "0.185.1",
-    "vinext": "1.0.0-beta.8"
+    "vinext": "1.0.0-beta.8",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.2",
+    "@cloudflare/vitest-plugin": "^1.1.8",
+    "@playwright/test": "^1.63.0",
     "@types/node": "26.4.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.3",

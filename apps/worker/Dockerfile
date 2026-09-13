@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:24.18.0-alpine
 WORKDIR /workspace
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./

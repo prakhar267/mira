@@ -8,6 +8,8 @@ const cloudflareCdn = cdnAdapter({});
 const transformersBrowserBuild = fileURLToPath(new URL("./node_modules/@huggingface/transformers/dist/transformers.web.js", import.meta.url));
 
 export default defineConfig({
+  define: { "process.env.MIRA_RELEASE_SHA": JSON.stringify(process.env.GITHUB_SHA ?? "unreleased") },
+  ...(process.env.MIRA_SYNTHETIC === "1" ? {server:{host:"127.0.0.1",port:4397,strictPort:true}} : {}),
   worker: {
     format: "es",
   },
@@ -27,6 +29,7 @@ export default defineConfig({
       },
     }),
     cloudflare({
+      ...(process.env.MIRA_SYNTHETIC === "1" ? { configPath: "tests/local/wrangler.jsonc" } : {}),
       viteEnvironment: {
         name: "rsc",
         childEnvironments: ["ssr"],

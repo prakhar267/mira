@@ -45,6 +45,7 @@ export function ActivitiesView({
   nudges,
   companionName,
   liveMode = false,
+  reflectionEnabled = false,
   onComplete,
   onAddJournal,
   onDeleteJournal,
@@ -59,6 +60,7 @@ export function ActivitiesView({
   nudges: ScheduledNudgeRecord[];
   companionName: string;
   liveMode?: boolean;
+  reflectionEnabled?: boolean;
   onComplete: (activity: ActivityDefinition) => void;
   onAddJournal: (entry: {
     title: string;
@@ -297,7 +299,7 @@ export function ActivitiesView({
                 <h2>Your entries</h2>
                 <p>
                   {journalEntries.length
-                    ? `${journalEntries.length} saved locally`
+                    ? `${journalEntries.length} saved ${liveMode ? "to your account" : "in this browser"}`
                     : "Nothing saved yet"}
                 </p>
               </div>
@@ -309,8 +311,8 @@ export function ActivitiesView({
                 <p>{entry.content}</p>
                 <footer>
                   <time>{new Date(entry.createdAt).toLocaleDateString()}</time>
-                  <button type="button" onClick={() => onReflect(entry)}>
-                    <Sparkles aria-hidden="true" /> Reflect with {companionName}
+                  <button type="button" disabled={!reflectionEnabled} onClick={() => onReflect(entry)}>
+                    <Sparkles aria-hidden="true" /> {reflectionEnabled ? `Reflect with ${companionName}` : "AI reflection unavailable"}
                   </button>
                   <button
                     type="button"
@@ -340,8 +342,7 @@ export function ActivitiesView({
               <div>
                 <h2>Remember a future moment</h2>
                 <p>
-                  {companionName} can check in later, within your quiet hours and
-                  notification choices.
+                  Keep the date here. Automatic reminders and outgoing notifications are unavailable in this beta.
                 </p>
               </div>
             </div>
@@ -371,14 +372,14 @@ export function ActivitiesView({
               className="button button--primary"
               onClick={saveFutureEvent}
             >
-              <BellRing aria-hidden="true" /> Save and plan check-in
+              <BellRing aria-hidden="true" /> Save plan
             </button>
           </form>
           <div className="journal-feed">
             <div className="section-heading">
               <div>
-                <h2>Planned check-ins</h2>
-                <p>Consent-aware and cancelable</p>
+                <h2>Saved plans</h2>
+                <p>No notifications will be sent.</p>
               </div>
             </div>
             {futureEvents.map((future) => (

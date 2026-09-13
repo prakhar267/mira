@@ -2432,3 +2432,8 @@ select {
 .legal-details { max-width: 760px; text-align: left; margin: 40px auto; }
 .legal-details h2 { font-size: 25px; margin: 28px 0 10px; }
 .legal-details p { font-size: 15px; line-height: 1.8; margin: 12px 0; }
+.account-sync-status { padding: 10px 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; line-height: 1.6; color: var(--text); background: var(--surface); border-bottom: 1px solid #bca9a933; }
+.message-actions button, .memory-row__actions button { min-width: 44px; min-height: 44px; }
+:where(button, a, input, select, textarea):focus-visible { outline: 3px solid #d67a5e; outline-offset: 3px; }
+@media (max-width: 560px) { .chat__composer textarea { font-size: 16px; } .suggestion-row button { min-height: 44px; } .account-sync-status { padding: 8px 12px; } }
+@media (prefers-reduced-motion: reduce) { .live-call *, .typing *, .app-loader * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
