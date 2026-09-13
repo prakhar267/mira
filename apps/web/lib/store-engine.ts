@@ -1,5 +1,6 @@
 import { ACCOUNT_POLICY_VERSION, decodeAccountState, MAX_ACCOUNT_MESSAGES, ownAccountState, STATE_MESSAGE_WINDOW, validateAccountState, type MemoryCommand, type StateEnvelope } from "./account-state-schema";
 import type { DemoState } from "./state";
+import { RecoveryJournal } from "./recovery-journal";
 
 export interface InferenceReservation { service:string;tier:"demo"|"account";principal:string;attemptId:string;units:number;max:number;personalMax:number;unitMax:number;personalUnitMax:number;demoMax:number;concurrency:number;globalConcurrency?:number;demoConcurrency?:number;ttl:number }
 export interface SqlStorage {
@@ -9,7 +10,9 @@ export interface SqlStorage {
 /** One SQLite coordinator for this beta. SQL calls are synchronous and each
  * action runs inside a Durable Object transaction. No raw content is logged. */
 export class StoreEngine {
+  private recovery: RecoveryJournal;
   constructor(private sql: SqlStorage) {
+    this.recovery = new RecoveryJournal(sql);
     sql.exec("CREATE TABLE IF NOT EXISTS records (key TEXT PRIMARY KEY, value TEXT, expires INTEGER, deleted INTEGER NOT NULL DEFAULT 0)");
     sql.exec("CREATE INDEX IF NOT EXISTS record_expiry ON records(expires)");
     sql.exec("CREATE TABLE IF NOT EXISTS limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL)");
@@ -34,6 +37,7 @@ export class StoreEngine {
     this.sql.exec("INSERT INTO records(key,value,expires,deleted) VALUES(?,?,?,0) ON CONFLICT(key) DO UPDATE SET value=excluded.value, expires=excluded.expires, deleted=0", key, value, ttl ? Date.now() + ttl * 1000 : null);
   }
   remove(key: string) {
+    if (key.startsWith("account:") && !this.row(key)?.deleted) this.recovery.append({ kind: "account", userId: key.slice(8) });
     // Keep a content-free tombstone: old KV data must never be imported again.
     this.sql.exec("INSERT INTO records(key,value,deleted) VALUES(?,NULL,1) ON CONFLICT(key) DO UPDATE SET value=NULL,expires=NULL,deleted=1", key);
   }
@@ -60,6 +64,8 @@ export class StoreEngine {
     if(snapshot&&!this.row(key))this.put(key,encoded,30*86400);
     const existing=JSON.parse(this.get(`account-policy:${userId}`)??"null");
     this.put(`account-policy:${userId}`,JSON.stringify({version:1,termsVersion:existing?.termsVersion??"legacy-self-declaration",adultDeclaredAt:existing?.adultDeclaredAt??new Date().toISOString(),consentUpdatedAt:new Date().toISOString(),aiProcessingConsent:state.aiProcessingConsent,memoryEnabled:state.memoryEnabled,conversationStorageEnabled:state.conversationStorageEnabled}));
+    const previousPrivacy = this.sql.exec("SELECT * FROM privacy_suppressions WHERE user_id=?", userId).toArray()[0];
+    if (!previousPrivacy || Boolean(previousPrivacy.ai_disabled) === state.aiProcessingConsent || Boolean(previousPrivacy.history_disabled) === state.conversationStorageEnabled || Boolean(previousPrivacy.memory_disabled) === state.memoryEnabled) this.recovery.append({ kind: "privacy", userId, revision: envelope.revision, ai: state.aiProcessingConsent, history: state.conversationStorageEnabled, memory: state.memoryEnabled });
     this.sql.exec("INSERT INTO privacy_suppressions(user_id,revision,ai_disabled,history_disabled,memory_disabled) VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET revision=excluded.revision,ai_disabled=excluded.ai_disabled,history_disabled=excluded.history_disabled,memory_disabled=excluded.memory_disabled",userId,envelope.revision,state.aiProcessingConsent?0:1,state.conversationStorageEnabled?0:1,state.memoryEnabled?0:1);
   }
   private persistMessages(userId:string,state:DemoState) {
@@ -146,6 +152,7 @@ export class StoreEngine {
     return {...next,state:{...state,messages:this.stateWindow(userId)}};
   }
   acceptPolicy(userId:string,input:{aiProcessingConsent:boolean;memoryEnabled:boolean;conversationStorageEnabled:boolean},revision:number){
+    if (JSON.parse(this.get(`account:${userId}`) ?? "null")?.recoveryVerificationRequired) throw new Error("ACCOUNT_VERIFICATION_REQUIRED");
     const current=this.readAccountState(userId);if(!current)return {missing:true};
     if(current.revision!==revision)return {conflict:true,revision:current.revision};
     const result=this.saveAccountState(userId,{...current.state,...input},revision);
@@ -165,6 +172,7 @@ export class StoreEngine {
     if(command.action==="delete"){
       if(!this.sql.exec("SELECT id FROM account_conversations WHERE user_id=? AND id=? AND deleted=0",userId,command.id).toArray().length)return {notFound:true};
       this.sql.exec("UPDATE account_conversations SET deleted=1 WHERE user_id=? AND id=?",userId,command.id);
+      this.recovery.append({ kind: "conversation", userId, id: command.id });
       this.sql.exec("DELETE FROM transcripts WHERE user_id=? AND json_extract(value,'$.conversationId')=?",userId,command.id);
       current.state.companionReflections=[];this.eraseSnapshots(userId);
     }
@@ -183,6 +191,7 @@ export class StoreEngine {
     }else{
       const target=state.memories.find(memory=>memory.id===command.id);
       if(!target)return {notFound:true};
+      if (command.action === "forget" || command.content !== undefined) this.recovery.append({ kind: "memory", userId, id: command.id });
       if(command.action==="forget"){
         this.sql.exec("INSERT OR IGNORE INTO memory_suppressions(user_id,id,forgotten_at) VALUES(?,?,?)",userId,command.id,Date.now());
         state.memories=state.memories.filter(memory=>memory.id!==command.id);
@@ -262,6 +271,7 @@ export class StoreEngine {
     const issuedAt=typeof parsed.createdAt==="number"?parsed.createdAt:Date.parse(parsed.createdAt);
     if(account.passwordChangedAt&&(!Number.isFinite(issuedAt)||issuedAt<=Date.parse(account.passwordChangedAt))){this.remove(tokenKey);return false;}
     account.passwordHash = hash; account.passwordSalt = salt;
+    delete account.passwordResetRequired;
     account.passwordAlgorithm="pbkdf2-sha256";account.passwordIterations=100_000;
     account.passwordChangedAt = new Date().toISOString();
     this.put(`account:${userId}`, JSON.stringify(account));
@@ -272,7 +282,7 @@ export class StoreEngine {
     const raw=this.get(tokenKey);if(!raw)return false;
     const token=JSON.parse(raw);const accountRaw=this.get(`account:${token.userId}`);if(!accountRaw)return false;
     const account=JSON.parse(accountRaw);if(account.email!==token.email)return false;
-    account.emailVerifiedAt=new Date().toISOString();this.put(`account:${account.id}`,JSON.stringify(account));this.remove(tokenKey);return true;
+    account.emailVerifiedAt=new Date().toISOString();delete account.recoveryVerificationRequired;this.put(`account:${account.id}`,JSON.stringify(account));this.remove(tokenKey);return true;
   }
   claimEmail(emailKey: string, account: { id: string }) {
     if (this.get(emailKey)) return false;

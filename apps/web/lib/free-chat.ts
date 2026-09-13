@@ -1,4 +1,6 @@
 import { detectCompanionRequestLanguage, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "./companion-prompt";
+import { CHAT_STREAM_TYPE, CompanionRequestError, readCompanionReplyStream } from "./chat-stream-protocol";
+export { CompanionRequestError } from "./chat-stream-protocol";
 
 export const FREE_CHAT_ENDPOINT = "https://api.llm7.io/v1/chat/completions";
 export const FREE_CHAT_MODEL = "fast";
@@ -104,30 +106,29 @@ export function readFreeChatResponse(result: unknown) {
   return { text, model: typeof record.model === "string" ? record.model : "" };
 }
 
-export async function requestFreeCompanionReply(input: EdgeCompanionRequest, signal?: AbortSignal) {
+export async function requestFreeCompanionReply(input: EdgeCompanionRequest, signal?: AbortSignal, onDelta?: (delta: string) => void) {
   const latestUserMessage = input.messages.at(-1)?.content ?? "";
   const expectedLanguage = detectCompanionRequestLanguage(input);
   const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
+  const deliverySignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000);
   const response = await fetch("/api/companion-chat", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", accept: (input.delivery ?? "text") === "text" ? CHAT_STREAM_TYPE : "application/json" },
     body: JSON.stringify(input),
-    signal: signal
-      ? AbortSignal.any([signal, AbortSignal.timeout(12_000)])
-      : AbortSignal.timeout(12_000),
+    signal: deliverySignal,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { error?: string; code?: string; requestId?: string; retryAfterSeconds?: number };
     throw new CompanionRequestError(body.error ?? "Mira could not reply. Please retry this turn.", response.status, body.code ?? "SERVICE_UNAVAILABLE", body.requestId ?? response.headers.get("x-request-id") ?? undefined, body.retryAfterSeconds);
   }
-  const generated = await response.json() as { reply?: string; model?: string };
+  deliverySignal.throwIfAborted();
+  const generated = response.headers.get("content-type")?.includes(CHAT_STREAM_TYPE)
+    ? await readCompanionReplyStream(response.body ?? new ReadableStream({ start(controller) { controller.close(); } }), deliverySignal, onDelta)
+    : await response.json() as { reply?: string; model?: string };
+  deliverySignal.throwIfAborted();
   const reply = sanitizeCompanionReplyForDelivery(generated.reply ?? "", generated.model === "safety" ? "text" : input.delivery);
   if (!reply || (generated.model !== "safety" && isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions, expectedLanguage))) {
     throw new CompanionRequestError("The reply missed the conversation requirements. Please retry this turn.", 503, "INVALID_REPLY");
   }
   return reply;
-}
-
-export class CompanionRequestError extends Error {
-  constructor(message: string, readonly status: number, readonly code: string, readonly requestId?: string, readonly retryAfterSeconds?: number) { super(message); this.name = "CompanionRequestError"; }
 }

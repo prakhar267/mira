@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-13",
+  "sourceBranch": "codex/mira-production-readiness",
+  "baselineCommit": "7ca99df895631589e5f2a77596a8eff2b9d9f99f",
+  "node": "24.18.0",
+  "packageManager": "pnpm 11.19.0",
+  "workspaceLint": "passed; active web fresh, unrelated workspace tasks cached",
+  "workspaceTypes": "passed; active web fresh, unrelated workspace tasks cached",
+  "webUnitTests": { "passed": 285, "files": 39, "fresh": true },
+  "workerTests": { "passed": 24, "files": 5, "fresh": true, "providers": "synthetic" },
+  "browserTests": { "passed": 87, "chromium": 29, "firefox": 29, "webkit": 29, "skipped": 0, "flaky": 0, "retries": 0, "durationMs": 120386.085, "startedAt": "2026-09-13T13:30:47.588Z" },
+  "mobileEmulation": { "samples": 3, "initialScriptBytesBefore": 801236, "initialScriptBytesAfter": 320746, "physicalDevice": false },
+  "nextWebpackBuild": "passed; 55 static pages generated",
+  "activeVinextBuild": "passed during final compiled browser and performance runs",
+  "backupFixture": { "accounts": 3, "transcriptsBefore": 3000, "transcriptsPreserved": 600, "deletedDataAbsent": true, "plaintextBytesBeforeEncryption": 999209, "ledgerEvents": 7, "localRestoreStageMs": 165.47, "freshSourceProofObtainedBeforeFileLoss": true, "productionRto": false },
+  "dependencyAdvisories": { "remaining": 2, "scope": "previously mitigated image-size@1.2.1 in non-serving mobile tooling", "exceptionExpiry": "2026-09-27" },
+  "release": "No deployment or merge in this verification run. Final commit, artifact smoke and GitHub check status follow in the handoff.",
+  "externalProofNotClaimed": ["physical microphone/speaker quality", "fluent human conversation assessment", "production Priya playback", "echo and long-call acceptance", "source-loss DR without current independent checkpoint", "active offsite backups", "real email/alert receipt", "independent accessibility/security/legal/provider review"]
+}

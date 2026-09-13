@@ -16,7 +16,7 @@ const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR
   CLOUDFLARE_API_TOKEN:"mira-synthetic-only-no-cloud-access",
   CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV:"false",WRANGLER_SEND_METRICS:"false",CI:"true"};
 let output="";
-const server=spawn("pnpm",["exec","wrangler","dev","--config","dist/server/wrangler.json","--local","--no-bundle","--ip","127.0.0.1","--port","4398","--inspector-port","0","--persist-to",join(directory,"state"),"--env-file",emptyEnv,"--var","MIRA_INFERENCE_DISABLED:true"],{cwd:web,env,stdio:["ignore","pipe","pipe"],detached:process.platform!=="win32"});
+const server=spawn(process.execPath,[join(web,"node_modules/wrangler/bin/wrangler.js"),"dev","--config","dist/server/wrangler.json","--local","--no-bundle","--ip","127.0.0.1","--port","4398","--inspector-port","0","--persist-to",join(directory,"state"),"--env-file",emptyEnv,"--var","MIRA_INFERENCE_DISABLED:true"],{cwd:web,env,stdio:["ignore","pipe","pipe"],detached:process.platform!=="win32"});
 server.stdout.on("data",chunk=>{output=(output+chunk).slice(-16000);});
 server.stderr.on("data",chunk=>{output=(output+chunk).slice(-16000);});
 let spawnError;

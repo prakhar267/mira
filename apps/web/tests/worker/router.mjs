@@ -21,11 +21,14 @@ import * as accountPolicy from "../../app/api/account/policy/route.ts";
 import * as accountReauth from "../../app/api/account/reauth/route.ts";
 import * as accountMessages from "../../app/api/account/messages/route.ts";
 import * as accountConversation from "../../app/api/account/conversation/route.ts";
+import * as backupAdmin from "../../app/api/admin/backup/route.ts";
+import {withResponseScope} from "./framework-shim.mjs";
 
 const routes={"/api/account/signup":signup,"/api/account/login":login,"/api/account/logout":logout,"/api/account/state":state,"/api/account/export":exportAccount,"/api/account/delete":deleteAccount,"/api/account/forgot-password":forgot,"/api/account/reset-password":reset,"/api/account/verify-email":verify,"/api/account/request-verification":requestVerification,"/api/demo/session":demo,"/api/capabilities":capabilities,"/api/companion-chat":chat,"/api/companion-speech":speech,"/api/companion-transcribe":transcription,"/api/companion-memory":memory};
-const syntheticRouter = { async fetch(request) {
-  const accountRoutes={"/api/account/memory":accountMemory,"/api/account/policy":accountPolicy,"/api/account/reauth":accountReauth,"/api/account/messages":accountMessages,"/api/account/conversation":accountConversation};
+const syntheticRouter = { async fetch(request, _environment, context) { return withResponseScope(context, async () => {
+  const accountRoutes={"/api/account/memory":accountMemory,"/api/account/policy":accountPolicy,"/api/account/reauth":accountReauth,"/api/account/messages":accountMessages,"/api/account/conversation":accountConversation,"/api/admin/backup":backupAdmin};
   const route=(accountRoutes[new URL(request.url).pathname]??routes[new URL(request.url).pathname])?.[request.method];
-  return route ? route(request) : new Response("Synthetic harness route not found",{status:404});
-}};
+  const result=route ? await route(request) : new Response("Synthetic harness route not found",{status:404});
+  return result;
+}); }};
 export default syntheticRouter;

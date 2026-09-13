@@ -14,6 +14,8 @@ declare module "cloudflare:workers" {
     INWORLD_API_KEY?: string;
     MIRA_LOCAL_TEST?: string;
     MIRA_INFERENCE_DISABLED?: string;
+    MIRA_BACKUP_KEY?: string;
+    MIRA_BACKUP_KEY_ID?: string;
     MIRA_TEST_PROVIDERS?: { fetch(request: Request): Promise<Response> };
     MIRA_ALERT_WEBHOOK?: string;
     MIRA_SUPPORT_OWNER?: string;

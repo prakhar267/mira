@@ -136,6 +136,8 @@ export function CompanionApp({
   const [state, setState] = useState<DemoState>(initialState);
   const [hydrated, setHydrated] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  // In-progress text is never part of DemoState, autosave, export or memories.
+  const [streamDraft, setStreamDraft] = useState<{ turnId: string; conversationId: string; text: string } | null>(null);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
   const [videoCallOpen, setVideoCallOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -748,6 +750,7 @@ export function CompanionApp({
     messages: ChatMessage[],
     delivery: "text" | "voice" | "video",
     signal: AbortSignal,
+    onDelta?: (delta: string) => void,
   ) => {
     const replyStartedAt = performance.now();
     try {
@@ -781,7 +784,7 @@ export function CompanionApp({
         memories: recalledMemories,
         responsePreferences: state.responsePreferences,
         delivery,
-      }, signal);
+      }, signal, onDelta);
       trackEvent("reply_received", Math.round(performance.now() - replyStartedAt));
       return reply;
     } catch (error) {
@@ -798,6 +801,7 @@ export function CompanionApp({
     if (!context) return;
     trackEvent("chat_send");
     setStreaming(true);
+    setStreamDraft(null);
     const now = new Date();
     const userMessage: ChatMessage = retryMessage ?? {
       id: context.turnId,
@@ -896,7 +900,10 @@ export function CompanionApp({
       userMessage,
     ];
     try {
-      await resolveConversationTurn(context, signal => generateDemoReply(conversation, "text", signal), reply => {
+      await resolveConversationTurn(context, signal => generateDemoReply(conversation, "text", signal, delta => {
+        if (context.signal.aborted) return;
+        setStreamDraft(current => context.signal.aborted ? current : { turnId: context.turnId, conversationId: userMessage.conversationId, text: `${current?.turnId === context.turnId ? current.text : ""}${delta}` });
+      }), reply => {
         setState(current => {
           if (context.signal.aborted || !current.aiProcessingConsent || current.activeConversationId !== userMessage.conversationId) return current;
           return { ...current,
@@ -913,6 +920,7 @@ export function CompanionApp({
         setState(current => ({ ...current, messages: current.messages.map(message => message.id === userMessage.id ? { ...message, status: "failed" } : message) }));
       }
     } finally {
+      setStreamDraft(current => current?.turnId === context.turnId ? null : current);
       turns.current.finish(context);
       if (!context.signal.aborted) setStreaming(false);
     }
@@ -1884,6 +1892,7 @@ export function CompanionApp({
             {...(accountMode && !olderComplete ? { onLoadOlder: loadOlderMessages } : {})}
             loadingOlder={olderBusy}
             streaming={streaming}
+            streamingText={streaming && state.aiProcessingConsent && streamDraft?.conversationId === state.activeConversationId ? streamDraft.text : ""}
             processingEnabled={state.aiProcessingConsent}
             liveMode={cloudBacked}
             onSend={sendMessage}

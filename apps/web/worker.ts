@@ -5,6 +5,8 @@ import {runOperationalMonitor} from "./lib/operational-monitor";
 import type {LaunchEnvironment} from "./lib/launch-readiness";
 import { MailOutboxEngine, type MailJob } from "./lib/mail-outbox-engine";
 import { runMailOutbox } from "./lib/mail-outbox";
+import { BackupEngine } from "./lib/backup-engine";
+import { runBackupOperation, type BackupEnvironment } from "./lib/backup-operations";
 export {MiraRecoveryDrill} from "./lib/recovery-drill";
 
 interface LegacyKV {
@@ -19,9 +21,11 @@ interface State {
 export class MiraStore {
   private engine: StoreEngine;
   private mail: MailOutboxEngine;
-  constructor(private ctx: State, private env: LaunchEnvironment & { LUMA_ACCOUNTS?: LegacyKV }) {
+  private backup: BackupEngine;
+  constructor(private ctx: State, private env: LaunchEnvironment & BackupEnvironment & { LUMA_ACCOUNTS?: LegacyKV }) {
     this.engine = new StoreEngine(ctx.storage.sql);
     this.mail = new MailOutboxEngine(ctx.storage.sql);
+    this.backup = new BackupEngine(ctx.storage.sql, this.engine);
     void ctx.blockConcurrencyWhile(async () => {
       const alarm=await ctx.storage.getAlarm();
       // Reuse this store's existing alarm: account-wide free cron slots may be
@@ -30,12 +34,15 @@ export class MiraStore {
     });
   }
   private async importLegacy(key: string) {
+    if (!this.backup.legacyAllowed()) return;
     if (this.engine.row(key)) return;
     const value = await this.env.LUMA_ACCOUNTS?.get(key);
     if (!value) return;
     // Network reads run outside the critical section. Recheck inside the atomic
     // transaction so a concurrent save/deletion always wins over stale KV.
     this.ctx.storage.transactionSync(()=>{
+      this.backup.assertAvailable();
+      if (!this.backup.legacyAllowed()) return;
       if(this.engine.row(key))return;
       let ttl: number | undefined;
       if (key.startsWith("session:")) ttl = Math.ceil((Date.parse(JSON.parse(value).createdAt) + 30*86400000 - Date.now())/1000);
@@ -48,10 +55,13 @@ export class MiraStore {
       this.engine.put(key, value, ttl);
     });
   }
+  private availableTransaction<T>(work: () => T) { return this.ctx.storage.transactionSync(() => { this.backup.assertAvailable(); return work(); }); }
   async fetch(request: Request) {
     // This class is reachable only by the Worker binding, never a public route.
     const data = await request.json() as { action: string; key?: string; value?: string; ttl?: number; prefix?: string; cursor?: string; limit?: number; max?: number; seconds?: number; name?: string; failed?: boolean; duration?: number; hash?: string; salt?: string; account?: { id: string }; userId?: string; timestamp?: string; subscription?: Record<string, unknown>; emailKey?:string; keys?:string[];state?:unknown;revision?:number;sessionKey?:string;sessionValue?:string;command?:MemoryCommand;attemptId?:string };
       try {
+        if (data.action === "backup") return Response.json(await runBackupOperation(this.backup, work => this.ctx.storage.transactionSync(work), this.env, data as unknown as Record<string, unknown>));
+        this.ctx.storage.transactionSync(() => this.backup.assertAvailable());
         if (data.key && ["get", "claimEmail", "bootstrap", "resetPassword"].includes(data.action)) await this.importLegacy(data.key);
         if(data.userId&&["stateRead","stateSave","stateExport","memoryCommand"].includes(data.action))await this.importLegacy(`state:${data.userId}`);
         if (data.action === "list" && (data.prefix?.startsWith("backup:") || data.prefix==="support:") && this.env.LUMA_ACCOUNTS) {
@@ -61,6 +71,7 @@ export class MiraStore {
           if(!this.engine.row(marker))this.engine.put(marker,JSON.stringify({prefix:data.prefix}));
         }
         const result = this.ctx.storage.transactionSync(() => {
+          this.backup.assertAvailable();
           switch(data.action) {
             case "get": return { value: this.engine.get(data.key!) };
             case "put": this.engine.put(data.key!, data.value!, data.ttl); return { ok: true };
@@ -104,46 +115,48 @@ export class MiraStore {
           if(current===null||current>next)await this.ctx.storage.setAlarm(next);
         }
         return Response.json(result);
-      } catch(cause) { const code=cause instanceof Error&&["TRANSCRIPT_LIMIT","CONVERSATION_REMOVED"].includes(cause.message)?cause.message:"STORAGE_UNAVAILABLE";return Response.json({ error:"Storage operation unavailable",code }, { status:code==="TRANSCRIPT_LIMIT"?413:code==="CONVERSATION_REMOVED"?409:503 }); }
+      } catch(cause) { const code=cause instanceof Error&&(/^(?:BACKUP_|RESTORE_|CUTOVER_|SOURCE_ALREADY_RETIRED|RECOVERY_MAINTENANCE)/.test(cause.message)||["TRANSCRIPT_LIMIT","CONVERSATION_REMOVED","ACCOUNT_VERIFICATION_REQUIRED"].includes(cause.message))?cause.message:"STORAGE_UNAVAILABLE";return Response.json({ error:code==="ACCOUNT_VERIFICATION_REQUIRED"?"Verify your email after recovery before enabling AI processing.":"Storage operation unavailable",code }, { status:code==="ACCOUNT_VERIFICATION_REQUIRED"?403:code==="TRANSCRIPT_LIMIT"?413:code==="CONVERSATION_REMOVED"?409:503 }); }
   }
   private async migrateBatch(){
     for(const marker of this.engine.list("migration:","",1).slice(0,1)){
       const job=JSON.parse(this.engine.get(marker)!) as {prefix:string;cursor?:string};
-      if(!this.env.LUMA_ACCOUNTS){this.engine.remove(marker);continue;}
+      if(!this.env.LUMA_ACCOUNTS){this.availableTransaction(() => this.engine.remove(marker));continue;}
       const page=await this.env.LUMA_ACCOUNTS.list({prefix:job.prefix,...(job.cursor?{cursor:job.cursor}:{}),limit:25});
       await Promise.all(page.keys.map(key=>this.importLegacy(key.name)));
-      if(page.list_complete)this.engine.remove(marker);else this.engine.put(marker,JSON.stringify({...job,cursor:page.cursor}));
+      this.availableTransaction(() => { if(page.list_complete)this.engine.remove(marker);else this.engine.put(marker,JSON.stringify({...job,cursor:page.cursor})); });
     }
   }
   private async purgeLegacy() {
     for(const marker of this.engine.list("purge:","",25).slice(0,25)){
       const key=JSON.parse(this.engine.get(marker)!).key as string;
-      try {await this.env.LUMA_ACCOUNTS?.delete(key);this.engine.remove(marker);}catch{/* Content is already blocked by tombstones. Retry in the alarm. */}
+      try {await this.env.LUMA_ACCOUNTS?.delete(key);this.availableTransaction(() => this.engine.remove(marker));}catch{/* Content is already blocked by tombstones. Retry in the alarm. */}
     }
     for(const marker of this.engine.list("purge-prefix:","",1).slice(0,1)){
       const job=JSON.parse(this.engine.get(marker)!) as {prefix:string;cursor?:string};
       try{
-        if(!this.env.LUMA_ACCOUNTS){this.engine.remove(marker);continue;}
+        if(!this.env.LUMA_ACCOUNTS){this.availableTransaction(() => this.engine.remove(marker));continue;}
         const page=await this.env.LUMA_ACCOUNTS.list({prefix:job.prefix,...(job.cursor?{cursor:job.cursor}:{}),limit:25});
-        await Promise.all(page.keys.map(async({name})=>{await this.env.LUMA_ACCOUNTS!.delete(name);this.engine.remove(name);}));
-        if(page.list_complete)this.engine.remove(marker);else this.engine.put(marker,JSON.stringify({...job,cursor:page.cursor}));
+        await Promise.all(page.keys.map(async({name})=>{await this.env.LUMA_ACCOUNTS!.delete(name);this.availableTransaction(() => this.engine.remove(name));}));
+        this.availableTransaction(() => { if(page.list_complete)this.engine.remove(marker);else this.engine.put(marker,JSON.stringify({...job,cursor:page.cursor})); });
       }catch{/* Bounded batch retried by the alarm without reopening access. */}
     }
     if(this.engine.list("purge:","",1).length)await this.ctx.storage.setAlarm(Date.now()+60000);
   }
   async alarm() {
     await this.ctx.storage.setAlarm(Date.now()+15*60000);
+    try { this.ctx.storage.transactionSync(() => this.backup.assertAvailable()); } catch { return; }
     if(Date.now()-Number(this.engine.get("ops:cleanup-at")??0)>=86400000) {
       this.engine.cleanup();this.engine.put("ops:cleanup-at",String(Date.now()));
     }
     await this.purgeLegacy();
     await this.migrateBatch().catch(()=>{/* Retry migration without delaying account operations. */});
+    try { this.availableTransaction(() => undefined); } catch { return; }
     this.mail.cleanup();
     await runMailOutbox(this.env, {
       get: async key => { await this.importLegacy(key); return this.engine.get(key); },
-      claim: async () => this.ctx.storage.transactionSync(() => this.mail.claim(Date.now(), 1)),
+      claim: async () => this.availableTransaction(() => this.mail.claim(Date.now(), 1)),
       pending: async id => this.mail.pending(id),
-      prepareToken: async (job,userId) => this.ctx.storage.transactionSync(() => {
+      prepareToken: async (job,userId) => this.availableTransaction(() => {
         const account=JSON.parse(this.engine.get(`account:${userId}`)??"null") as {passwordChangedAt?:string}|null;
         if (!this.mail.pending(job.id) || !account) return false;
         if(job.purpose==="recovery" && account.passwordChangedAt && Date.parse(account.passwordChangedAt)>=job.createdAt)return false;
@@ -153,15 +166,16 @@ export class MiraStore {
         this.engine.put(key,JSON.stringify({userId,email:job.email,createdAt:job.createdAt}),Math.max(1,Math.floor((job.expiresAt-Date.now())/1000)));
         return true;
       }),
-      complete: async (id,status) => { this.ctx.storage.transactionSync(()=>this.mail.complete(id,status)); },
-      metric: async (failed,duration) => { this.engine.metric("api:mail-provider-acceptance",failed,duration); },
+      complete: async (id,status) => { this.availableTransaction(()=>this.mail.complete(id,status)); },
+      metric: async (failed,duration) => { this.availableTransaction(() => this.engine.metric("api:mail-provider-acceptance",failed,duration)); },
     });
     if(this.mail.status().pending)await this.ctx.storage.setAlarm(Date.now()+60_000);
+    try { this.availableTransaction(() => undefined); } catch { return; }
     // Direct adapter, not the MIRA_STORE binding: calling the same object's
     // public fetch from its alarm could deadlock. No user content is reported.
     const state=await runOperationalMonitor(this.env,{
       get:async key=>this.engine.get(key),
-      put:async(key,value,options)=>{this.engine.put(key,value,options?.expirationTtl);},
+      put:async(key,value,options)=>{this.availableTransaction(() => this.engine.put(key,value,options?.expirationTtl));},
       recentMetrics:async()=>this.engine.recentMetrics(),
       capacity:async()=>this.engine.capacity().map(row=>({key:String(row.key),count:Number(row.count)})),
     },fetch,"durable-object-alarm");

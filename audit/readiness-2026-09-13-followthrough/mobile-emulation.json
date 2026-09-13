@@ -1,0 +1,89 @@
+{
+  "before": {
+    "conditions": "Chromium, 393x851, cold cache, 4x CPU, 1.6Mbps/150ms, local compiled Worker; diagnostic uncommitted source",
+    "lcpMs": [
+      1464,
+      1292,
+      1288
+    ],
+    "cls": [
+      0.006128026869643788,
+      0.006128026869643788,
+      0.006128026869643788
+    ],
+    "initialScriptDecodedBytes": [
+      801236,
+      801236,
+      801236
+    ],
+    "heroImageBytes": 2224077,
+    "belowFoldPortraitBytes": 1965219,
+    "heroLoadMs": [
+      22225.6,
+      22362.4,
+      22351.2
+    ],
+    "note": "Compiled server built before public-link prefetch and offscreen-image changes. Raw temporary report replaced by next Playwright run; values retained from tool output, no production or physical-device claim."
+  },
+  "after": {
+    "measuredAt": "2026-09-13T13:34:09.969Z",
+    "conditions": "Local compiled Worker, Chromium, 393x851, cold cache, 4x CPU throttle, 1.6Mbps/150ms; not physical phone or production field data",
+    "samples": [
+      {
+        "sample": 1,
+        "lcpMs": 1280,
+        "cls": 0.006128026869643788,
+        "longTasks": 2,
+        "longTaskMs": 121,
+        "initialScriptDecodedBytes": 320746,
+        "totalTransferBytes": 2499732,
+        "hero": {
+          "path": "/assets/mira/loft-morning.png",
+          "transferBytes": 2224377,
+          "decodedBytes": 2224077,
+          "durationMs": 11884.299999999814,
+          "type": "css"
+        },
+        "portraitRequested": false,
+        "companionAppRequested": false
+      },
+      {
+        "sample": 2,
+        "lcpMs": 1240,
+        "cls": 0.006128026869643788,
+        "longTasks": 1,
+        "longTaskMs": 57,
+        "initialScriptDecodedBytes": 320746,
+        "totalTransferBytes": 2499732,
+        "hero": {
+          "path": "/assets/mira/loft-morning.png",
+          "transferBytes": 2224377,
+          "decodedBytes": 2224077,
+          "durationMs": 11869.700000000186,
+          "type": "css"
+        },
+        "portraitRequested": false,
+        "companionAppRequested": false
+      },
+      {
+        "sample": 3,
+        "lcpMs": 1228,
+        "cls": 0.006128026869643788,
+        "longTasks": 1,
+        "longTaskMs": 50,
+        "initialScriptDecodedBytes": 320746,
+        "totalTransferBytes": 2499732,
+        "hero": {
+          "path": "/assets/mira/loft-morning.png",
+          "transferBytes": 2224377,
+          "decodedBytes": 2224077,
+          "durationMs": 11859.200000001118,
+          "type": "css"
+        },
+        "portraitRequested": false,
+        "companionAppRequested": false
+      }
+    ]
+  },
+  "limits": "Three observations, not a P95 sample or release SLO. LCP is largely text here; the large hero image remains a slow-network cost. Final after-run waits for the hero resource to finish before recording totals. No physical phone, production network, avatar FPS or real call latency was measured."
+}

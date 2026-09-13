@@ -1,5 +1,7 @@
 # Mira production-readiness implementation — 13 September 2026
 
+Historical initial delivery ledger. The subsequent [remaining-work follow-through](READINESS-FOLLOWTHROUGH.md) adds actual streaming, encrypted archive/recovery tooling, accessibility fixes and new measured evidence. Its explicit external gates remain open.
+
 ## Scope and outcome
 
 Implemented against `5487e4e1655292ef4dc6b9da67f189cf3511b437` on `codex/mira-production-readiness`, using three independent implementation agents plus root integration/review. The owner's [assessment](PRODUCTION_READINESS_PROMPT.md) was preserved. **All payment work is excluded.** No live deployment, production migration, real provider inference, real email/alert recipient, purchase or account billing change was performed.

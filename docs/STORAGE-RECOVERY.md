@@ -62,7 +62,9 @@ For a real incident, the operator must:
 4. Invalidate restored sessions and outstanding recovery/verification credentials; reconcile mailbox jobs and verified billing records without enabling new payments. Check that suppression does not depend on a subsequently resurrected session.
 5. Run owner-scoped synthetic checks and document recovery-point age, elapsed recovery time, missing data and reconciliation outcomes before reopening admission.
 
-An independently retained encrypted suppression ledger, a complete transcript backup/export job, owner-approved RPO/RTO, a production-shaped provider PITR recovery exercise, and retention/legal review are **not** established by the local test. The daily profile-only snapshots and earlier marker-only PITR drill do not satisfy those requirements. Proposed planning targets of RPO ≤1 hour and RTO ≤4 hours require owner approval and measurement; they are not achieved service promises.
+An operator-driven encrypted account/transcript archive and separately exported minimal recovery journal are now implemented. See [Encrypted backup operations](ENCRYPTED-BACKUP-OPERATIONS.md) for authenticated manifests/chunks, explicit key/destination gates, bounded freeze leases, target quarantine, credential invalidation and fresh surviving-source cutover proof. Independent filesystem and actual Worker regressions exercise this path; production keys/offsite storage have not been configured and no real user data has been exported.
+
+**Source-loss disaster recovery is not established.** If the source is lost before fresh cutover proof and no trusted independent latest-ledger authority survives, restore stays quarantined rather than guessing that an older signed ledger is current. Owner-approved RPO/RTO, a real offsite/source-loss recovery exercise, recovery-email delivery, retention/legal review and routing cutover remain external gates. The daily profile-only snapshots and earlier marker-only PITR drill do not satisfy those requirements. Proposed RPO ≤1 hour and RTO ≤4 hours still require approval and measurement; they are not achieved service promises.
 
 ## Local evidence
 

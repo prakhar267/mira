@@ -102,8 +102,8 @@ export const companionApi = {
   hasSession: () => Boolean(storedTokens()?.accessToken),
   clearSession: () => saveTokens(null),
 
-  async demoReply(input: EdgeCompanionRequest, signal?: AbortSignal) {
-    return requestFreeCompanionReply(input, signal);
+  async demoReply(input: EdgeCompanionRequest, signal?: AbortSignal, onDelta?: (delta: string) => void) {
+    return requestFreeCompanionReply(input, signal, onDelta);
   },
 
   async semanticMemories(query: string, memories: MemoryRecord[], limit = 8) {

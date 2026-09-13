@@ -133,3 +133,67 @@ for (const kind of ["voice", "video"]) {
     expect(await page.evaluate(() => window.__mediaTest.requested)).toBe(1);
   });
 }
+
+// UI-only stream fixture. The separate chat-streaming.test.ts sends the real
+// route through a TCP server and the real parser against delayed provider SSE.
+async function syntheticChatStream(page) {
+  await page.addInitScript(() => {
+    const original = window.fetch.bind(window), encoder = new TextEncoder();
+    window.__chatStream = { starts: 0, canceled: 0, controller: null };
+    window.fetch = async (url, init) => {
+      if (!String(url).includes("/api/companion-chat")) return original(url, init);
+      const state = window.__chatStream; state.starts++;
+      return new Response(new ReadableStream({
+        start(controller) { state.controller = controller; },
+        cancel() { state.canceled++; },
+      }), { headers: { "content-type": "application/x-ndjson" } });
+    };
+    window.__chatEvent = event => window.__chatStream.controller.enqueue(encoder.encode(`${JSON.stringify({ requestId: "synthetic", ...event })}\n`));
+  });
+}
+
+test("streamed text is visible before completion but saved only after terminal success", async ({ page }) => {
+  await syntheticChatStream(page); await enterDemo(page); await navigate(page, "Chat");
+  await page.getByRole("textbox", { name: "Message Mira", exact: true }).fill("Help me prepare for my interview.");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__chatStream.starts)).toBe(1);
+  await page.evaluate(() => window.__chatEvent({ type: "delta", text: "Let's practice your introduction." }));
+  await expect(page.locator(".message--streaming")).toContainText("Let's practice your introduction.");
+  expect(await page.evaluate(() => localStorage.getItem("mira-demo-v1"))).not.toContain("Let's practice your introduction.");
+  await page.evaluate(() => window.__chatEvent({ type: "done", reply: "Let's practice your introduction. Start with your current role.", model: "synthetic" }));
+  await expect(page.locator(".message--streaming")).toHaveCount(0);
+  await expect(page.locator(".message--assistant")).toHaveCount(1);
+  await expect(page.locator(".message--assistant")).toContainText("Start with your current role.");
+});
+
+test("post-header stream failure removes partial reply and retries the original user turn", async ({ page }) => {
+  await syntheticChatStream(page); await enterDemo(page); await navigate(page, "Chat");
+  await page.getByRole("textbox", { name: "Message Mira", exact: true }).fill("Help me prepare for my interview.");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__chatStream.starts)).toBe(1);
+  await page.evaluate(() => window.__chatEvent({ type: "delta", text: "Let's practice your introduction." }));
+  await expect(page.locator(".message--streaming")).toBeVisible();
+  await page.evaluate(() => window.__chatEvent({ type: "error", error: "Synthetic stream could not finish.", code: "STREAM_FAILED", status: 503 }));
+  await expect(page.getByRole("dialog", { name: "That didn’t work" })).toBeVisible();
+  await expect(page.locator(".message--assistant")).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("mira-demo-v1"))).not.toContain("Let's practice your introduction.");
+  await page.getByRole("button", { name: "Okay", exact: true }).click();
+  await page.getByRole("button", { name: "Retry last message", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__chatStream.starts)).toBe(2);
+  await page.evaluate(() => window.__chatEvent({ type: "done", reply: "Start with a project you know well.", model: "synthetic" }));
+  await expect(page.locator(".message--assistant")).toHaveCount(1); await expect(page.locator(".message--user")).toHaveCount(1);
+});
+
+test("navigation cancels streaming and removes its unsaved draft", async ({ page }) => {
+  await syntheticChatStream(page); await enterDemo(page); await navigate(page, "Chat");
+  await page.getByRole("textbox", { name: "Message Mira", exact: true }).fill("Help me prepare for my interview.");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__chatStream.starts)).toBe(1);
+  await page.evaluate(() => window.__chatEvent({ type: "delta", text: "Let's practice your introduction." }));
+  await expect(page.locator(".message--streaming")).toBeVisible();
+  await navigate(page, "Home");
+  await expect.poll(() => page.evaluate(() => window.__chatStream.canceled)).toBe(1);
+  await navigate(page, "Chat");
+  await expect(page.locator(".message--assistant")).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("mira-demo-v1"))).not.toContain("Let's practice your introduction.");
+});

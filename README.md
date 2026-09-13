@@ -8,7 +8,7 @@ Mira is an original AI companion, not a real person or a substitute for professi
 
 ## Current website
 
-September 13 hardening is a source update pending an explicitly authorized deployment; the live link can still run the earlier release. The [evidence ledger](docs/READINESS-IMPLEMENTATION.md) separates local results from external launch gates.
+September 13 hardening is a source update pending verified release; the live link can still run the earlier release. The [latest follow-through](docs/READINESS-FOLLOWTHROUGH.md) separates actual streaming, encrypted archive tooling and accessibility improvements from the external launch gates.
 
 - **Conversation:** context-aware chat, with Cloudflare Llama 3.3 70B inference.
 - **Voice and avatar calls:** shared call controls, automatic listening, Inworld speech recognition and the Priya voice. Cloudflare Whisper provides a transcription fallback. The video companion is an animated, open-licensed avatar; it is not a live human video feed.
@@ -75,6 +75,8 @@ The public deployment comes from `apps/web/`. Archived code and dated reports re
 - [Current deployment](docs/DEPLOYMENT.md)
 - [Current architecture, configuration and capabilities](docs/CURRENT-ARCHITECTURE.md)
 - [September 13 implementation and verification ledger](docs/READINESS-IMPLEMENTATION.md)
+- [Remaining-work follow-through and current gates](docs/READINESS-FOLLOWTHROUGH.md)
+- [Encrypted backup operations and recovery limitations](docs/ENCRYPTED-BACKUP-OPERATIONS.md)
 - [Launch operations, providers and remaining gates](docs/LAUNCH-OPERATIONS.md)
 - [Mira brand guide](docs/brand.md)
 - [Security reporting](SECURITY.md)

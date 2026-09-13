@@ -24,9 +24,10 @@ type ChatSpeechWindow = Window & typeof globalThis & {
   webkitSpeechRecognition?: new () => ChatSpeechRecognition;
 };
 
-export function ChatView({ state, streaming, processingEnabled, mediaEnabled = false, liveMode = false, onLoadOlder, loadingOlder = false, onSend, onNewConversation, onDeleteConversation, onBack, onCall, onVideoCall, onVoiceNote, onVoiceRecording, onSpeak, onImageUpload, onGenerateImage, onFeedback, onRegenerate, onCamera }: {
+export function ChatView({ state, streaming, streamingText = "", processingEnabled, mediaEnabled = false, liveMode = false, onLoadOlder, loadingOlder = false, onSend, onNewConversation, onDeleteConversation, onBack, onCall, onVideoCall, onVoiceNote, onVoiceRecording, onSpeak, onImageUpload, onGenerateImage, onFeedback, onRegenerate, onCamera }: {
   state: DemoState;
   streaming: boolean;
+  streamingText?: string;
   processingEnabled: boolean;
   liveMode?: boolean;
   mediaEnabled?: boolean;
@@ -86,7 +87,7 @@ export function ChatView({ state, streaming, processingEnabled, mediaEnabled = f
       else if (viewport && stickToBottom.current) viewport.scrollTo({ top: viewport.scrollHeight, behavior: "auto" });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages, streaming]);
+  }, [messages, streaming, streamingText]);
 
   useEffect(() => {
     const cleanup = () => { recordingAttempt.current++; voicePending.current = false; clearTimeout(recordingTimer.current); voiceRecognition.current?.abort(); if (mediaRecorder.current?.state === "recording") mediaRecorder.current.stop(); voiceStream.current?.getTracks().forEach(track => track.stop()); };
@@ -220,7 +221,8 @@ export function ChatView({ state, streaming, processingEnabled, mediaEnabled = f
         {onLoadOlder ? <button type="button" className="button button--ghost" disabled={loadingOlder} onClick={() => { stickToBottom.current = false; const viewport = messagesViewport.current; if (viewport) scrollAnchor.current = { height: viewport.scrollHeight, top: viewport.scrollTop }; void onLoadOlder().catch(cause => { scrollAnchor.current = null; setVoiceError(cause instanceof Error ? cause.message : "Older messages could not load."); }); }}>{loadingOlder ? "Loading earlier messages…" : "Load earlier messages"}</button> : null}
         <div className="day-divider"><span>Today</span></div>
         {messages.map((message) => <MessageBubble key={message.id} message={message} companionName={state.companion.name} onFeedback={onFeedback} onRegenerate={onRegenerate} {...(onSpeak ? { onSpeak } : {})} onWhy={() => setWhyMessage(message)} onReply={() => { setDraft(`Replying to “${message.content.slice(0, 54)}${message.content.length > 54 ? "…" : ""}”\n`); textarea.current?.focus(); }} onEdit={() => { setDraft(message.content); textarea.current?.focus(); }} />)}
-        {streaming && !messages.some((message) => message.status === "sending") ? <div className="typing" aria-label={`${state.companion.name} is typing`}><i /><i /><i /></div> : null}
+        {streamingText ? <div className="message message--assistant message--streaming" role="status" aria-live="polite" aria-atomic="true"><div className="message__bubble"><p>{streamingText}</p><small>Reply in progress · not saved yet</small></div></div> : null}
+        {streaming && !streamingText && !messages.some((message) => message.status === "sending") ? <div className="typing" aria-label={`${state.companion.name} is typing`}><i /><i /><i /></div> : null}
       </div>
 
       <div className="chat__composer-wrap">
@@ -228,7 +230,7 @@ export function ChatView({ state, streaming, processingEnabled, mediaEnabled = f
         <div className="suggestion-row"><span className="suggestion-row__label">Try asking</span>{["Just listen to me", "Plan banane mein help karo", "एक बात याद रखना"].map((suggestion) => <button type="button" key={suggestion} disabled={!processingEnabled} onClick={() => { setDraft(suggestion); textarea.current?.focus(); }}>{suggestion}</button>)}</div>
         <div className="chat__composer">
           <button type="button" className="icon-button" aria-label={mediaEnabled ? "Attach image" : "Image upload unavailable"} disabled={!processingEnabled || !mediaEnabled} onClick={() => fileInput.current?.click()}><Plus aria-hidden="true" /></button>
-          <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setVoiceError(""); void onImageUpload(file).catch((cause) => setVoiceError(cause instanceof Error ? cause.message : "The image could not be shared.")); } event.target.value = ""; }} />
+          <input ref={fileInput} className="visually-hidden" type="file" aria-label="Upload a photo" tabIndex={-1} disabled={!processingEnabled || !mediaEnabled} accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setVoiceError(""); void onImageUpload(file).catch((cause) => setVoiceError(cause instanceof Error ? cause.message : "The image could not be shared.")); } event.target.value = ""; }} />
           <textarea ref={textarea} value={draft} disabled={!processingEnabled} maxLength={8_000} rows={1} aria-label={`Message ${state.companion.name}`} placeholder={processingEnabled ? "Say it in English, Hindi, or Hinglish…" : "AI processing is paused"} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} />
           <button type="button" className="icon-button" aria-label="Upload a photo" disabled={!processingEnabled || !mediaEnabled} onClick={() => fileInput.current?.click()}><ImagePlus aria-hidden="true" /></button>
           {draft.trim() ? <button type="button" className="send-button" aria-label="Send message" disabled={streaming || !processingEnabled} onClick={() => void submit()}><Send aria-hidden="true" /></button> : <button type="button" disabled={!processingEnabled} className={voiceActive ? "icon-button icon-button--active" : "icon-button"} aria-label={voiceActive ? "Stop recording voice note" : "Record voice note"} onClick={() => { if (voiceActive) stopVoice(); else void startVoice(); }}><Mic aria-hidden="true" /></button>}

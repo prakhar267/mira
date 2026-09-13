@@ -56,6 +56,29 @@ The shared `companion-safety` module gives distinct English, Hindi and Hinglish 
 
 ## Reproducible checks
 
+### Incremental text delivery
+
+The active text client negotiates `Accept: application/x-ndjson` with `/api/companion-chat`. Voice/video continue using the existing JSON response and complete-text Priya playback. No model, voice, external processor, or provider allowance changed.
+
+Text transport emits newline-delimited `delta`, `done`, or terminal `error` events. A `delta` contains new checked text; `done` includes the final reply and model. **HTTP 200 and EOF do not mean success:** only a valid `done` permits the client to commit an assistant message. Post-header errors retain `status`, `code`, `requestId` and optional `retryAfterSeconds` inside the terminal event because an HTTP status/header cannot change after streaming starts. Interrupted/malformed/inconsistent streams fail closed. Existing JSON callers remain supported.
+
+The stream does not forward raw model tokens. It accumulates output, checks the raw prefix with the existing output guard, holds one complete sentence as lookahead, and releases a style-valid, separately checked complete-sentence prefix. Reasoning markup and overlength candidates remain buffered. At most eight partial frames are released per turn, followed by a fully checked final result. Safety-category user inputs use their deterministic support response without provider work. If subsequent output or full-reply validation fails, the client removes its transient draft and offers retry of the same user turn, without retaining an incomplete assistant success. Repair is permitted only before any prefix has been emitted.
+
+This is **genuine incremental network delivery**, not playback of an already completed answer. It intentionally does not optimize raw token-first latency: one-sentence answers, unsafe/uncertain drafts and buffered candidates may wait until generation finishes. The existing bounded deterministic guard is not universal semantic moderation; lookahead reduces partial-context risk but cannot prove every response safe. Content already delivered to the network or seen by a user cannot be recalled if a later chunk fails or consent changes.
+
+Frames are pull-driven with zero application prefetch buffering. Before every partial frame and final result, the route rechecks session, processing consent and the selected owner-scoped memory context. A queued application frame is rejected if consent is withdrawn, the account is deleted, or selected memory is paused/deleted/corrected. Provider abort/deadline also invalidates a pending prefix under backpressure. Already-started upstream compute is subject to the existing lease-expiry policy; cancellation does not promise a provider refund.
+
+The provider SSE reader limits total transport to 512,000 bytes, an unterminated/pending frame to 64,000 characters and collected reply text to 4,000 characters. Empty or keepalive frames cannot bypass the transport cap. The response stream has a 15-second total delivery lifetime, including waiting to emit terminal success/error to a client that stops reading. Deadline/abort races also fence pending authorization reads; timed-out streams close without a success marker.
+
+The UI holds partial text outside `DemoState`: it is absent from autosave, export, history and memory extraction. Navigation, new conversation, withdrawal and cancellation remove it. Calls do not consume partial text for TTS. Network-stage tests use the real route, a local TCP HTTP server, the real client parser and a deliberately unfinished synthetic upstream. Separate browser fixtures cover actual transient UI display, final-only saving, retry without duplicate user turns and navigation cleanup. Neither fixture establishes production provider latency or acoustic quality.
+
+`tests/worker/chat-streaming.test.mjs` additionally exercises streamed success/error and voice/video JSON through real Worker route, policy, capacity and SQLite boundaries with the existing synthetic provider binding. Its scheduler regression uses an actual execution context and `waitOnExecutionContext` to drain post-response work. The synthetic framework shim now implements request-scoped `after` with real `ctx.waitUntil`; throwing and abandoning the fallback task previously caused a test-runtime import/read hang after demo creation. This is a harness correction, not a production storage change.
+
+```sh
+pnpm --filter @companion/web exec vitest run --config vitest.config.ts lib/chat-streaming.test.ts lib/chat-stream-protocol.test.ts lib/chat-stream.test.ts lib/conversation-turn.test.ts lib/inference-routes.test.ts
+pnpm --filter @companion/web test:browser tests/browser/companion-flows.spec.mjs
+```
+
 Focused local suites cover streaming byte limits/depth/UTF-8, current/expired/revoked sessions, policy withdrawal, ownership, malformed/oversize payloads, active-route denial before providers, reranker reservations/deadlines, post-generation consent fencing, safe output replacement, multilingual curated safety, prompt preferences, estimated-budget charging and isolated test-provider restrictions.
 
 ```sh
