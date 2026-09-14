@@ -1,12 +1,14 @@
-import {mkdtemp,writeFile} from "node:fs/promises";
+import {mkdtemp,writeFile,readdir,readFile,mkdir} from "node:fs/promises";
+import {createHash} from "node:crypto";
 import {tmpdir} from "node:os";
 import {resolve,join} from "node:path";
 import {spawn} from "node:child_process";
 import {retainRuntimeFailure,waitForRuntimeExit} from "./runtime-diagnostics.mjs";
+import {verifyRuntimeCadence} from "./runtime-cadence.mjs";
 
 // Execute the already-built bytes, without rebundling or touching the sealed
-// production config. Persistence and env-file are unique/empty. --local alone
-// does not isolate AI: the runtime kill switch explicitly refuses inference.
+// production config. Persistence and env-file are unique/empty. The runtime
+// blocks external egress and its kill switch explicitly refuses inference.
 const directory=await mkdtemp(join(tmpdir(),"mira-artifact-smoke-"));
 const emptyEnv=join(directory,"empty.env");
 await writeFile(emptyEnv,"# Intentionally no credentials\n");
@@ -22,7 +24,7 @@ const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR
   CLOUDFLARE_API_TOKEN:"mira-synthetic-only-no-cloud-access",
   CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV:"false",WRANGLER_SEND_METRICS:"false",CI:"true"};
 let output="";
-const server=spawn(process.execPath,[join(web,"node_modules/wrangler/bin/wrangler.js"),"dev","--config","dist/server/wrangler.json","--local","--no-bundle","--ip","127.0.0.1","--port","4398","--inspector-port","0","--persist-to",join(directory,"state"),"--env-file",emptyEnv,"--var","MIRA_INFERENCE_DISABLED:true"],{cwd:web,env,stdio:["ignore","pipe","pipe"],detached:process.platform!=="win32"});
+const server=spawn(process.execPath,[join(web,"scripts/built-artifact-runtime.mjs"),join(web,"dist/server/wrangler.json"),directory,"4398"],{cwd:web,env,stdio:["ignore","pipe","pipe"],detached:process.platform!=="win32"});
 server.stdout.on("data",chunk=>{output=(output+chunk).slice(-16000);});
 server.stderr.on("data",chunk=>{output=(output+chunk).slice(-16000);});
 let spawnError;
@@ -48,12 +50,28 @@ try{
     if(denied.status!==503||deniedBody.code!=="INFERENCE_DISABLED")throw new Error("Local artifact did not refuse external inference");
   }
   console.log("24 rejected POST bodies: expected inference-disabled responses, zero inference calls.");
+  const chunks=join(web,"dist/client/_next/static/chunks");
+  const moduleName=(await readdir(chunks)).filter(name=>name.endsWith(".js")).sort()[0];
+  if(!moduleName)throw new Error("Compiled artifact has no JavaScript asset for timing regression");
+  const expectedSha256=createHash("sha256").update(await readFile(join(chunks,moduleName))).digest("hex");
+  const cadence=[];
+  await mkdir(evidence,{recursive:true});
+  try{
+    await verifyRuntimeCadence({url:`${base}/_next/static/chunks/${moduleName}`,expectedSha256,
+      onResult:result=>{cadence.push(result);console.log(`Compiled-byte cadence ${JSON.stringify(result)}`);}});
+  }finally{
+    await writeFile(join(evidence,"runtime-cadence.json"),JSON.stringify({scope:"isolated-compiled-artifact",intervalMs:5000,retries:0,expectedSha256,results:cadence},null,2));
+  }
   const smoke=spawn(process.execPath,[join(web,"scripts/production-smoke.mjs")],{cwd:resolve(web,"../.."),env:{...env,COMPANARO_URL:base,MIRA_EXPECTED_SHA:process.env.GITHUB_SHA??"unreleased",MIRA_SYNTHETIC_DIAGNOSTICS:"true",QA_DIRECTORY:evidence},stdio:"inherit"});
   const code=await new Promise((resolve,reject)=>{smoke.on("error",reject);smoke.on("exit",resolve);});
   // This server has isolated synthetic credentials and no real user requests.
   // Retain its bounded diagnostics on failure: otherwise a workerd exit after
   // readiness looks like unexplained page failures and hides the release cause.
   if(code!==0)throw new Error(`Local built-artifact smoke failed (${code}); server exit=${server.exitCode}, signal=${server.signalCode}: ${output}`);
+  // A successful last HTTP response must not hide an already-failed runtime.
+  // Let pending child lifecycle events settle before authorizing shutdown.
+  await new Promise(resolve=>setImmediate(resolve));
+  if(spawnError||server.exitCode!==null||server.signalCode!==null)throw new Error(`Artifact runtime failed before verification completed: exit=${server.exitCode}, signal=${server.signalCode}`);
   console.log(`Built artifact executed locally; isolated state retained at ${directory}. No live deployment/provider calls.`);
 }catch(error){
   // Wrangler can render a blank Error.message while its debug file contains the
@@ -61,8 +79,8 @@ try{
   // level need not be debug; Wrangler writes debug records to disk by default.
   try{
     await waitForRuntimeExit(server);
-    const report=await retainRuntimeFailure({directory:evidence,logPath:debugLog,consoleTail:output,exitCode:server.exitCode,signal:server.signalCode});
-    console.error(`Isolated runtime debug log (${report.debug.truncated?"tail":"complete"}):\n${report.debug.text||"unavailable"}`);
+    await retainRuntimeFailure({directory:evidence,logPath:debugLog,consoleTail:output,exitCode:server.exitCode,signal:server.signalCode});
+    console.error(`Isolated runtime diagnostics retained at ${join(evidence,"runtime-diagnostics.json")}`);
   }catch{console.error("Could not retain isolated runtime diagnostics; original failure follows.");}
   throw error;
 }finally{

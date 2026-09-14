@@ -63,10 +63,8 @@ jobs:
         # promotion. A single lucky start must not hide an intermittent crash.
         run: |
           for verification in 1 2 3; do
-            node apps/web/scripts/artifact-smoke.mjs
+            QA_DIRECTORY="apps/web/test-results/artifact-$verification" node apps/web/scripts/artifact-smoke.mjs
           done
-        env:
-          QA_DIRECTORY: audit/readiness-${{ github.run_id }}/artifact/
 
       - name: Seal the source-verified and locally smoke-tested artifact
         run: node apps/web/scripts/release-artifact.mjs create apps/web/dist
