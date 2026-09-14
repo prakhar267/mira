@@ -180,13 +180,14 @@ describe("dormant HTTPS suppression transport",()=>{
   it("sends only the strict protocol with no redirects, cache or indefinite wait",async()=>{
     const after=await genesisCheckpoint(writer),request=vi.fn<typeof fetch>(async()=>Response.json({...writer,...after}));
     await suppressionTransport(configuration,request)!.append({writer,after,entries:[]});
-    expect(request).toHaveBeenCalledWith(new URL(configuration.MIRA_SUPPRESSION_AUTHORITY_URL),expect.objectContaining({method:"POST",redirect:"error",cache:"no-store",signal:expect.any(AbortSignal)}));
+    expect(request).toHaveBeenCalledWith(new URL(configuration.MIRA_SUPPRESSION_AUTHORITY_URL),expect.objectContaining({method:"POST",redirect:"manual",cache:"no-store",signal:expect.any(AbortSignal)}));
     expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({writer,after,entries:[]});
   });
   it("bounds response bytes and does not return a provider error body",async()=>{
     const after=await genesisCheckpoint(writer);
     await expect(suppressionTransport(configuration,vi.fn(async()=>new Response("x".repeat(4097))))!.append({writer,after,entries:[]})).rejects.toThrow("RECEIPT_INVALID");
     await expect(suppressionTransport(configuration,vi.fn(async()=>new Response("sensitive provider details",{status:503})))!.append({writer,after,entries:[]})).rejects.toThrow("AUTHORITY_UNAVAILABLE");
+    await expect(suppressionTransport(configuration,vi.fn(async()=>new Response(null,{status:302,headers:{location:"https://untrusted.example.test/"}})))!.append({writer,after,entries:[]})).rejects.toThrow("AUTHORITY_UNAVAILABLE");
   });
 });
 

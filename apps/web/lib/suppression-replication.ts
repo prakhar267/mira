@@ -11,7 +11,8 @@ const MAX_BATCHES=8;
 /** Durable local-commit / independent-ack barrier, not a recovery admission or
  * serving lease. A failed response can have committed locally; a successful
  * protected response may not outrun its independently acknowledged journal.
- * Provisioning/activation is deliberately NOT exposed by any app route. */
+ * Provisioning requires the separate explicitly enabled operator-only v2 path;
+ * ordinary application requests can never activate or reset protection. */
 export class SourceSuppressionReplicator {
   private journal:RecoveryJournal;
   private pending:Promise<void>=Promise.resolve();
@@ -38,14 +39,15 @@ export class SourceSuppressionReplicator {
     return state;
   }
   isProtected(){return this.expectedProtection()!==undefined;}
+  protection(){const state=this.expectedProtection();if(!state)throw new Error("SUPPRESSION_PROTECTION_REQUIRED");return state;}
   status(){
     const state=this.expectedProtection(),head=this.journal.watermark();
     return {protected:Boolean(state),journalSequence:head,acknowledgedSequence:state?.acknowledged.sequence??null,pending:state?Math.max(0,head-state.acknowledged.sequence):null};
   }
   /** Internal provisioning primitive for an independently enrolled generation.
    * Always replay from genesis, never trust a supplied high-water mark. It has
-   * no disable/reset counterpart. Production enrollment still needs a fenced,
-   * complete baseline and tested serving/admission handoff before exposure. */
+   * no disable/reset counterpart. The v2 capture/restore orchestrator supplies
+   * registered coverage and successor admission; configuration is not enrollment. */
   async beginProtection(raw:Writer) {
     const writer=writerSchema.parse(raw);
     if(writer.source!==this.source)throw new Error("SUPPRESSION_SOURCE_MISMATCH");

@@ -5,7 +5,7 @@ import {reset,runInDurableObject,evictAllDurableObjects,listDurableObjectIds} fr
  * can crash the current local workerd, or retain evicted SQLite fixture data. */
 export async function cleanupWorkerState(){
   if(env.MIRA_LOCAL_TEST!=="synthetic-only")throw new Error("Refusing to clear non-synthetic storage");
-  for(const id of await listDurableObjectIds(env.MIRA_STORE))await runInDurableObject(env.MIRA_STORE.get(id),async(instance,ctx)=>{
+  for(const namespace of [env.MIRA_STORE,env.MIRA_AUTHORITY].filter(Boolean))for(const id of await listDurableObjectIds(namespace))await runInDurableObject(namespace.get(id),async(instance,ctx)=>{
     instance.__releaseLegacy?.(null);
     if(instance.__realLegacy)instance.env.LUMA_ACCOUNTS=instance.__realLegacy;
     await ctx.storage.deleteAlarm();

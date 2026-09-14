@@ -29,14 +29,15 @@ export async function captureArchive(call,vault,key,kind="snapshot"){
   }catch(cause){if(kind==="snapshot"&&!finished)await call({operation:"cancel",archiveId:job.archiveId,nonce:job.nonce}).catch(()=>{});throw cause;}
 }
 export async function verifyArchive(directory,key){
-  const root=await realpath(directory),sealed=await readBounded(join(root,"manifest.sealed.json")),manifest=await openBackup(sealed,"manifest",key);
+  const root=await realpath(directory),sealed=await readBounded(join(root,"manifest.sealed.json")),envelope=await openBackup(sealed,"manifest",key);
+  const manifest=envelope.version===2&&envelope.kind==="protected-snapshot"?envelope.snapshot:envelope;
   if(manifest.version!==1||!Array.isArray(manifest.chunks)||manifest.chunks.length>BACKUP_MAX_CHUNKS||!["snapshot","ledger"].includes(manifest.kind)||!Number.isSafeInteger(manifest.totalBytes)||manifest.totalBytes>BACKUP_MAX_BYTES)throw Error("Unsupported archive manifest");
   let bytes=0,rows=0;
   for(let index=0;index<manifest.chunks.length;index++){const part=manifest.chunks[index];if(part.index!==index)throw Error("Archive chunk order invalid");const chunk=await openBackup(await readBounded(join(root,`${String(index).padStart(6,"0")}.sealed.json`)),"chunk",key);
     if(chunk.archiveId!==manifest.archiveId||chunk.source!==manifest.source||chunk.kind!==manifest.kind||chunk.index!==index||chunk.table!==part.table||chunk.rows.length!==part.rows||await backupDigest(chunk)!==part.digest)throw Error("Archive integrity verification failed");
     const length=new TextEncoder().encode(JSON.stringify(chunk)).length;if(length!==part.bytes)throw Error("Archive byte accounting mismatch");bytes+=length;rows+=chunk.rows.length;
   }
-  if(bytes!==manifest.totalBytes||rows!==manifest.totalRows)throw Error("Archive is incomplete");return {manifest,sealed,directory:root};
+  if(bytes!==manifest.totalBytes||rows!==manifest.totalRows)throw Error("Archive is incomplete");return {manifest,sealed,directory:root,version:envelope.version};
 }
 export async function restoreArchive(sourceCall,targetCall,archiveDirectory,ledgerVault,key,target,confirmation){
   if(confirmation!=="RETIRE mira-production-v1"||!/^mira-recovery-[a-z0-9-]{8,80}$/.test(target))throw Error("Explicit source retirement and isolated target confirmation required");
@@ -59,4 +60,18 @@ export async function restoreArchive(sourceCall,targetCall,archiveDirectory,ledg
 export function operatorClient(url,token,target="mira-production-v1"){
   const endpoint=new URL("/api/admin/backup",url);if(endpoint.protocol!=="https:"&&!(["localhost","127.0.0.1"].includes(endpoint.hostname)&&endpoint.protocol==="http:"))throw Error("Backup transport requires HTTPS");if(!token)throw Error("MIRA_BACKUP_OPERATOR_KEY is required");
   return async data=>{const response=await fetch(endpoint,{method:"POST",redirect:"error",headers:{authorization:`Bearer ${token}`,"content-type":"application/json",origin:endpoint.origin},body:JSON.stringify({...data,target}),signal:AbortSignal.timeout(30_000)});const length=Number(response.headers.get("content-length")??0);if(length>maxFile)throw Error("Backup response too large");const reader=response.body.getReader();let size=0,text="";const decoder=new TextDecoder();for(;;){const item=await reader.read();if(item.done)break;size+=item.value.length;if(size>maxFile){await reader.cancel();throw Error("Backup response too large");}text+=decoder.decode(item.value,{stream:true});}text+=decoder.decode();const result=JSON.parse(text);if(!response.ok)throw Error(result.code??"Backup request failed");return result;};
+}
+
+/** Source-loss restore: only the surviving archive and target endpoint are
+ * contacted. Every resume rechecks the live independent authority server-side.
+ * Routing is a separate explicit deployment configuration, never a CLI side
+ * effect. Physical source retirement is neither requested nor fabricated. */
+export async function restoreProtectedArchive(targetCall,archiveDirectory,key,target){
+  if(!/^mira-recovery-[a-z0-9-]{8,80}$/.test(target))throw Error("Explicit isolated target required");
+  const archive=await verifyArchive(archiveDirectory,key);if(archive.version!==2)throw Error("A protected v2 archive is required");
+  let result=await targetCall({operation:"restoreBegin",sealed:archive.sealed});
+  if(result.complete)return result;
+  for(let index=result.progress.snapshotNext;index<archive.manifest.chunks.length;index++)await targetCall({operation:"restoreChunk",sealed:await readBounded(join(archive.directory,`${String(index).padStart(6,"0")}.sealed.json`))});
+  for(let batch=0;batch<2000;batch++){result=await targetCall({operation:"restoreStep"});if(result.complete)return result;}
+  throw Error("Bounded recovery unfinished; resume the same target/archive. It remains quarantined.");
 }

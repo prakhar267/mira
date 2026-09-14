@@ -5,6 +5,7 @@ import { RecoveryJournal, recoveryEventSchema as event, type RecoveryEvent } fro
 import { BACKUP_CHUNK_BYTES, BACKUP_MAX_BYTES, BACKUP_MAX_CHUNKS, type SealedBackup } from "./backup-crypto";
 import { authorityPreparationSchema, authorityRestoreBindingSchema, authorityVerifiedPageSchema, authorityWriteFenceSchema, AUTHORITY_PREPARATION_MAX_EVENTS, type AuthorityPreparation, type AuthorityVerifiedPage } from "./authority-quarantine-protocol";
 import { checkpointSchema, writerSchema, type Checkpoint, type Writer } from "./suppression-protocol";
+import { archiveRegistrationReceiptSchema, protectedRestoreSchema, recoveryAdmissionSchema, recoveryHandoffSchema, type ArchiveRegistrationReceipt } from "./protected-recovery-protocol";
 
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,120}$/);
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -48,6 +49,12 @@ export class BackupEngine {
   status() { const state = this.control(); return { mode: state.mode, source: this.source(), watermark: this.journal.watermark(), ...(state.mode === "restore" ? { challenge: state.challenge, target: state.target, archiveId: state.snapshot.archiveId, next: state.next, ledgerNext: state.ledgerNext, ledgerArchiveId: state.ledger?.archiveId, ...(state.authority ? { preparation: state.authority.kind, prepared: state.authority.prepared, coverageVerified: false, servingAllowed: false } : {}) } : {}), ...(state.mode === "export" ? { expiresAt: new Date(state.expires).toISOString() } : {}), restored: this.get("restored"), legacyImportAllowed: !this.get("legacy-disabled") }; }
   assertAvailable() { const state = this.control(); if (state.mode === "export" && state.expires <= Date.now()) this.set("control", { mode: "active" }); else if (state.mode !== "active") fail("RECOVERY_MAINTENANCE"); }
   legacyAllowed() { return !this.get("legacy-disabled"); }
+  assertSelectedTarget(target:string){
+    if(target==="mira-production-v1")return;
+    if(!/^mira-recovery-[a-z0-9-]{8,80}$/.test(target))fail("RECOVERY_TARGET_CONFIGURATION_INVALID");
+    const parsed=protectedRestoreSchema.safeParse(this.get("protected-restore"));
+    if(!parsed.success||!parsed.data.admission||parsed.data.admission.handoff.target!==target||parsed.data.successor.source!==this.source()||this.control().mode!=="active")fail("RECOVERY_TARGET_NOT_ADMITTED");
+  }
   begin(kind: "snapshot" | "ledger") {
     if (kind === "snapshot") this.assertAvailable();
     if (this.control().mode === "restore") fail("RECOVERY_MAINTENANCE");
@@ -248,6 +255,55 @@ export class BackupEngine {
     // Intentionally no `restored` receipt and no active mode. Neither valid
     // ciphertext nor this write fence establishes coverage or serving safety.
     return this.authorityPreparationState();
+  }
+  /** V2 is established on an empty target only. A historical v1 quarantine can
+   * never be upgraded by supplying a newer receipt to its finalizer. */
+  beginProtectedRestore(raw: unknown, target: string, rawRegistration: ArchiveRegistrationReceipt, digest: string, genesis: Checkpoint) {
+    const registration=archiveRegistrationReceiptSchema.parse(rawRegistration), manifest=this.validateManifest(raw);
+    if(registration.archiveId!==manifest.archiveId||registration.writer.source!==manifest.source||registration.manifestDigest!==digest||registration.checkpoint.sequence!==manifest.watermark)fail("RESTORE_COVERAGE_INVALID");
+    const saved=this.get("protected-restore");
+    if(saved){
+      const state=protectedRestoreSchema.parse(saved);
+      if(JSON.stringify(state.registration)!==JSON.stringify(registration))fail("RESTORE_COVERAGE_CHANGED");
+      if(this.control().mode==="active") {
+        if(!state.admission||state.admission.handoff.target!==target)fail("RESTORE_TARGET_INVALID");
+        return this.protectedRestoreState();
+      }
+    } else {
+      if(this.control().mode!=="active"||this.sql.exec("SELECT 1 FROM suppression_protection LIMIT 1").toArray().length)fail("RESTORE_TARGET_INVALID");
+    }
+    this.beginAuthorityQuarantine(manifest,target,registration.writer,digest,genesis);
+    if(!saved)this.set("protected-restore",{version:2,registration,successor:{authorityId:registration.writer.authorityId,source:this.source(),writerId:crypto.randomUUID(),epoch:1},handoff:null,admission:null});
+    return this.protectedRestoreState();
+  }
+  protectedRestoreState() {
+    const value=this.get("protected-restore");if(!value)fail("RESTORE_V2_REQUIRED");
+    const state=protectedRestoreSchema.parse(value);
+    return {...state,mode:this.control().mode,...(this.control().mode==="restore"?{progress:this.authorityPreparationState()}:{}),complete:this.control().mode==="active"&&Boolean(state.admission)};
+  }
+  pinProtectedHandoff(raw:unknown) {
+    const handoff=recoveryHandoffSchema.parse(raw),state=protectedRestoreSchema.parse(this.get("protected-restore"));
+    if(JSON.stringify(handoff.registration)!==JSON.stringify(state.registration)||JSON.stringify(handoff.successor)!==JSON.stringify(state.successor))fail("RESTORE_HANDOFF_CHANGED");
+    if(state.handoff&&JSON.stringify(handoff)!==JSON.stringify(state.handoff))fail("RESTORE_HANDOFF_CHANGED");
+    const fence={...handoff.previous,target:handoff.target,challenge:handoff.challenge,fenced:true};
+    this.pinAuthorityWriteFence(fence);
+    this.set("protected-restore",{...state,handoff});return this.protectedRestoreState();
+  }
+  finalizeProtectedRestore(raw:unknown) {
+    const admission=recoveryAdmissionSchema.parse(raw),v2=protectedRestoreSchema.parse(this.get("protected-restore"));
+    if(!v2.handoff||JSON.stringify(admission.handoff)!==JSON.stringify(v2.handoff))fail("RESTORE_ADMISSION_INVALID");
+    const protection=this.sql.exec("SELECT value FROM suppression_protection WHERE id=1").toArray()[0];
+    const local=z.object({version:z.literal(1),writer:writerSchema,acknowledged:checkpointSchema}).strict().parse(protection?JSON.parse(String(protection.value)):null);
+    if(JSON.stringify(local.writer)!==JSON.stringify(v2.successor)||local.acknowledged.sequence!==this.journal.watermark()||local.acknowledged.sequence<admission.checkpoint.sequence)fail("RESTORE_PROTECTION_INCOMPLETE");
+    if(this.control().mode==="active") {
+      if(!v2.admission||JSON.stringify(v2.admission)!==JSON.stringify(admission))fail("RESTORE_ADMISSION_INVALID");
+      return this.protectedRestoreState();
+    }
+    const progress=this.authorityPreparationState();
+    if(!progress.prepared||!progress.fence||progress.cursor.sequence!==progress.fence.sequence||progress.cursor.digest!==progress.fence.digest||admission.checkpoint.sequence!==progress.cursor.sequence||local.acknowledged.digest!==admission.checkpoint.digest)fail("RESTORE_PROTECTION_INCOMPLETE");
+    this.set("protected-restore",{...v2,admission});
+    this.set("restored",{version:2,archiveId:v2.registration.archiveId,source:v2.registration.writer.source,watermark:progress.cursor.sequence,completedAt:Date.now(),passwordsResetRequired:true,emailReverificationRequired:true,protected:true});
+    this.set("control",{mode:"active"});return this.protectedRestoreState();
   }
   finalize(proofRaw: unknown) {
     const state = this.restore();

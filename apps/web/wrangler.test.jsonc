@@ -14,8 +14,8 @@
     "SPEECH_DAILY_LIMIT": "600",
     "TRANSCRIBE_DAILY_LIMIT": "600"
   },
-  "durable_objects": {"bindings": [{"name":"MIRA_STORE","class_name":"MiraStore"}]},
-  "migrations": [{"tag":"synthetic-store-v1","new_sqlite_classes":["MiraStore"]}],
+  "durable_objects": {"bindings": [{"name":"MIRA_STORE","class_name":"MiraStore"},{"name":"MIRA_AUTHORITY","class_name":"SyntheticRecoveryAuthority"}]},
+  "migrations": [{"tag":"synthetic-store-v1","new_sqlite_classes":["MiraStore","SyntheticRecoveryAuthority"]}],
   "kv_namespaces": [{"binding":"LUMA_ACCOUNTS","id":"00000000000000000000000000000000"}],
   "services": [
     {"binding":"AI","service":"mira-synthetic-tests","entrypoint":"MockAI"},

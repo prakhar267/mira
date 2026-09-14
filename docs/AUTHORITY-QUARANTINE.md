@@ -2,6 +2,8 @@
 
 Updated 14 September 2026. This is a dormant, internal preparation slice, not an operational disaster-recovery feature. No production data, source retirement, new route, authority endpoint, infrastructure, credential, payment or routing change is included.
 
+This document describes **v1 permanent quarantine only**. The separate [protected archive v2 path](PROTECTED-RECOVERY-V2.md) can complete recovery using independently registered capture coverage and protected successor admission. It never upgrades this v1 mode; the refusals and tests below remain in place.
+
 ## What this slice establishes
 
 `prepareAuthorityQuarantine` in `apps/web/lib/authority-quarantine.ts` can decrypt a retained account archive, fetch a write-fenced journal from a separately surviving authority, replay newer suppression, and validate account ownership/authentication after the original SQLite source has been destroyed. It requires no call to that source. The result always has:
