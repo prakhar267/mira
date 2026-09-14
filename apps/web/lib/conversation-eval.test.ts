@@ -40,6 +40,17 @@ function harness(overrides:{session?:()=>Response;reply?:(index:number)=>Respons
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();});
 
 describe("consent-aware bounded conversation evaluator (synthetic only)",()=>{
+  it("flags potentially invented circumstances for review, not semantic certification",()=>{
+    const turn={text:"We changed the day because of work",language:"en",reviewPhrases:["extra day"]};
+    expect(evaluateTurn(turn,"Now you have an extra day to relax.")).toContain("meaning-review");
+    expect(evaluateTurn(turn,"Sunday morning, got it. Work changed the timing.")).toEqual([]);
+    expect(evaluateTurn(turn,"That does not mean you have an extra day off.")).toContain("meaning-review"); // Human review resolves negation.
+  });
+  it("rejects malformed review phrases before any provider or identity request",async()=>{
+    const x=harness();
+    const invalid=[{id:"synthetic-continuity",turns:[{text:"Hello",language:"en",reviewPhrases:[""]}]}];
+    await expect(x.run({},invalid)).rejects.toThrow("review phrases");expect(x.http).not.toHaveBeenCalled();
+  });
   it("accepts actual generated demo/account cookies and detects current policy drift",async()=>{
     const {cloudStore}=await import("./cloud-store");
     const put=vi.spyOn(cloudStore,"put").mockResolvedValue(undefined);

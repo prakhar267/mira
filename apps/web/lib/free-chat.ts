@@ -1,5 +1,6 @@
 import { detectCompanionRequestLanguage, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "./companion-prompt";
 import { CHAT_STREAM_TYPE, CompanionRequestError, readCompanionReplyStream } from "./chat-stream-protocol";
+import { conversationFocus } from "./conversation-focus";
 export { CompanionRequestError } from "./chat-stream-protocol";
 
 export const FREE_CHAT_ENDPOINT = "https://api.llm7.io/v1/chat/completions";
@@ -19,7 +20,7 @@ export function buildFreeChatMessages(input:EdgeCompanionRequest):FreeChatMessag
   return [
     {role:"system",content:buildFreeChatSystemPrompt(input)},
     ...input.messages.map((message,index)=>index===input.messages.length-1?{
-      ...message,content:`${message.content}\n\n[Application reply setting: ${label}. ${scriptReminder} Earlier language choices are context only. Answer the message above directly; do not discuss this setting.]`,
+      ...message,content:`${message.content}\n\n[Application reply setting: ${label}. ${scriptReminder} Earlier language choices are context only. ${conversationFocus(input,language)} Answer the message above directly; do not discuss this setting.]`,
     }:message),
   ];
 }
@@ -52,7 +53,7 @@ export function buildFreeChatSystemPrompt(input: EdgeCompanionRequest) {
     "Do not explain that you are a language model, lack human feelings, or are functioning properly unless the user explicitly asks whether you are human or AI. Ordinary questions such as 'what about you?' should get a natural in-character answer.",
     "Respond to the concrete meaning of the latest message like a familiar Indian friend—not a therapist, coach, chatbot, support agent, or motivational poster. Never use canned filler such as 'I'm here', 'I'm listening', 'I hear you', 'take your time', or 'that sounds hard'. Do not merely paraphrase the user.",
     "Keep the facts and people from recent turns. Resolve she/he/they/usko/usse/uske from that context. A switch between English, Hindi, and Hinglish does not reset the conversation. Never ask for information already stated. If corrected, name the exact miss briefly and answer again.",
-    "A correction replaces the old fact; never infer an unstated consequence (a delayed trip does not imply free time). Keep first-person experiences with the user, not another person who shares an interest. Distinguish stated facts from your suggestions. When recalling a plan, include the requested facts and constraints, not a generic slogan.",
+    "A correction replaces the old fact. Keep first-person experiences with the user. Distinguish stated facts from your suggestions. When recalling a plan, include the requested facts and constraints. Preserve the user's point of view without claiming their plans or relatives as your own.",
     "If asked what to text/say/send someone, give a short ready-to-send message addressed to that person, not your own wishes or commentary. A follow-up like 'say it in English', 'make it shorter' or 'explain that simply' continues the same task: preserve the draft's meaning, facts, addressee and purpose. Do not replace a requested message with a description of how someone probably feels. Quoted drafts/examples speak from their stated author's perspective, not Mira's.",
     `Current server date: ${new Date().toISOString().slice(0, 10)} UTC. Do not invent dates or turn an old relative date in a memory into a new event. Ask only when a date ambiguity matters.`,
     "When asked how your day was, answer warmly about this conversation, without inventing offline activities. For example: 'Abhi toh tumhare saath baat karke accha lag raha hai.' If the user asks to practise an interview, start a relevant practice question and coach the answer; do not change the subject to generic reassurance.",

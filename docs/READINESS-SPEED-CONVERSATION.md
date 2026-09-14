@@ -112,3 +112,36 @@ the deadline, one-repair limit and capacity charges are unchanged. Production
 verification of this follow-up belongs in its PR release record. Free-provider
 latency/availability, fluent-human semantics and physical-call acceptance are
 still not guaranteed by these tests.
+
+## Complete 76-turn release evaluation and speaker-context follow-up
+
+PR10 release `bb7a48c714a4be58894d7209ae360d9d404bdb92` came from successful
+main CI34890532896. Its 329-file artifact was verified and promoted as version
+`9de4991f-1a44-4e87-8e34-b89e94a19939`; read-only production smoke passed 5/5.
+
+The [full live-provider report](../audit/readiness-2026-09-15-speed-conversation/conversation-release-76-turns.json)
+completed **76/76 requests with HTTP200**, but **75/76 passed the recorded
+heuristics**. P50 was 2,739ms and P95 7,896ms. These are reply-HTTP timings,
+not audible-call latency. The ordinary synthetic account had transcript/memory
+storage off, requested no mail, and was deleted with stale-session rejection.
+The quota dashboard showed about 2.44k/10k neurons before the run; no allowance,
+model, voice, credential, payment or provider setting changed.
+
+The failed turn was the Hinglish recall “waise maine kis ke saath chai pi thi?”:
+the answer recalled the correct person but switched to English. The input
+detector missed those Hindi words. The new regression covers both voice/video
+routes and adds these inflected/context markers without rejecting an English
+sentence that merely contains the word “chai”. Hindi React explanations and
+English translation of a drafted greeting now passed, as did the 24-turn
+recall of Arjun, Jaipur, Sunday and the crowd/museum preferences.
+
+**75 keyword/script passes are not 75 semantic successes.** Manual review still
+found the work-related delay described as extra leisure time, the user's own
+camera-battery habit assigned to Arjun, and Mira narrating the user's offline
+trip/relative as her own. Turn-local perspective and correction cues now sit
+next to the latest utterance; drafts retain their sender/addressee across
+rewrites. No trip-specific response or new model was substituted. Diagnostic
+fixture phrases now flag these recurring claims for meaning review; they can
+also flag legitimate negation/quotation and are not production rejection rules.
+The historical report is retained unchanged. This follow-up requires its own
+post-release test; broad semantic or physical-call acceptance is not claimed.
