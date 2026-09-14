@@ -4,12 +4,19 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { build } = createRequire(require.resolve("vite"))("esbuild");
 
+// This module is supplied by Playwright, not the application server. An active
+// service worker can bypass that route and request the nonexistent QA URL.
+// Keep this transport diagnostic isolated, like the other HTTP-mocked suites;
+// the separate real-avatar performance suite exercises the actual app bundle.
+test.use({ serviceWorkers: "block" });
+
 test("the actual bounded mesh loader reconstructs the committed GLB in this browser", async ({ page, context }) => {
   const bundled = await build({ entryPoints: [new URL("../../lib/avatar-delivery.ts", import.meta.url).pathname], bundle: true, write: false, platform: "browser", format: "esm" });
   await context.route("**/*", route => new URL(route.request().url()).origin === "http://127.0.0.1:4397" ? route.continue() : route.abort());
   await page.route("**/__qa/avatar-loader.js", route => route.fulfill({ contentType: "application/javascript", body: bundled.outputFiles[0].text }));
   await page.goto("/");
   const result = await page.evaluate(async () => {
+    if (navigator.serviceWorker.controller) throw new Error("QA module must not be intercepted by a service worker");
     const { fetchAvatarDelivery } = await import("/__qa/avatar-loader.js");
     const bytes = await fetchAvatarDelivery(new AbortController().signal);
     const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), b => b.toString(16).padStart(2, "0")).join("");
