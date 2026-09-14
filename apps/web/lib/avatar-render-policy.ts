@@ -17,10 +17,19 @@ export function avatarSmoothing(coefficient: number, deltaSeconds: number) {
 
 export class AvatarResolutionBudget {
   scale = 1;
+  paused = false;
   private slowFrames = 0;
+  private severeFrames = 0;
+  resetWindow() { this.slowFrames = 0; this.severeFrames = 0; }
   observe(frameMs: number) {
-    // Ignore cold shader compilation, idle frame scheduling and tab resumes.
-    if (!Number.isFinite(frameMs) || frameMs > 250 || frameMs < 0) return false;
+    if (!Number.isFinite(frameMs) || frameMs < 0 || this.paused) return false;
+    // Called only after the first draw; visibility transitions reset the
+    // caller's clock. A single compilation/OS stall is not sustained slowness.
+    this.severeFrames = frameMs > 180 ? this.severeFrames + 1 : 0;
+    if (this.severeFrames >= 8) {
+      this.paused = true;
+      return false;
+    }
     this.slowFrames = frameMs > 48 ? this.slowFrames + 1 : Math.max(0, this.slowFrames - 1);
     if (this.slowFrames < 8 || this.scale <= .75) return false;
     this.scale = Math.max(.75, this.scale - .125);

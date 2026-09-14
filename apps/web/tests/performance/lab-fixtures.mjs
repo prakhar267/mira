@@ -49,14 +49,14 @@ export async function enterDemo(page) {
   await page.evaluate(() => document.fonts.ready);
 }
 
-export async function coldMobilePage(browser) {
+export async function coldMobilePage(browser, cpuThrottle = 4) {
   const context = await browser.newContext({ viewport: { width: 393, height: 851 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1, serviceWorkers: "block" });
   const requests = await isolateDemo(context);
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   await cdp.send("Network.enable");
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: cpuThrottle });
   return { context, page, requests };
 }
 

@@ -39,5 +39,28 @@ describe("avatar rendering budget", () => {
     for (let i = 0; i < 20; i++) { budget.observe(80); budget.observe(16); }
     for (const value of [NaN, Infinity, -1, 3000]) expect(budget.observe(value)).toBe(false);
     expect(budget.scale).toBe(1);
+    expect(budget.paused).toBe(false);
+  });
+  it("pauses after eight consecutive severe stalls instead of ignoring a slow GPU forever", () => {
+    const budget = new AvatarResolutionBudget();
+    for (let i = 0; i < 7; i++) { budget.observe(380); expect(budget.paused).toBe(false); }
+    budget.observe(380);
+    expect(budget.paused).toBe(true);
+    for (let i = 0; i < 30; i++) budget.observe(16);
+    expect(budget.paused).toBe(true); // No repeated freeze/restart oscillation.
+    expect(new AvatarResolutionBudget().paused).toBe(false); // Reopening retries.
+  });
+  it("does not pause for occasional severe stalls separated by normal frames", () => {
+    const budget = new AvatarResolutionBudget();
+    for (let i = 0; i < 30; i++) { budget.observe(400); budget.observe(16); }
+    expect(budget.paused).toBe(false);
+  });
+  it("starts a fresh observation window after backgrounding without raising resolution", () => {
+    const budget = new AvatarResolutionBudget();
+    for (let i = 0; i < 8; i++) budget.observe(100);
+    for (let i = 0; i < 7; i++) budget.observe(400);
+    budget.resetWindow(); budget.observe(400);
+    expect(budget.paused).toBe(false);
+    expect(budget.scale).toBe(.875);
   });
 });

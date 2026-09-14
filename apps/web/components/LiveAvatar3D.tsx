@@ -84,7 +84,7 @@ export function LiveAvatar3D({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef({ speaking, thinking, listening, blinking, mouthPose, emotion });
-  const [loadState, setLoadState] = useState<"loading" | "ready" | "fallback">("loading");
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "fallback" | "limited">("loading");
 
   useEffect(() => {
     stateRef.current = { speaking, thinking, listening, blinking, mouthPose, emotion };
@@ -248,6 +248,7 @@ export function LiveAvatar3D({
     const onVisibilityChange = () => {
       window.cancelAnimationFrame(frame);
       lastFrameAt = lastCallbackAt = performance.now();
+      resolutionBudget.resetWindow();
       if (active && !renderFailed && !document.hidden) frame = window.requestAnimationFrame(animate);
     };
     const animate = () => {
@@ -263,6 +264,12 @@ export function LiveAvatar3D({
       const elapsed = (now - startedAt) / 1_000;
       lastFrameAt = now;
       if (ready && resolutionBudget.observe(callbackGap)) resize();
+      if (resolutionBudget.paused) {
+        renderFailed = true;
+        window.cancelAnimationFrame(frame);
+        setLoadState("limited");
+        return;
+      }
       const smooth = (coefficient: number) => avatarSmoothing(coefficient, delta);
       const pose = targetForPose(state.speaking ? state.mouthPose : 0);
       const expression = emotionTargets(state.emotion);
@@ -331,10 +338,11 @@ export function LiveAvatar3D({
 
   return (
     <div className={`live-avatar-3d live-avatar-3d--${loadState}`}>
-      <img className="live-avatar-3d__fallback" src="/assets/mira/avatar/mira-anime-live-v2.png" alt="" draggable={false} />
-      <canvas ref={canvasRef} className="live-avatar-3d__canvas" role="img" aria-label={`${companionName}, an expressive open-licensed anime 3D companion`} />
+      <img className="live-avatar-3d__fallback" src="/assets/mira/avatar/mira-anime-live-v2.png" alt={loadState === "ready" ? "" : `${companionName}, anime companion portrait`} aria-hidden={loadState === "ready"} draggable={false} />
+      <canvas ref={canvasRef} className="live-avatar-3d__canvas" role="img" aria-hidden={loadState !== "ready"} aria-label={`${companionName}, an expressive open-licensed anime 3D companion`} />
       {loadState === "loading" ? <span className="live-avatar-3d__loading">Bringing {companionName} into the call…</span> : null}
-      {loadState === "fallback" ? <span className="live-avatar-3d__loading">3D is unavailable on this device · using anime portrait mode</span> : null}
+      {loadState === "fallback" ? <span className="live-avatar-3d__loading" role="status">3D is unavailable on this device · using anime portrait mode</span> : null}
+      {loadState === "limited" ? <span className="live-avatar-3d__loading" role="status">Animation paused · portrait mode keeps your call responsive</span> : null}
     </div>
   );
 }
