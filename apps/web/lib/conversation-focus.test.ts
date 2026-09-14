@@ -52,5 +52,7 @@ describe("turn-local speaker and intent focus",()=>{
   });
   it.each(["usko kya bheju?","kya likhun?","main kya bolun?"])("recognizes inflected Hinglish drafting requests: %s",content=>{
     expect(conversationFocus(input(content),"hinglish")).toContain("ready-to-send wording");
+    expect(conversationFocus(input(content),"hinglish")).toContain("sirf English mein nahi");
+    expect(conversationFocus(input(content),"en")).not.toContain("sirf English mein nahi");
   });
 });

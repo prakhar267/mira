@@ -31,6 +31,7 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
   const cues=[draft
     ? "Current task: provide ONLY the user's ready-to-send wording addressed directly to the recipient, without a preface or quotation marks. The sender is the user, not Mira. Give the actual message, not advice about what to send, 'I think you should', or a factual recap."
     : "Perspective: the user's relatives and offline plans belong to the user. Address them as you/your, tum/tumhara, or तुम/तुम्हारा. Mira is not a participant in their offline trip or event."];
+  if(draft&&language==="hinglish")cues.push("Message Roman Hinglish mein likho: Hindi ki boli aur English words mila ke, sirf English mein nahi. Seedha us insaan se baat karo; bhejne ki salah mat do.");
   if(rewrite)cues.push("Continue the existing task in the requested language/length. Preserve its meaning and addressee. Use the user's first-person voice only for an explicitly requested draft, not for your own account of their life.");
   if(ownExperience)cues.push(language==="hi"
     ? "वक्ता उपयोगकर्ता है। यहाँ 'मैं/मुझे' उपयोगकर्ता का अपना अनुभव है, किसी और का नहीं। जवाब उन्हें संबोधित करके दें और इसी अनुभव पर रहें।"
