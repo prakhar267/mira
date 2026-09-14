@@ -43,3 +43,19 @@ transport, without a runtime decoder download or paid image service.
   542,802 bytes; SHA-256 `e6b32a6793d2c81c217e744025bf8040c1271792b01da53b76b1523da459f6cf`.
 
 The original VRM/PNG remain available for compatibility and provenance.
+
+## Call-ready profile (default)
+
+`mira-anime-call-v2.glb.gz` and its raw `.glb` companion preserve every geometry
+buffer, rig, expression binding, material value and VRM licence from the source.
+Material textures use WebP quality 90, lossless alpha and at most 1024 pixels on
+either edge. This profile is deliberately **not pixel-identical**: textures are
+resized and RGB-compressed. Tests compare visible RGB against the resized
+originals (mean absolute error below 5/255 per texture), exact alpha and all
+geometry bytes. The larger lossless derivative is retained, not silently changed.
+
+The default transfer is 1,235,862 bytes (raw GLB 2,920,764 bytes). Browsers without
+native gzip decompression use the bounded, hash-verified raw call profile, never
+the old 9 MB source. `mira-anime-preview-v2.webp` is a 384-pixel, 13,868-byte
+thumbnail for immediate loading/error display. Exact hashes and dimensions are
+recorded in `lib/avatar-call-manifest.json`; the generator validates both profiles.

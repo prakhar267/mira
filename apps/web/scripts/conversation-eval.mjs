@@ -37,10 +37,11 @@ function selectDataset(dataset,ids){
     seen.add(scenario.id);
     for(const turn of scenario.turns){
       if(!turn||typeof turn.text!=="string"||!turn.text.trim()||turn.text.length>8000||!["en","hi","hinglish"].includes(turn.language)||(turn.noQuestion!==undefined&&typeof turn.noQuestion!=="boolean")||(turn.anchors!==undefined&&(!Array.isArray(turn.anchors)||!turn.anchors.length||turn.anchors.length>20||turn.anchors.some(anchor=>typeof anchor!=="string"||!anchor||anchor.length>200))))throw Error("Invalid synthetic turn.");
+      if(turn.anchorGroups!==undefined&&(!Array.isArray(turn.anchorGroups)||!turn.anchorGroups.length||turn.anchorGroups.length>8||turn.anchorGroups.some(group=>!Array.isArray(group)||!group.length||group.length>10||group.some(anchor=>typeof anchor!=="string"||!anchor||anchor.length>200))))throw Error("Invalid required synthetic facts.");
     }
   }
   if(ids?.some(id=>!seen.has(id)))throw Error("An explicitly selected scenario is not in the synthetic dataset.");
-  return ids?dataset.filter(scenario=>ids.includes(scenario.id)):dataset;
+  return ids?ids.map(id=>dataset.find(scenario=>scenario.id===id)):dataset;
 }
 
 /** Same review heuristics as the source dataset's original evaluator. A pass is
@@ -50,14 +51,15 @@ export function evaluateTurn(turn,reply,status=200){
   const romanHindi=/\b(?:haan|hai|hoon|tum|aaj|kya|kar|karo|yaar|mujhe|nahi|accha|kaafi|bilkul|batao|toh|usko|uske|ek|main|aur|phir|pasand|chahiye|wahan|kal|saath|liye|rakh|rakho|hoga|hum|tujhe|kaam|chalo|tumhe|tumhari|bolo|mat|bas)\b/i.test(reply);
   const englishHasHindi=(reply.match(/\b(?:aaj|abhi|hoon|haan|hai|hain|mujhe|tum|tumhe|tumhara|tumhari|kaafi|nahi|nahin|yaar|karti|rahi|aap|dono|bhi|rahega|rahegi|karoge|karogi|waapas|aaoge|thakaan|hoga|hogi|accha|kaise|kya|aur)\b/gi)?.length??0)>=2;
   const languageOk=turn.language==="hi"?hindi:turn.language==="hinglish"?!hindi&&romanHindi:!hindi&&!englishHasHindi;
-  const anchorsOk=!turn.anchors||turn.anchors.some(anchor=>reply.toLowerCase().includes(anchor.toLowerCase()));
+  const contains=anchor=>reply.toLowerCase().includes(anchor.toLowerCase());
+  const anchorsOk=(!turn.anchors||turn.anchors.some(contains))&&(!turn.anchorGroups||turn.anchorGroups.every(group=>group.some(contains)));
   return [...(status!==200||!reply.trim()?["service-error"]:[]),...(!languageOk?["language"]:[]),...(generic.test(reply)?["generic-misunderstanding"]:[]),...(!anchorsOk?["context-anchor-review"]:[]),...(turn.noQuestion&&reply.includes("?")?["unwanted-question"]:[])];
 }
 
 class EvaluationFailure extends Error{
   constructor(code,status=0){super(code);this.code=code;this.status=status;}
 }
-const knownErrorCodes=new Set(["DEMO_SESSION_REQUIRED","DEMO_SESSION_EXPIRED","DEMO_SESSION_LIMIT","SESSION_EXPIRED","CONSENT_REQUIRED","POLICY_CONFIRMATION_REQUIRED","DAILY_CAPACITY_EXHAUSTED","INFERENCE_BUSY","PROVIDER_UNAVAILABLE","SERVICE_UNAVAILABLE","INFERENCE_DISABLED","RATE_LIMITED","INPUT_TOO_LARGE","INVALID_REQUEST"]);
+const knownErrorCodes=new Set(["DEMO_SESSION_REQUIRED","DEMO_SESSION_EXPIRED","DEMO_SESSION_LIMIT","SESSION_EXPIRED","CONSENT_REQUIRED","POLICY_CONFIRMATION_REQUIRED","DAILY_CAPACITY_EXHAUSTED","INFERENCE_BUSY","PROVIDER_UNAVAILABLE","SERVICE_UNAVAILABLE","INFERENCE_DISABLED","RATE_LIMITED","INPUT_TOO_LARGE","INVALID_REQUEST","INVALID_REPLY","UNSAFE_STREAM","CONTEXT_CHANGED"]);
 function failureCode(body,fallback){return knownErrorCodes.has(body?.code)?body.code:fallback;}
 async function boundedJson(fetchImpl,url,init){
   const abort=new AbortController();let reader,timer;
@@ -154,6 +156,10 @@ export async function runConversationEvaluation(env,dataset,{fetchImpl=fetch,sle
   report.p95Ms=sorted.length?sorted[Math.min(sorted.length-1,Math.floor(sorted.length*.95))]:null;
   report.p99Ms=sorted.length?sorted[Math.min(sorted.length-1,Math.floor(sorted.length*.99))]:null;
   report.genericMisunderstandingRate=report.total?report.results.filter(result=>result.flags.includes("generic-misunderstanding")).length/report.total:null;
+  report.languages=Object.fromEntries(["en","hi","hinglish"].map(language=>{
+    const turns=report.results.filter(result=>result.expectedLanguage===language),latencies=turns.map(result=>result.latencyMs).sort((a,b)=>a-b);
+    return [language,{turns:turns.length,passed:turns.filter(result=>!result.flags.length&&!result.error).length,p50Ms:latencies.length?latencies[Math.floor(latencies.length*.5)]:null,p95Ms:latencies.length?latencies[Math.min(latencies.length-1,Math.floor(latencies.length*.95))]:null}];
+  }));
   report.complete=!report.stopReason&&report.total===report.requestedTurns&&report.stableDeployment;
   report.success=report.complete&&report.passed===report.total;
   return report;

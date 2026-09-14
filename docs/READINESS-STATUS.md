@@ -4,6 +4,13 @@ Updated 14 September 2026. This is the current handoff; dated implementation rep
 
 ## Latest follow-up
 
+The [startup and conversation follow-through](READINESS-SPEED-CONVERSATION.md)
+adds a 1.24 MB call-ready avatar, three measured 10.8–10.9-second slow-network
+loads, stricter multi-fact evaluation and a short-Hinglish reply rejection fix.
+The diagnostic provider report retains its incomplete 27/28 result; check the
+new PR's release record for promotion and post-release evaluation. The following
+paragraphs are earlier checkpoints, not proof of the latest deployment.
+
 See [the live-provider and smaller-delivery follow-up](READINESS-LIVE-FOLLOWUP.md):
 12 actual-provider multilingual turns passed the bounded evaluator's heuristics;
 physical/acoustic and fluent-human acceptance remain outstanding. The new

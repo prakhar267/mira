@@ -30,6 +30,7 @@ const devanagariMemoryRecallPattern = /(?:तुम्हें याद है
 const identityPattern = /\b(?:what(?:'s| is) your name|who are you|what do you do|tum(?:hara)? naam kya hai|tum kaun ho|tum kya karti ho|tum kya karte ho)\b|(?:तुम्हारा नाम क्या है|तुम कौन हो|तुम क्या करती हो|तुम क्या करते हो)/iu;
 const hinglishPattern = /\b(?:aaj|abhi|acha|accha|arey|aur|bahut|bas|batao|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karun|karta|karti|kya|kyun|lekin|liye|matlab|mein|mera|meri|mere|mujhe|nahi|nhi|sakta|sakti|sach|samajh|shaam|theek|thik|thoda|tum|tumhara|uske|usko|yaar|yar|daant|sabke|samne)\b/i;
 const naturalHinglishReplyPattern = /\b(?:aaj|abhi|accha|arey|aur|bas|haan|hai|hoon|kaafi|kar|karo|karti|kya|kyun|lekin|main|matlab|mera|meri|mujhe|nahi|par|sach|theek|thoda|toh|tum|tumhara|uske|yaar)\b/i;
+const hasInflectedHindi = (value: string) => (value.match(/\b(?:bhi|dono|rahega|rahegi|karoge|karogi|gaya|gayi|tha|thi|raha|rahi|aap|nahin|waapas)\b/gi)?.length ?? 0) >= 2;
 const listenOnlyPattern = /\b(?:just listen|only listen|don['’]?t (?:advise|fix|ask)|no advice|no questions?|(?:bas|sirf)\s+(?:(?:meri|meri baat)\s+)?sun(?:o|na)|(?:advice|salah|salaah)\s+mat\s+(?:do|dena)|(?:sawal|question)\s+mat\s+(?:puch|pooch)\w*)\b|(?:बस सुनो|सिर्फ सुनो|मेरी बात सुनो|सलाह मत|सवाल मत)/iu;
 const providerClaimPattern = /\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b.{0,28}\b(?:made|built|created|designed|trained|model|basis)\b|\b(?:made|built|created|designed|trained)\b.{0,28}\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b/i;
 const roboticSelfDescriptionPattern = /\b(?:large language model|language model|as an ai|i (?:do not|don['’]?t) have feelings|working properly|functioning (?:normally|properly|well)|ready to chat)\b/i;
@@ -37,7 +38,7 @@ const roboticSelfDescriptionPattern = /\b(?:large language model|language model|
 export type CompanionLanguage = "en" | "hi" | "hinglish";
 
 function explicitlyRequestedLanguage(value: string): CompanionLanguage | null {
-  if (!/(?:speak|talk|reply|answer|chat|language|baat|bolo|बात|बोल|जवाब|भाषा|mein|में)/iu.test(value)) return null;
+  if (!/(?:speak|talk|reply|answer|chat|language|keep|say|switch|baat|bolo|बात|बोल|जवाब|भाषा|mein|में)/iu.test(value)) return null;
 
   const mentions = [
     ...[...value.matchAll(/(?:hinglish|हिंग्लिश)/giu)].map((match) => ({ language: "hinglish" as const, index: match.index, value: match[0] })),
@@ -67,7 +68,7 @@ export function detectCompanionLanguage(value: string): CompanionLanguage {
   // Short natural updates often contain inflected verbs, not dictionary forms.
   // Require two of these extra markers so an English mention of Gaya alone is
   // not mistaken for Hindi.
-  if ((value.match(/\b(?:bhi|dono|rahega|rahegi|karoge|karogi|gaya|gayi|tha|thi|raha|rahi|aap|nahin|waapas)\b/gi)?.length??0)>=2) return "hinglish";
+  if (hasInflectedHindi(value)) return "hinglish";
   return "en";
 }
 
@@ -328,7 +329,9 @@ export function isInvalidCompanionReply(value: string, latestUserMessage: string
   if (expectedLanguage === "hi" && !/\p{Script=Devanagari}/u.test(reply)) return true;
   if (expectedLanguage !== "hi" && /\p{Script=Devanagari}/u.test(reply)) return true;
   if (expectedLanguage === "en" && (reply.match(/\b(?:aaj|abhi|hoon|haan|hai|hain|mujhe|tum|tumhe|tumhara|tumhari|kaafi|nahi|nahin|yaar|karti|rahi|aap|dono|bhi|rahega|rahegi|karoge|karogi|waapas|aaoge|thakaan|hoga|hogi|accha|kaise|kya|aur)\b/gi)?.length ?? 0) >= 2) return true;
-  if (expectedLanguage === "hinglish" && !naturalHinglishReplyPattern.test(reply)) return true;
+  // Short factual replies may consist of a name/place and an inflected verb,
+  // without the conversational filler tokens used by the old validator.
+  if (expectedLanguage === "hinglish" && !naturalHinglishReplyPattern.test(reply) && !hasInflectedHindi(reply)) return true;
   // The user's sister, brother, a past day and Mira can have different gendered
   // predicates in the same turn. Comparing every masculine reply word against
   // any feminine input word rejected valid multi-person conversations. Check

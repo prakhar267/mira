@@ -19,6 +19,7 @@ import {
 import { useCompanionCall } from "./useCompanionCall";
 import type { TurnContext } from "@/lib/conversation-turn";
 import { useCallDialog } from "./useCallDialog";
+import { avatarDelivery, fetchAvatarDelivery } from "@/lib/avatar-delivery";
 const LiveAvatar3D = lazy(() => import("./LiveAvatar3D").then(module => ({ default: module.LiveAvatar3D })));
 
 const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
@@ -52,6 +53,16 @@ export function VideoCallModal({
   const [activityOpen, setActivityOpen] = useState(false);
   const [activity, setActivity] = useState("");
   const [blinking, setBlinking] = useState(false);
+  const [avatarDownload, setAvatarDownload] = useState<Promise<ArrayBuffer> | null>(null);
+  useEffect(() => {
+    // Begin only when a video call opens, in parallel with the lazy 3D module.
+    // Every mounted call owns and cancels its own network request.
+    const controller = new AbortController();
+    const pending = fetchAvatarDelivery(controller.signal);
+    void pending.catch(() => undefined); // Could reject before the module loads.
+    setAvatarDownload(pending);
+    return () => controller.abort();
+  }, []);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const activeRef = useRef(true);
@@ -151,7 +162,8 @@ export function VideoCallModal({
   return (
     <motion.div ref={dialogRef} className="live-call live-call--video" role="dialog" aria-modal="true" aria-label={`Video call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div className={speaking ? "video-call__avatar-feed video-call__avatar-feed--speaking" : "video-call__avatar-feed"}>
-        <Suspense fallback={<p role="status">Loading avatar… Voice and captions remain available.</p>}><LiveAvatar3D
+        <Suspense fallback={<div className="live-avatar-3d live-avatar-3d--loading"><img className="live-avatar-3d__fallback" src={avatarDelivery.portraitPath} alt="" /><span className="live-avatar-3d__loading" role="status">Loading avatar… Voice and captions remain available.</span></div>}>{avatarDownload && <LiveAvatar3D
+          download={avatarDownload}
           companionName={companionName}
           speaking={speaking}
           thinking={thinking}
@@ -159,7 +171,7 @@ export function VideoCallModal({
           blinking={blinking}
           mouthPose={mouthPose}
           emotion="natural"
-        /></Suspense>
+        />}</Suspense>
         <span className="video-call__feed-badge"><i className="status-dot" /> Live 3D avatar · expression synced</span>
       </div>
       <div className="live-call__veil live-call__veil--video" />

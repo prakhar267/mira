@@ -10,8 +10,6 @@ import { avatarDelivery, fetchAvatarDelivery } from "../lib/avatar-delivery";
 export type AvatarMouthPose = 0 | 1 | 2 | 3;
 export type AvatarEmotion = "natural" | "happy" | "playful" | "tender" | "intimate" | "sad" | "angry";
 
-const avatarAsset = "/assets/mira/avatar/mira-anime-live-v2.vrm";
-
 function targetForPose(pose: AvatarMouthPose) {
   if (pose === 1) return { aa: 0, ee: .08, ih: .44, oh: 0, ou: 0 };
   if (pose === 2) return { aa: .58, ee: .05, ih: 0, oh: .05, ou: 0 };
@@ -74,6 +72,7 @@ export function LiveAvatar3D({
   blinking,
   mouthPose,
   emotion = "natural",
+  download,
 }: {
   companionName: string;
   speaking: boolean;
@@ -82,6 +81,7 @@ export function LiveAvatar3D({
   blinking: boolean;
   mouthPose: AvatarMouthPose;
   emotion?: AvatarEmotion;
+  download?: Promise<ArrayBuffer>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef({ speaking, thinking, listening, blinking, mouthPose, emotion });
@@ -152,12 +152,10 @@ export function LiveAvatar3D({
 
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
-    const download = new AbortController();
-    // Old browsers keep the source VRM path. A failed compressed download does
-    // not silently trigger another 9MB transfer; the portrait remains usable.
-    const loading = typeof DecompressionStream === "function"
-      ? fetchAvatarDelivery(download.signal).then(bytes => loader.parseAsync(bytes, "/assets/mira/avatar/"))
-      : loader.loadAsync(avatarAsset);
+    const controller = new AbortController();
+    // Both browser paths use the smaller derivative. An unsuccessful transfer
+    // remains portrait-only; never silently start a second model download.
+    const loading = (download ?? fetchAvatarDelivery(controller.signal)).then(bytes => loader.parseAsync(bytes, "/assets/mira/avatar/"));
 
     loading.then((gltf) => {
       const loadedVrm = gltf.userData.vrm as VRM | undefined;
@@ -335,7 +333,7 @@ export function LiveAvatar3D({
       active = false;
       window.cancelAnimationFrame(frame);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      download.abort();
+      controller.abort();
       canvas.removeEventListener("webglcontextlost", onContextLost);
       resizeObserver.disconnect();
       canvas.removeEventListener("pointermove", onPointerMove);
@@ -343,7 +341,7 @@ export function LiveAvatar3D({
       if (avatar) disposeObject(avatar);
       renderer.dispose();
     };
-  }, []);
+  }, [download]);
 
   return (
     <div className={`live-avatar-3d live-avatar-3d--${loadState}`}>

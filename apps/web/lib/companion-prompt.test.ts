@@ -61,6 +61,10 @@ describe("edge companion prompting", () => {
   });
 
   it("does not confuse Mira's grammar with a different person's or a past event",()=>{
+    expect(isInvalidCompanionReply("Riya Delhi gayi thi.", "Riya kahan gayi thi? Keep it short in Hinglish.")).toBe(false);
+    expect(isInvalidCompanionReply("Aman Mumbai waapas gaya tha.", "Aman kahan gaya tha?")).toBe(false);
+    expect(isInvalidCompanionReply("Riya went to Delhi.", "Riya kahan gayi thi? Keep it short in Hinglish.")).toBe(true);
+    expect(detectCompanionLanguage("Riya kahan gayi thi? Keep it short in English.")).toBe("en");
     const input="Meri behen Riya kal Delhi gayi thi. Mera bhai Aman abhi Mumbai mein hai.";
     expect(isInvalidCompanionReply("Riya Delhi gayi thi aur Aman Mumbai mein hai. Kya Aman kal aa raha tha?",input)).toBe(false);
     expect(isInvalidCompanionReply("Haan, woh plan accha tha.","Riya bhi trip pe gayi thi")).toBe(false);

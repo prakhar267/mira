@@ -2,7 +2,7 @@ import {mkdir,writeFile} from "node:fs/promises";
 import {resolve} from "node:path";
 import {createHash} from "node:crypto";
 import {gunzipSync} from "node:zlib";
-import avatarDelivery from "../lib/avatar-delivery-manifest.json" with {type:"json"};
+import avatarDelivery from "../lib/avatar-call-manifest.json" with {type:"json"};
 
 // Promotion smoke is read-only: no synthetic account creation, inference calls,
 // email or real conversations. Provider-backed evaluation is a separate gate.

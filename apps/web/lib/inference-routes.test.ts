@@ -37,6 +37,13 @@ describe("active inference route boundaries (mock providers)", () => {
     const response = await chat(request({ ...input, messages: [{ role: "user", content: "a".repeat(8001) }] }));
     expect(response.status).toBe(413); expect(mocks.provider).not.toHaveBeenCalled();
   });
+  it.each(["voice","video"])("delivers concise Hinglish facts without a repair roundtrip in %s", async delivery => {
+    mocks.provider.mockResolvedValue({response:"Riya Delhi gayi thi."});
+    const response=await chat(request({...input,delivery,messages:[{role:"user",content:"Meri behen Riya kal Delhi gayi thi."},{role:"assistant",content:"Uska safar kaisa tha?"},{role:"user",content:"Riya kahan gayi thi? Keep it short in Hinglish."}]}));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({reply:"Riya Delhi gayi thi."});
+    expect(mocks.provider).toHaveBeenCalledOnce();
+  });
   it("returns category-specific Hindi support without spending provider capacity", async () => {
     const response = await chat(request({ ...input, messages: [{ role: "user", content: "मुझे जीना नहीं है" }] }));
     const body = await response.json() as { reply: string; model: string };

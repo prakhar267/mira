@@ -23,6 +23,8 @@ describe("free chat inference", () => {
     expect(prompt).toContain("does not reset the conversation");
     expect(prompt).toContain("Answer short turns normally");
     expect(prompt).toContain("Never say you heard it wrong");
+    expect(prompt).toContain("A correction replaces the old fact");
+    expect(prompt).toContain("Keep first-person experiences with the user");
     expect(prompt.length).toBeLessThan(5_000);
   });
 

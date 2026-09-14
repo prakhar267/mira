@@ -3,14 +3,16 @@ import { gunzipSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { avatarDelivery, fetchAvatarDelivery } from "./avatar-delivery";
+import losslessDelivery from "./avatar-delivery-manifest.json";
 // @ts-expect-error Deliberate standalone Node asset tool.
 import { decodeGlb } from "../scripts/avatar-delivery.mjs";
 
 const asset = (path: string) => readFile(new URL(`../public${path}`, import.meta.url));
 afterEach(() => vi.unstubAllGlobals());
 
-describe("pixel-identical compressed avatar delivery", () => {
+describe("verified avatar delivery profiles", () => {
   it("preserves every geometry view, rig, expression and licence; textures decode to identical RGBA pixels", async () => {
+    const avatarDelivery = losslessDelivery;
     const source = decodeGlb(await asset("/assets/mira/avatar/mira-anime-live-v2.vrm"));
     const compressed = await asset(avatarDelivery.path), delivered = decodeGlb(gunzipSync(compressed));
     expect([...compressed.subarray(0, 10)]).toEqual([31, 139, 8, 0, 0, 0, 0, 0, 2, 255]);
@@ -34,6 +36,46 @@ describe("pixel-identical compressed avatar delivery", () => {
       expect(texture).toEqual({ sampler: source.model.textures[index].sampler, extensions: { EXT_texture_webp: { source: source.model.textures[index].source } } });
     });
   }, 30_000);
+
+  it("bounds the fast profile, preserves geometry/rig and verifies texture quality against resized originals", async () => {
+    const source = decodeGlb(await asset("/assets/mira/avatar/mira-anime-live-v2.vrm"));
+    const compressed = await asset(avatarDelivery.path), delivered = decodeGlb(gunzipSync(compressed));
+    expect(compressed.length).toBeLessThan(1_300_000);
+    expect(avatarDelivery.portraitBytes).toBeLessThan(40_000);
+    expect(avatarDelivery.pixelIdentical).toBe(false);
+    expect((await asset(avatarDelivery.rawPath)).equals(gunzipSync(compressed))).toBe(true);
+    for (const key of ["asset", "accessors", "nodes", "meshes", "skins", "materials", "scenes", "samplers", "extensions"]) expect(delivered.model[key]).toEqual(source.model[key]);
+    for (let index = 0; index < 879; index++) {
+      const old = source.model.bufferViews[index], next = delivered.model.bufferViews[index];
+      expect(delivered.binary.subarray(next.byteOffset, next.byteOffset + next.byteLength).equals(source.binary.subarray(old.byteOffset, old.byteOffset + old.byteLength))).toBe(true);
+    }
+    for (let index = 0; index < 19; index++) {
+      const view = source.model.bufferViews[source.model.images[index].bufferView];
+      const edge = index === 18 ? 384 : 1024;
+      const resized = await sharp(source.binary.subarray(view.byteOffset, view.byteOffset + view.byteLength)).resize({ width: edge, height: edge, fit: "inside", withoutEnlargement: true }).png().toBuffer();
+      const reference = await sharp(resized).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      const next = delivered.model.bufferViews[delivered.model.images[index].bufferView];
+      const output = await sharp(index === 18 ? await asset(avatarDelivery.portraitPath) : delivered.binary.subarray(next.byteOffset, next.byteOffset + next.byteLength)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      expect(output.info).toEqual(reference.info);
+      let error = 0, weight = 0;
+      for (let p = 0; p < output.data.length; p += 4) {
+        if (output.data[p + 3] !== reference.data[p + 3]) throw Error("Alpha changed");
+        const alpha = reference.data[p + 3]! / 255;
+        for (let c = 0; c < 3; c++) error += Math.abs(output.data[p + c]! - reference.data[p + c]!) * alpha;
+        weight += 3 * alpha;
+      }
+      expect(weight ? error / weight : 0).toBeLessThan(5);
+    }
+  }, 30_000);
+
+  it("uses the bounded fast raw GLB without downloading the original VRM on older browsers", async () => {
+    vi.stubGlobal("DecompressionStream", undefined);
+    const bytes = await asset(avatarDelivery.rawPath);
+    const mock = vi.fn().mockResolvedValue(new Response(bytes)); vi.stubGlobal("fetch", mock);
+    expect(Buffer.from(await fetchAvatarDelivery(new AbortController().signal)).equals(bytes)).toBe(true);
+    expect(mock).toHaveBeenCalledOnce();
+    expect(mock.mock.calls[0]?.[0]).toContain(avatarDelivery.rawPath);
+  });
 
   it("loads, bounds, verifies and decompresses the actual committed payload", async () => {
     const compressed = await asset(avatarDelivery.path);

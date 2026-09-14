@@ -66,6 +66,40 @@ An explicitly authorized, dedicated synthetic QA account may instead supply only
 
 Reports go to a new temporary directory by default, or `QA_DIRECTORY` with exclusive file creation. They contain release IDs, scenario/turn IDs, hashes, heuristic flags, bounded metadata and latency summaries—not raw inputs, generated replies, cookies or raw service exceptions. A script/language/anchor pass is not a semantic-quality score; P50/P95/P99 are small-sample chat-HTTP observations, not end-to-audible voice latency. Fluent human review and the [physical call protocol](REAL-DEVICE-CALL-QA.md) remain separate. Routine regression tests inject local HTTP/mocks and consume no live provider allowance.
 
+The evaluator now supports required **groups** of alternative fact anchors: a
+question about a person and a city must match both groups, not either one. It
+preserves explicitly selected scenario order (so the longest sequence can run
+first), records per-language latency summaries and distinguishes bounded style,
+safety and changed-context error codes. These are still review flags, not an
+automatic semantic judge.
+
+## Call-ready avatar delivery and repeatable slow-network lab
+
+The default call profile is described in [the avatar licence and derivative
+notice](../apps/web/public/assets/mira/avatar/LICENSE.md#call-ready-profile-default).
+It preserves geometry/rig bytes but deliberately uses smaller, high-quality
+textures. The original and pixel-identical derivative remain intact. Downloads
+start alongside the lazy 3D code only after opening a video call; hang-up aborts
+the owned request. A tiny portrait remains visible during loading. Both gzip
+and raw-browser compatibility paths are size- and SHA-256-verified.
+
+For a local Apple M4 comparison, after the browser build/check finishes:
+
+```sh
+pnpm --filter @companion/web build:vinext
+node apps/web/scripts/avatar-metal-lab.mjs --slow-network
+```
+
+This explicitly macOS-only diagnostic starts isolated compiled Workers runtime
+with blocked provider egress and synthetic media. It shapes the **call-opening**
+phase to 1.6 Mbps down/0.8 Mbps up/150 ms latency, uses a cold mobile-emulated
+393×851 viewport at DPR 1 with no CPU throttle, and requires the real Apple M4
+Metal renderer. Each run writes new temporary JSON/screenshots and verifies
+post-hang-up cleanup. Run three separate cold samples with no concurrent builds
+for a comparison. Draw submissions/rAF are not presented FPS or lip-sync proof;
+this is not a physical phone/acoustic or whole-page cold-start test. Do not run
+Next and vinext builds concurrently: both manage generated `.next` route types.
+
 ## Failure, migration and recovery boundary
 
 A failed post-deploy smoke is a release incident, not a success with a warning. Record SHA/version/request IDs, contain new admission if necessary, inspect content-free health/operator metrics, and choose a compatible forward fix or owner-approved rollback. Do not auto-retry deployment or purchase credits.

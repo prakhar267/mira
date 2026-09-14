@@ -18,7 +18,7 @@
   {"id":"two-people-and-gender","turns":[
     {"text":"Meri behen Riya kal Delhi gayi thi. Mera bhai Aman abhi Mumbai mein hai.","language":"hinglish"},
     {"text":"Aman called me because he lost his keys, not Riya","language":"en"},
-    {"text":"चाबी किसकी खोई है और वो किस शहर में है?","language":"hi","anchors":["अमन"]},
+    {"text":"चाबी किसकी खोई है और वो किस शहर में है?","language":"hi","anchorGroups":[["अमन","Aman"],["मुंबई","मुम्बई","Mumbai"]]},
     {"text":"Riya kahan gayi thi? Keep it short in Hinglish.","language":"hinglish","anchors":["Delhi","Dilli"]}
   ]},
   {"id":"ordinary-mixed-smalltalk","turns":[
@@ -48,9 +48,9 @@
     {"text":"Arjun just said he wants one good meal instead of lots of cafe stops","language":"en"},
     {"text":"mujhe bhi ye plan accha lag raha hai","language":"hinglish"},
     {"text":"Keep the plan simple, we are not trying to see everything","language":"en"},
-    {"text":"Do you remember who I'm travelling with and which city we're visiting?","language":"en","anchors":["Arjun"]},
+    {"text":"Do you remember who I'm travelling with and which city we're visiting?","language":"en","anchorGroups":[["Arjun"],["Jaipur"]]},
     {"text":"हम अब किस दिन सुबह निकल रहे हैं?","language":"hi","anchors":["रविवार"]},
     {"text":"Arjun ko kaisi jagah pasand nahi hai?","language":"hinglish","anchors":["bheed","crowd","bhid"]},
-    {"text":"In English, sum up our relaxed plan with the corrected departure day","language":"en","anchors":["Sunday"]}
+    {"text":"In English, sum up our relaxed plan with the corrected departure day","language":"en","anchorGroups":[["Sunday"],["Jaipur"],["Arjun"],["museum"]]}
   ]}
 ]
