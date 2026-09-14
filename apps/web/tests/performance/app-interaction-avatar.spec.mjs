@@ -52,6 +52,48 @@ test("three cold mobile-emulated app sessions record real interaction timing", a
   }
 });
 
+test("avatar pauses when hidden, resumes once, and falls back after actual WebGL context loss", async ({ browser }) => {
+  const { context, page, requests } = await coldMobilePage(browser);
+  try {
+    await syntheticCallMedia(page);
+    await observeAvatar(page);
+    await enterDemo(page);
+    await page.getByRole("button", { name: "Chat", exact: true }).tap();
+    await page.getByRole("button", { name: "Start video call with Mira", exact: true }).tap();
+    await expect(page.locator(".live-avatar-3d--ready")).toBeVisible({ timeout: 90_000 });
+    const canvas = page.locator(".live-avatar-3d__canvas");
+    expect(await canvas.evaluate(element => element.width * element.height)).toBeLessThanOrEqual(601_600);
+    // Exercise the visibility listener deterministically without taking over
+    // the user's foreground browser or claiming a physical backgrounding test.
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const paused = await page.evaluate(() => window.__miraAvatarLab.drawCalls);
+    await page.waitForTimeout(350);
+    expect(await page.evaluate(() => window.__miraAvatarLab.drawCalls)).toBe(paused);
+    await page.evaluate(() => {
+      delete document.hidden;
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect.poll(() => page.evaluate(() => window.__miraAvatarLab.drawCalls)).toBeGreaterThan(paused);
+    await canvas.evaluate(element => {
+      const context = element.getContext("webgl2");
+      const extension = context?.getExtension("WEBGL_lose_context");
+      if (!extension) throw new Error("WebGL loss testing is unavailable");
+      extension.loseContext();
+    });
+    await expect(page.locator(".live-avatar-3d--fallback")).toBeVisible();
+    await expect(page.getByText("3D is unavailable on this device · using anime portrait mode", { exact: true })).toBeVisible();
+    const lost = await page.evaluate(() => window.__miraAvatarLab.drawCalls);
+    await page.waitForTimeout(350);
+    expect(await page.evaluate(() => window.__miraAvatarLab.drawCalls)).toBe(lost);
+    await page.getByRole("button", { name: "End video call", exact: true }).tap();
+    await expect(page.getByRole("dialog", { name: "Video call with Mira", exact: true })).toHaveCount(0);
+    expect(requests).toMatchObject({ chat: 0, speech: 1, unexpected: [] });
+  } finally { await context.close(); }
+});
+
 test("cold video avatar records load, real WebGL activity and frame-timing proxies", async ({ browser }, testInfo) => {
   const { context, page, requests } = await coldMobilePage(browser);
   const evidence = { measuredAt: new Date().toISOString(), conditions,
@@ -73,14 +115,15 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
     const loaded = await page.evaluate(() => ({ ...window.__miraAvatarLab }));
     evidence.load = { callStartToReadyMs: loaded.readyAt - callStartedAt, callStartToFirstDrawMs: loaded.firstDrawAt - callStartedAt, ...loaded };
     evidence.samples.push(await sampleAvatarCadence(page, "synthetic-speaking"));
+    await page.screenshot({ path: testInfo.outputPath("avatar-speaking-mobile.png") });
     await page.evaluate(() => window.__miraLabMedia.activeAudio.finish());
     await expect(dialog.getByRole("button", { name: "Listening automatically", exact: true })).toBeVisible();
     evidence.samples.push(await sampleAvatarCadence(page, "synthetic-listening"));
     await recordInteraction(page, "hide-call-captions", () => dialog.getByRole("button", { name: "Hide captions", exact: true }).tap(),
       () => expect(page.locator(".video-call__captions")).toHaveCount(0));
+    await page.screenshot({ path: testInfo.outputPath("avatar-mobile-ready.png") });
     await recordInteraction(page, "open-call-activity", () => dialog.getByRole("button", { name: "Activity", exact: true }).tap(),
       () => expect(page.locator(".call-activity-menu")).toBeVisible());
-    await page.screenshot({ path: testInfo.outputPath("avatar-mobile-ready.png") });
     await recordInteraction(page, "end-video-call", () => dialog.getByRole("button", { name: "End video call", exact: true }).tap(),
       () => expect(dialog).toHaveCount(0));
     await expect.poll(() => page.evaluate(() => window.__miraLabMedia.stopped)).toBeGreaterThan(0);

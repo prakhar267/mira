@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { type VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+import { type VRM, MToonMaterial, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { AvatarResolutionBudget, avatarFrameInterval, avatarPixelRatio, avatarSmoothing } from "../lib/avatar-render-policy";
 
 export type AvatarMouthPose = 0 | 1 | 2 | 3;
 export type AvatarEmotion = "natural" | "happy" | "playful" | "tender" | "intimate" | "sad" | "angry";
@@ -38,12 +39,20 @@ function prepareAvatar(root: THREE.Object3D) {
     object.frustumCulled = false;
     object.castShadow = false;
     object.receiveShadow = false;
+    // MToon outline passes duplicate skinned draws and shimmer at call-sized
+    // resolutions. Keep the authored textured surface, omit only the extra
+    // inverted-hull pass; facial features remain in the original textures.
+    for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+      if (material instanceof MToonMaterial && material.isOutline) material.visible = false;
+    }
   });
 }
 
 function disposeObject(root: THREE.Object3D) {
+  const skeletons = new Set<THREE.Skeleton>();
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
+    if (object instanceof THREE.SkinnedMesh) skeletons.add(object.skeleton);
     object.geometry.dispose();
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) {
@@ -53,6 +62,7 @@ function disposeObject(root: THREE.Object3D) {
       material.dispose();
     }
   });
+  for (const skeleton of skeletons) skeleton.dispose();
 }
 
 export function LiveAvatar3D({
@@ -102,21 +112,28 @@ export function LiveAvatar3D({
     let pointerX = 0;
     let pointerY = 0;
     let modelLoaded = false;
-    let stableFrames = 0;
+    let renderFailed = false;
+    let ready = false;
+    const resolutionBudget = new AvatarResolutionBudget();
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "high-performance" });
+      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "default" });
     } catch (cause) {
       console.warn("3D avatar renderer unavailable", cause);
       setLoadState("fallback");
       return;
     }
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.45));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.04;
+    const onContextLost = () => {
+      renderFailed = true;
+      window.cancelAnimationFrame(frame);
+      if (active) setLoadState("fallback");
+    };
+    canvas.addEventListener("webglcontextlost", onContextLost);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(28, 1, .05, 20);
@@ -147,6 +164,10 @@ export function LiveAvatar3D({
       avatar = loadedVrm.scene;
       avatar.name = "MiraOpenLicensedAnimeAvatar";
       VRMUtils.rotateVRM0(loadedVrm);
+      // Official VRM optimizers preserve authored expression bindings while
+      // removing repeated skeleton work and unused per-vertex morph channels.
+      VRMUtils.combineSkeletons(avatar);
+      VRMUtils.combineMorphs(loadedVrm);
       prepareAvatar(avatar);
 
       const sourceBounds = new THREE.Box3().setFromObject(avatar);
@@ -190,6 +211,8 @@ export function LiveAvatar3D({
       modelLoaded = true;
     }).catch((cause) => {
       console.warn("Anime VRM avatar failed to load", cause);
+      renderFailed = true;
+      window.cancelAnimationFrame(frame);
       if (active) setLoadState("fallback");
     });
 
@@ -197,6 +220,7 @@ export function LiveAvatar3D({
       const bounds = canvas.getBoundingClientRect();
       const width = Math.max(1, Math.round(bounds.width));
       const height = Math.max(1, Math.round(bounds.height));
+      renderer.setPixelRatio(avatarPixelRatio(width, height, window.devicePixelRatio) * resolutionBudget.scale);
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       const compact = width < 720;
@@ -219,56 +243,61 @@ export function LiveAvatar3D({
 
     const startedAt = performance.now();
     let lastFrameAt = startedAt;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let lastCallbackAt = startedAt;
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onVisibilityChange = () => {
+      window.cancelAnimationFrame(frame);
+      lastFrameAt = lastCallbackAt = performance.now();
+      if (active && !renderFailed && !document.hidden) frame = window.requestAnimationFrame(animate);
+    };
     const animate = () => {
+      if (!active || renderFailed || document.hidden) return;
       frame = window.requestAnimationFrame(animate);
       const now = performance.now();
-      const delta = Math.min((now - lastFrameAt) / 1_000, .05);
+      const callbackGap = now - lastCallbackAt;
+      lastCallbackAt = now;
+      const reducedMotion = motionPreference.matches;
+      const state = stateRef.current;
+      if (!modelLoaded || now - lastFrameAt < avatarFrameInterval(state.speaking, reducedMotion) - 1) return;
+      const delta = Math.min((now - lastFrameAt) / 1_000, .1);
       const elapsed = (now - startedAt) / 1_000;
       lastFrameAt = now;
-      const state = stateRef.current;
-      const pose = targetForPose(state.mouthPose);
+      if (ready && resolutionBudget.observe(callbackGap)) resize();
+      const smooth = (coefficient: number) => avatarSmoothing(coefficient, delta);
+      const pose = targetForPose(state.speaking ? state.mouthPose : 0);
       const expression = emotionTargets(state.emotion);
 
       if (vrm) {
-        setExpression(vrm, "blink", state.blinking ? 1 : 0, state.blinking ? .76 : .34);
-        setExpression(vrm, "aa", pose.aa, .4);
-        setExpression(vrm, "ee", pose.ee, .4);
-        setExpression(vrm, "ih", pose.ih, .4);
-        setExpression(vrm, "oh", pose.oh, .4);
-        setExpression(vrm, "ou", pose.ou, .4);
-        setExpression(vrm, "happy", expression.happy, .11);
-        setExpression(vrm, "relaxed", expression.relaxed, .11);
-        setExpression(vrm, "sad", expression.sad, .11);
-        setExpression(vrm, "angry", expression.angry, .11);
-        setExpression(vrm, "surprised", expression.surprised, .11);
+        setExpression(vrm, "blink", state.blinking ? 1 : 0, smooth(state.blinking ? .76 : .34));
+        for (const [name, target] of Object.entries(pose)) setExpression(vrm, name, target, smooth(.4));
+        for (const [name, target] of Object.entries(expression)) setExpression(vrm, name, target, smooth(.11));
 
         const movement = reducedMotion ? 0 : state.speaking ? 1 : .42;
         if (spine && spineBase) {
-          const breath = Math.sin(elapsed * 1.08) * .0045;
-          spine.position.y = THREE.MathUtils.lerp(spine.position.y, spineBaseY + breath, .055);
+          const breath = reducedMotion ? 0 : Math.sin(elapsed * 1.08) * .0045;
+          spine.position.y = THREE.MathUtils.lerp(spine.position.y, spineBaseY + breath, smooth(.055));
           spine.rotation.x = spineBase.x + Math.sin(elapsed * 1.25) * .009 * movement;
-          spine.rotation.z = spineBase.z + Math.sin(elapsed * .48) * .008;
+          spine.rotation.z = spineBase.z + Math.sin(elapsed * .48) * .008 * movement;
         }
         if (neck && neckBase) {
-          neck.rotation.y = THREE.MathUtils.lerp(neck.rotation.y, neckBase.y + pointerX * -.045 + Math.sin(elapsed * .34) * .014, .035);
-          neck.rotation.x = THREE.MathUtils.lerp(neck.rotation.x, neckBase.x + pointerY * .025 + Math.sin(elapsed * .53) * .007, .035);
+          neck.rotation.y = THREE.MathUtils.lerp(neck.rotation.y, neckBase.y + (pointerX * -.045 + Math.sin(elapsed * .34) * .014) * movement, smooth(.035));
+          neck.rotation.x = THREE.MathUtils.lerp(neck.rotation.x, neckBase.x + (pointerY * .025 + Math.sin(elapsed * .53) * .007) * movement, smooth(.035));
         }
         if (head && headBase) {
           const conversationalNod = state.speaking
             ? Math.sin(elapsed * 2.05) * .016
             : state.listening ? Math.max(0, Math.sin(elapsed * .72)) * .009 : Math.sin(elapsed * .47) * .006;
           const thinkingTurn = state.thinking ? .045 : 0;
-          head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, headBase.x + conversationalNod, .04);
-          head.rotation.y = THREE.MathUtils.lerp(head.rotation.y, headBase.y + thinkingTurn + pointerX * -.022, .032);
-          head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, headBase.z + Math.sin(elapsed * .27) * .012, .035);
+          head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, headBase.x + conversationalNod * movement, smooth(.04));
+          head.rotation.y = THREE.MathUtils.lerp(head.rotation.y, headBase.y + (thinkingTurn + pointerX * -.022) * movement, smooth(.032));
+          head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, headBase.z + Math.sin(elapsed * .27) * .012 * movement, smooth(.035));
         }
         const eyeSaccadeX = reducedMotion ? 0 : Math.sin(elapsed * .83) * .012 + Math.sin(elapsed * 2.17) * .004;
         const eyeSaccadeY = reducedMotion ? 0 : Math.sin(elapsed * .57) * .006;
         for (const [eye, base] of [[leftEye, leftEyeBase], [rightEye, rightEyeBase]] as const) {
           if (!eye || !base) continue;
-          eye.rotation.y = THREE.MathUtils.lerp(eye.rotation.y, base.y + pointerX * -.035 + eyeSaccadeX + (state.thinking ? .025 : 0), .08);
-          eye.rotation.x = THREE.MathUtils.lerp(eye.rotation.x, base.x + pointerY * .018 + eyeSaccadeY, .08);
+          eye.rotation.y = THREE.MathUtils.lerp(eye.rotation.y, base.y + (reducedMotion ? 0 : pointerX * -.035 + eyeSaccadeX + (state.thinking ? .025 : 0)), smooth(.08));
+          eye.rotation.x = THREE.MathUtils.lerp(eye.rotation.x, base.x + (reducedMotion ? 0 : pointerY * .018 + eyeSaccadeY), smooth(.08));
         }
 
         // The current VRM 1 avatar has a stable standards-compliant spring rig.
@@ -277,18 +306,21 @@ export function LiveAvatar3D({
         vrm.update(delta);
       }
 
-      camera.lookAt(pointerX * -.012, 1.45 + pointerY * -.008, 0);
+      camera.lookAt(reducedMotion ? 0 : pointerX * -.012, 1.45 + (reducedMotion ? 0 : pointerY * -.008), 0);
       renderer.render(scene, camera);
-      if (modelLoaded && stableFrames < 12) {
-        stableFrames += 1;
-        if (stableFrames === 12 && active) setLoadState("ready");
+      if (!ready) {
+        ready = true;
+        setLoadState("ready");
       }
     };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     animate();
 
     return () => {
       active = false;
       window.cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      canvas.removeEventListener("webglcontextlost", onContextLost);
       resizeObserver.disconnect();
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);

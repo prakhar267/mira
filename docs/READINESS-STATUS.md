@@ -2,7 +2,13 @@
 
 Updated 14 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
 
-## Verified live release
+## Avatar optimization follow-up
+
+The [avatar performance follow-up](AVATAR-PERFORMANCE.md) reduces the model losslessly from 10.78 MB to 9.00 MB, bounds rendering work, improves reduced-motion handling, and adds hidden-tab/context-loss cleanup checks to CI. It preserves Priya and the character's original rig/textures. This is implementation/test evidence, not physical-device acceptance. A merge alone does not deploy; use `/api/health` and the corresponding promotion record to identify the live source.
+
+GitHub's production account ID is now configured; the scoped Cloudflare API token is still missing. The sender, backup/authority placement, alert destination/ownership and independent acceptance inputs below remain unresolved. The historical baseline and its exact deployment evidence follow.
+
+## Verified hardening release baseline
 
 - Application source: `f2d00cb4694d20f93b81c2c35e754dc8b7eeec60`, merged through [PR #3](https://github.com/prakhar267/mira/pull/3).
 - [Main CI 34825950777](https://github.com/prakhar267/mira/actions/runs/34825950777): workspace lint/typecheck/build, **395 web tests**, **35 actual Worker tests**, **90 compiled browser tests**, asset/dependency checks, three independent artifact cold starts, and sealed upload/download integrity all passed.
