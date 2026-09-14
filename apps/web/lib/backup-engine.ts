@@ -1,18 +1,12 @@
 import { z } from "zod";
 import { accountMessageSchema, decodeAccountState } from "./account-state-schema";
 import type { SqlStorage, StoreEngine } from "./store-engine";
-import { RecoveryJournal, type RecoveryEvent } from "./recovery-journal";
+import { RecoveryJournal, recoveryEventSchema as event, type RecoveryEvent } from "./recovery-journal";
 import { BACKUP_CHUNK_BYTES, BACKUP_MAX_BYTES, BACKUP_MAX_CHUNKS, type SealedBackup } from "./backup-crypto";
 
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,120}$/);
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const flag = z.union([z.literal(0), z.literal(1)]);
-const event = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("account"), userId: id }).strict(),
-  z.object({ kind: z.literal("memory"), userId: id, id }).strict(),
-  z.object({ kind: z.literal("conversation"), userId: id, id }).strict(),
-  z.object({ kind: z.literal("privacy"), userId: id, revision: integer, ai: z.boolean(), history: z.boolean(), memory: z.boolean() }).strict(),
-]);
 const rows = {
   records: z.object({ key: z.string().regex(/^(?:account|email|state|account-policy):[A-Za-z0-9_-]{1,120}$/), value: z.string().max(1_500_000).nullable(), expires: integer.nullable(), deleted: flag }).strict(),
   transcripts: z.object({ user_id: id, id, created_at: z.string().max(40), value: z.string().max(100_000) }).strict(),

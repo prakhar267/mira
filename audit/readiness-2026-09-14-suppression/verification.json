@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-14",
+  "baseCommit": "424dad9069e063662ce3379380481e87276d7fe3",
+  "scope": "Dormant independent suppression authority and source acknowledgement; not recovery admission",
+  "web": {"passed": 329, "total": 329, "files": 42, "seconds": 4.64},
+  "worker": {"passed": 30, "total": 30, "files": 6, "seconds": 14.25},
+  "focusedAuthorityAndReplication": {"tests": 27},
+  "newWorkerHandlerScenarios": {"passed": 6, "total": 6},
+  "eslint": "passed",
+  "routeGenerationAndTypecheck": "passed",
+  "review": {"scope": "bounded code review, not independent security assessment", "legacyImportProtectionRace": "fixed and covered by actual workerd regression"},
+  "sourceLossFixture": {"sourceSQLiteFileRemoved": true, "separateAuthoritySQLiteReopened": true, "acknowledgedEventsPreserved": 7, "sourceLossRestoreAdmission": false, "offsite": false},
+  "externalProviderRequests": 0,
+  "consumerDataExported": false,
+  "productionProtectionActivated": false,
+  "newInfrastructureProvisioned": false,
+  "paymentsEnabled": false,
+  "remaining": ["independent authenticated authority deployment", "complete bootstrap coverage", "serving leases and drain fence", "target-bound source-loss recovery admission and handoff", "live offsite recovery drill", "real mail and alert delivery", "physical voice/video and screen-reader acceptance", "independent security/legal/provider review"]
+}

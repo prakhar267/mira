@@ -1,0 +1,42 @@
+{
+  "at": "2026-09-14T06:23:33.443Z",
+  "baseUrl": "https://luma-companion.prakhargupta267.workers.dev",
+  "versionId": "47d4a3bb-a44a-48fd-82aa-281a30655916",
+  "expectedCommit": "424dad9069e063662ce3379380481e87276d7fe3",
+  "providerRequests": 0,
+  "accountMutations": 0,
+  "unverified": [
+    "provider response quality",
+    "physical microphone/playback",
+    "email and alert delivery"
+  ],
+  "passed": 5,
+  "total": 5,
+  "results": [
+    {
+      "name": "public site and security headers",
+      "passed": true,
+      "detail": "application reachable; CSP/HSTS/frame protection present"
+    },
+    {
+      "name": "public free-beta pages",
+      "passed": true,
+      "detail": "demo, account entry, recovery and disclosures reachable"
+    },
+    {
+      "name": "account-page boundary",
+      "passed": true,
+      "detail": "redirects unauthenticated page to login; API boundaries covered in Worker suite"
+    },
+    {
+      "name": "operational health and exact release correlation",
+      "passed": true,
+      "detail": "Worker version 47d4a3bb-a44a-48fd-82aa-281a30655916; commit 424dad9069e063662ce3379380481e87276d7fe3; inference not probed"
+    },
+    {
+      "name": "avatar asset availability",
+      "passed": true,
+      "detail": "asset reachable; no claim about frame rate or lip sync"
+    }
+  ]
+}
