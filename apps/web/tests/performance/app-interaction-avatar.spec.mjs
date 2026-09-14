@@ -189,7 +189,16 @@ test("actual avatar drawing followed by severe rendering stalls uses an explicit
     await expect(page.locator(".live-avatar-3d--limited")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("status").filter({ hasText: "Animation paused" })).toBeVisible();
     await expect(page.locator(".live-avatar-3d__canvas")).toHaveAttribute("aria-hidden", "true");
-    await expect(page.getByRole("img", { name: "Mira, anime companion portrait", exact: true })).toBeVisible();
+    const portrait = page.getByRole("img", { name: "Mira, anime companion portrait", exact: true });
+    await expect(portrait).toBeVisible();
+    const portraitStyle = await portrait.evaluate(element => ({ fit: getComputedStyle(element).objectFit,
+      filter: getComputedStyle(element).filter, width: element.getBoundingClientRect().width,
+      height: element.getBoundingClientRect().height, viewport: innerWidth }));
+    expect(portraitStyle.fit).toBe("contain");
+    expect(portraitStyle.filter).not.toContain("blur");
+    expect(portraitStyle.width).toBeLessThan(portraitStyle.viewport);
+    expect(Math.abs(portraitStyle.width - portraitStyle.height)).toBeLessThan(2);
+    await page.screenshot({ path: testInfo.outputPath("performance-portrait-mobile.png") });
     const paused = await page.evaluate(() => window.__miraAvatarLab.drawCalls);
     await page.waitForTimeout(450);
     expect(await page.evaluate(() => window.__miraAvatarLab.drawCalls)).toBe(paused);

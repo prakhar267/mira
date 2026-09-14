@@ -1573,6 +1573,23 @@ select {
 }
 .live-avatar-3d--ready .live-avatar-3d__canvas { opacity: 1; }
 .live-avatar-3d--ready .live-avatar-3d__fallback { opacity: 0; }
+/* A persistent fallback is a deliberate portrait, not the blurred, tightly
+   cropped loading placeholder. Keep the whole face clear on narrow phones. */
+.live-avatar-3d:is(.live-avatar-3d--limited, .live-avatar-3d--fallback) .live-avatar-3d__fallback {
+  inset: auto;
+  top: 43%;
+  left: 50%;
+  width: min(78vw, 46vh, 420px);
+  height: auto;
+  aspect-ratio: 1;
+  border: 2px solid rgba(255,255,255,.18);
+  border-radius: 50%;
+  object-fit: contain;
+  object-position: center;
+  filter: brightness(.94);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 18px 80px rgba(0,0,0,.3);
+}
 .live-avatar-3d__loading {
   position: absolute;
   z-index: 3;
@@ -1588,6 +1605,12 @@ select {
   font-size: 9px;
   letter-spacing: .04em;
   white-space: nowrap;
+}
+.live-avatar-3d:is(.live-avatar-3d--limited, .live-avatar-3d--fallback) .live-avatar-3d__loading {
+  top: calc(43% + min(39vw, 23vh, 210px) + 28px);
+  max-width: calc(100% - 32px);
+  text-align: center;
+  white-space: normal;
 }
 .video-call__feed-badge { position: absolute; z-index: 4; left: 22px; bottom: 20px; display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: rgba(12,9,8,.62); color: rgba(255,255,255,.82); font-size: 8px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; backdrop-filter: blur(10px); }
 .video-call__status {

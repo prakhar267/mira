@@ -11,6 +11,7 @@ This work addresses the measured avatar bottleneck. It does **not** certify phys
 - The backing framebuffer is limited to approximately 600,000 pixels before bounded adaptive downscaling. Sustained slow callbacks can reduce its scale to 0.75; isolated spikes/background stalls do not. Resolution never oscillates upward/downward during one call.
 - Hidden tabs stop requesting animation frames and reset timing when resumed. A lost WebGL context or failed load displays the existing portrait fallback. Hang-up removes listeners, cancels animation and disposes skeleton resources as well as geometry/materials/textures.
 - Eight consecutive rendering callbacks slower than 180 ms trigger a clearly labelled portrait mode for the rest of that call. This prevents sustained GPU stalls from monopolizing call controls. A new call retries animation. One isolated OS/shader stall does not trigger it. Background transitions clear the observation window. Timings above 250 ms are **not** discarded as outliers indefinitely.
+- Persistent performance/context-loss fallbacks show a sharp, framed full-face portrait, not the zoomed and blurred loading placeholder. The call controls and explicit non-animated status remain available; no lip-sync claim is made in portrait mode.
 - Reduced-motion changes are observed during the call. Decorative head, neck, eye and breathing offsets are suppressed while speech expressions remain available.
 
 ## Verification scope
