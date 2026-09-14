@@ -5,6 +5,8 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 import { compactAvatar } from "./compact-avatar.mjs";
+import { packAvatarMesh } from "./avatar-mesh-delivery.mjs";
+import { boundCallPrecision } from "./avatar-call-precision.mjs";
 
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const align = n => Math.ceil(n / 4) * 4;
@@ -19,7 +21,7 @@ export function decodeGlb(bytes) {
 
 // The archival delivery is pixel-identical. The separate call profile resizes
 // and compresses textures, never geometry, rigs or expressions.
-export async function buildAvatarDelivery(source, { fast = false } = {}) {
+export async function buildAvatarDelivery(source, { fast = false, meshProfile = false } = {}) {
   // Node's version alone is insufficient: Homebrew links Apple's zlib 1.2.12,
   // while official Node 24.18.0 uses this pinned compressor on macOS/Linux.
   assert.equal(process.versions.zlib, "1.3.1-e00f703", "Use the official Node 24.18.0 binary for deterministic avatar generation/checks (not a system-zlib build)");
@@ -92,6 +94,7 @@ export async function buildAvatarDelivery(source, { fast = false } = {}) {
   glb.fill(32, 20, 20 + jsonLength); json.copy(glb, 20);
   glb.writeUInt32LE(length, 20 + jsonLength); glb.writeUInt32LE(0x004e4942, 24 + jsonLength);
   Buffer.concat(payloads).copy(glb, 28 + jsonLength);
+  const precision = meshProfile ? boundCallPrecision(glb, model, 28 + jsonLength) : undefined;
   const gzip = gzipSync(glb, { level: 9 });
   // RFC 1952 OS=255 means unknown. zlib otherwise stamps the host OS (19 on
   // macOS, 3 on Linux), changing the hash of identical compressed content.
@@ -100,22 +103,31 @@ export async function buildAvatarDelivery(source, { fast = false } = {}) {
   gzip[9] = 255;
   assert.ok(gunzipSync(gzip).equals(glb), "Gzip must preserve every GLB byte");
   assert.ok(gzip.length < (fast ? 1_300_000 : 3_500_000) && portrait.length < (fast ? 40_000 : 600_000), `Delivery budgets exceeded: model=${gzip.length}, portrait=${portrait.length}`);
-  const profile = fast ? "call-v2" : "delivery-v1";
+  const profile = meshProfile ? "call-v3" : fast ? "call-v2" : "delivery-v1";
   const manifest = { sourceSha256: sourceDigest, path: `/assets/mira/avatar/mira-anime-${profile}.glb.gz`, bytes: gzip.length,
     sha256: digest(gzip), decodedBytes: glb.length, decodedSha256: digest(glb),
     portraitPath: `/assets/mira/avatar/mira-anime-${fast ? "preview-v2" : "portrait-v1"}.webp`, portraitBytes: portrait.length, portraitSha256: digest(portrait), images,
-    ...(fast ? { rawPath: `/assets/mira/avatar/mira-anime-${profile}.glb`, textureMaxEdge: 1024, textureQuality: 90, pixelIdentical: false, geometryIdentical: true } : {}) };
-  return { gzip, glb, portrait, manifest };
+    ...(fast ? { rawPath: `/assets/mira/avatar/mira-anime-${profile}.glb`, textureMaxEdge: 1024, textureQuality: 90, pixelIdentical: false, geometryIdentical: !meshProfile, ...(precision ? { precision } : {}) } : {}) };
+  let mesh;
+  if (meshProfile) {
+    const packed = await packAvatarMesh(glb, model, 28 + jsonLength);
+    mesh = gzipSync(packed, { level: 9 }); mesh[9] = 255;
+    assert.ok(mesh.length < 900_000, `Mesh delivery budget exceeded: ${mesh.length}`);
+    Object.assign(manifest, { meshPath: "/assets/mira/avatar/mira-anime-call-v3.mesh.gz", meshBytes: mesh.length,
+      meshSha256: digest(mesh), meshPackedBytes: packed.length });
+  }
+  return { gzip, glb, portrait, manifest, mesh };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
- for (const fast of [false, true]) {
-  const result = await buildAvatarDelivery(await readFile(new URL("../public/assets/mira/avatar/mira-anime-live-v2.vrm", import.meta.url)), { fast });
+ for (const [fast, meshProfile] of [[false, false], [true, false], [true, true]]) {
+  const result = await buildAvatarDelivery(await readFile(new URL("../public/assets/mira/avatar/mira-anime-live-v2.vrm", import.meta.url)), { fast, meshProfile });
   const files = [
     ["../public" + result.manifest.path, result.gzip],
     ["../public" + result.manifest.portraitPath, result.portrait],
-    [`../lib/avatar-${fast ? "call" : "delivery"}-manifest.json`, Buffer.from(JSON.stringify(result.manifest, null, 2) + "\n")],
+    [`../lib/avatar-${meshProfile ? "call" : fast ? "call-v2" : "delivery"}-manifest.json`, Buffer.from(JSON.stringify(result.manifest, null, 2) + "\n")],
     ...(fast ? [["../public" + result.manifest.rawPath, result.glb]] : []),
+    ...(meshProfile ? [["../public" + result.manifest.meshPath, result.mesh]] : []),
   ];
   for (const [path, bytes] of files) {
     const url = new URL(path, import.meta.url);

@@ -14,7 +14,7 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
     || (language==="hi"&&/^(?:मैं|मैंने|मुझे)(?![\p{L}\p{M}])/u.test(latest));
   const correction=/\b(?:actually|correct(?:ion|ed)?|changed|reschedul\w*|instead|nahi sorry)\b|(?:बदल|वजह|नहीं.{0,24}(?:भाई|बहन|दोस्त))/iu.test(latest);
   const cues=[draft
-    ? "Current task: provide the user's ready-to-send wording addressed directly to the recipient. The sender is the user, not Mira."
+    ? "Current task: provide ONLY the user's ready-to-send wording addressed directly to the recipient, without a preface or quotation marks. The sender is the user, not Mira."
     : "Perspective: the user's relatives and offline plans belong to the user. Address them as you/your, tum/tumhara, or तुम/तुम्हारा. Mira is not a participant in their offline trip or event."];
   if(rewrite)cues.push("Continue the existing task in the requested language/length. Preserve its meaning and addressee. Use the user's first-person voice only for an explicitly requested draft, not for your own account of their life.");
   if(ownExperience)cues.push(language==="hi"
@@ -22,6 +22,6 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
     : "The latest speaker is the USER describing their OWN experience. Keep that experience with the user, even if another person in the history has a related interest. Address the user directly.");
   if(correction)cues.push(language==="hi"
     ? "बताया गया बदलाव और उसकी बताई हुई वजह ही स्वीकार करें। अपने-आप कोई नई परिस्थिति न जोड़ें। पहले की गलत जानकारी को दोहराएँ नहीं।"
-    : "Current task: acknowledge the corrected fact/timing and retain any stated reason. Replace the old fact; infer no additional circumstance or consequence. Continue the user's existing task.");
+    : "Current task: acknowledge the corrected fact/timing and retain any stated reason in ONE short sentence, without a follow-up question. Replace the old fact; infer no additional circumstance or consequence. Continue the user's existing task.");
   return cues.join(" ");
 }

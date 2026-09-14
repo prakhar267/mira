@@ -1,0 +1,109 @@
+{
+  "at": "2026-09-14T21:47:30.824Z",
+  "sourceArtifact": "Local compiled app; this is not proof of a sealed release or a deployment",
+  "rawReportSha256": "01fe7f897770d1aa2b0f13c6b3b9127082d50746fefcc5b6a341326005e2c8bb",
+  "conditions": "Headless Chromium with ANGLE Metal on this Apple M4 Mac; 393x851 mobile emulation, DPR1, no CPU throttle, loopback network. Actual GPU, synthetic audio and microphone. Not an iPhone or an acoustic test.",
+  "network": "After demo entry, CDP shaped loopback: 1.6 Mbps down, 0.8 Mbps up, 150ms latency; cold cache. Not a physical cellular connection.",
+  "providerRequests": 0,
+  "realMicrophoneRequests": 0,
+  "load": {
+    "drawCalls": 65,
+    "contextLost": 0,
+    "firstDrawAt": 9863.59999999404,
+    "readyAt": 9942.69999999553,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+    "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "callToReadyMs": 9268.89999999851
+  },
+  "samples": [
+    {
+      "label": "metal-synthetic-speaking",
+      "elapsedMs": 4014.3000000044703,
+      "drawCalls": 1560,
+      "rAFCallbacks": 241,
+      "medianRAFIntervalMs": 16.69999999999891,
+      "maxRAFIntervalMs": 16.80000000000109,
+      "intervalsOver50ms": 0,
+      "interpretation": "Instrumented WebGL draw submissions and rAF frame-timing proxy, not actual presented avatar FPS or perceptual lip-sync.",
+      "rawFrameCount": 240
+    },
+    {
+      "label": "metal-synthetic-listening",
+      "elapsedMs": 4003.8000000044703,
+      "drawCalls": 1053,
+      "rAFCallbacks": 241,
+      "medianRAFIntervalMs": 16.69999999999891,
+      "maxRAFIntervalMs": 16.80000000000291,
+      "intervalsOver50ms": 0,
+      "interpretation": "Instrumented WebGL draw submissions and rAF frame-timing proxy, not actual presented avatar FPS or perceptual lip-sync.",
+      "rawFrameCount": 240
+    }
+  ],
+  "final": {
+    "avatar": {
+      "drawCalls": 2782,
+      "contextLost": 0,
+      "firstDrawAt": 9863.59999999404,
+      "readyAt": 9942.69999999553,
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    },
+    "interactions": [
+      {
+        "label": "metal-end-video-call",
+        "confirmationWallMs": 55.100000001490116,
+        "observedInteractions": [
+          {
+            "interactionId": 8450,
+            "durationMs": 32
+          }
+        ],
+        "events": [
+          {
+            "name": "pointerdown",
+            "interactionId": 8450,
+            "startTime": 18469.19999999553,
+            "durationMs": 32,
+            "inputDelayMs": 15.200000002980232,
+            "processingMs": 0,
+            "approximatePresentationDelayMs": 16.799999997019768
+          },
+          {
+            "name": "pointerup",
+            "interactionId": 8450,
+            "startTime": 18469.19999999553,
+            "durationMs": 32,
+            "inputDelayMs": 15.300000004470348,
+            "processingMs": 0,
+            "approximatePresentationDelayMs": 16.69999999552965
+          },
+          {
+            "name": "click",
+            "interactionId": 8450,
+            "startTime": 18469.19999999553,
+            "durationMs": 32,
+            "inputDelayMs": 15.800000004470348,
+            "processingMs": 2.899999998509884,
+            "approximatePresentationDelayMs": 13.299999997019768
+          }
+        ],
+        "missingEventInterpretation": null
+      }
+    ],
+    "media": {
+      "requested": 1,
+      "stopped": 1,
+      "activeTracks": 0,
+      "cameraRequested": 0
+    }
+  },
+  "assets": [
+    {
+      "path": "/assets/mira/avatar/mira-anime-call-v3.mesh.gz",
+      "durationMs": 8559.5,
+      "bytes": 888738,
+      "transferBytes": 889038
+    }
+  ],
+  "passed": true
+}

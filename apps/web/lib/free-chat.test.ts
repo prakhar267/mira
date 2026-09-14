@@ -25,7 +25,9 @@ describe("free chat inference", () => {
     expect(prompt).toContain("Never say you heard it wrong");
     expect(prompt).toContain("A correction replaces the old fact");
     expect(prompt).toContain("Keep first-person experiences with the user");
-    expect(prompt.length).toBeLessThan(5_000);
+    expect(prompt).toContain("never ask again about a feeling");
+    expect(prompt).toContain("without guessing benefits");
+    expect(prompt.length).toBeLessThan(4_300);
   });
 
   it("reads OpenAI-compatible text and the selected model safely", () => {

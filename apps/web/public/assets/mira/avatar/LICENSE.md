@@ -44,7 +44,7 @@ transport, without a runtime decoder download or paid image service.
 
 The original VRM/PNG remain available for compatibility and provenance.
 
-## Call-ready profile (default)
+## Call-ready profile v2 (retained)
 
 `mira-anime-call-v2.glb.gz` and its raw `.glb` companion preserve every geometry
 buffer, rig, expression binding, material value and VRM licence from the source.
@@ -54,8 +54,27 @@ resized and RGB-compressed. Tests compare visible RGB against the resized
 originals (mean absolute error below 5/255 per texture), exact alpha and all
 geometry bytes. The larger lossless derivative is retained, not silently changed.
 
-The default transfer is 1,235,862 bytes (raw GLB 2,920,764 bytes). Browsers without
+The v2 transfer is 1,235,862 bytes (raw GLB 2,920,764 bytes). Browsers without
 native gzip decompression use the bounded, hash-verified raw call profile, never
 the old 9 MB source. `mira-anime-preview-v2.webp` is a 384-pixel, 13,868-byte
 thumbnail for immediate loading/error display. Exact hashes and dimensions are
-recorded in `lib/avatar-call-manifest.json`; the generator validates both profiles.
+recorded in `lib/avatar-call-v2-manifest.json`; the generator validates this profile.
+
+## Smaller call profile v3 (default)
+
+The v3 derivative keeps v2's exact textures, indices, skin weights, joints, rig,
+materials, expression bindings and metadata. Only floating-point position,
+normal and UV render attributes (including morph deltas) retain 14 fraction bits.
+Every changed component is tested against v2: absolute error below 0.000062;
+position error is below 0.062 mm per coordinate in glTF's metre units. Original
+accessor bounds remain conservative. This derivative is **not geometry-identical**.
+The v2/raw original assets remain unchanged for provenance and comparison.
+
+`mira-anime-call-v3.mesh.gz` uses a bounded MMP1 transport with the MIT-licensed
+meshoptimizer 1.1.1 lossless vertex/index codec (see [its licence](MESHOPTIMIZER-LICENSE.txt)). The decoder ships locally; no
+third-party service is called. Decompression restores the exact v3 GLB, verified
+with SHA-256 before rendering. Unsupported browsers use the verified v3 gzip or
+raw GLB compatibility path. All sizes, hashes and measured precision bounds are
+in `lib/avatar-call-manifest.json`. Startup download and decoding begin only
+after opening a call. Neither this precision bound nor draw submissions certify
+physical-phone performance or lip-sync accuracy.

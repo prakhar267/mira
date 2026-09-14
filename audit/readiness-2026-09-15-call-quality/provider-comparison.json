@@ -1,0 +1,345 @@
+{
+  "at": "2026-09-14T21:44:49.750Z",
+  "method": "Sequential small-sample diagnostic on actual Cloudflare AI via owner-authorized remote binding. Fixed fictional inputs, no production user data, no application account/storage bindings, no inference retries. Not randomized or a deployed endpoint/speech latency measurement.",
+  "selectedModel": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "batches": [
+    {
+      "variant": "baseline",
+      "n": 8,
+      "p50Ms": 2249,
+      "maxMs": 3625,
+      "turns": [
+        {
+          "id": "correction-en",
+          "variant": "baseline",
+          "synthetic": true,
+          "promptChars": 4061,
+          "latencyMs": 2368,
+          "replySha256": "7fcde3643ddf07afb452c47fab3e08d0357df0fa4f13cdeab48a9ab3a53edba9",
+          "replyCharacters": 122
+        },
+        {
+          "id": "correction-hi",
+          "variant": "baseline",
+          "synthetic": true,
+          "promptChars": 4358,
+          "latencyMs": 3625,
+          "replySha256": "f77dad1789feed0a7363d4cb04b2b75d14af03e553cbe3f97461655a1b4a25d5",
+          "replyCharacters": 87
+        },
+        {
+          "id": "ownership-hi",
+          "variant": "baseline",
+          "synthetic": true,
+          "promptChars": 4358,
+          "latencyMs": 2224,
+          "replySha256": "efa9d5ab51d1acac846b6ae8800da0930dfe932d18b03fd4ab2b304ac74ee508",
+          "replyCharacters": 108
+        },
+        {
+          "id": "answered-feeling",
+          "variant": "baseline",
+          "synthetic": true,
+          "promptChars": 4358,
+          "latencyMs": 2274,
+          "replySha256": "169b3a16792b3aa6f27d50b5bb4db4f96366760a9f77f1723c550dfb2172db1e",
+          "replyCharacters": 140
+        },
+        {
+          "id": "draft-hinglish",
+          "variant": "baseline",
+          "synthetic": true,
+          "promptChars": 4219,
+          "latencyMs": 2825,
+          "replySha256": "6bd5afeeb1694ebfe09da0a3a0222bbaf7662772e66fffab2017c2f4c4a86026",
+          "replyCharacters": 76
+        },
+        {
+          "id": "heldout-correction",
+          "variant": "baseline",
+          "synthetic": true,
+          "promptChars": 4061,
+          "latencyMs": 785,
+          "replySha256": "c0ee0f087f081253d6d464ebdc79f9350c1f493a31eca0a4f538f361fffa4ba5",
+          "replyCharacters": 127
+        },
+        {
+          "id": "heldout-ownership",
+          "variant": "baseline",
+          "synthetic": true,
+          "promptChars": 4219,
+          "latencyMs": 1359,
+          "replySha256": "425e8995a9170d90160b7cdf209779f8f384ce39749282273b4fe1b24c4f4af2",
+          "replyCharacters": 84
+        },
+        {
+          "id": "heldout-feeling",
+          "variant": "baseline",
+          "synthetic": true,
+          "promptChars": 4061,
+          "latencyMs": 600,
+          "replySha256": "9115d9f35248bae181bf1929a35642d790c6f17b1ba50ec346a32b22a032c197",
+          "replyCharacters": 126
+        }
+      ]
+    },
+    {
+      "variant": "candidate",
+      "n": 8,
+      "p50Ms": 1552,
+      "maxMs": 2183,
+      "turns": [
+        {
+          "id": "correction-en",
+          "variant": "candidate",
+          "synthetic": true,
+          "promptChars": 3336,
+          "latencyMs": 1635,
+          "replySha256": "7b10af43515b88ba5970d70c6f6dc14dfd9c0d6e574d167b77797b1bd4aeaae8",
+          "replyCharacters": 64
+        },
+        {
+          "id": "correction-hi",
+          "variant": "candidate",
+          "synthetic": true,
+          "promptChars": 3718,
+          "latencyMs": 1905,
+          "replySha256": "f20ab98f1a09748f78d92cf575377e189e42939ab4488ccf085deb2eefa7e230",
+          "replyCharacters": 69
+        },
+        {
+          "id": "ownership-hi",
+          "variant": "candidate",
+          "synthetic": true,
+          "promptChars": 3718,
+          "latencyMs": 1125,
+          "replySha256": "a3f38bb07453c9ef600a92c39e1e2a9ee6b6e76dc7fc093bafe15f11f03b68f3",
+          "replyCharacters": 78
+        },
+        {
+          "id": "answered-feeling",
+          "variant": "candidate",
+          "synthetic": true,
+          "promptChars": 3718,
+          "latencyMs": 1283,
+          "replySha256": "853189acaaf75a574ae49c7bd9adcac4ad65f882f66739f73ed75af918573263",
+          "replyCharacters": 75
+        },
+        {
+          "id": "draft-hinglish",
+          "variant": "candidate",
+          "synthetic": true,
+          "promptChars": 3579,
+          "latencyMs": 1469,
+          "replySha256": "873b4e11de6f62cc75a02812aa7e117ed099fb503889e80168654efbe898a8e3",
+          "replyCharacters": 62
+        },
+        {
+          "id": "heldout-correction",
+          "variant": "candidate",
+          "synthetic": true,
+          "promptChars": 3336,
+          "latencyMs": 1929,
+          "replySha256": "7d4e8210d918808324b361805c0a9aa96f82fa545110a3c27f03b7ac30635f02",
+          "replyCharacters": 74
+        },
+        {
+          "id": "heldout-ownership",
+          "variant": "candidate",
+          "synthetic": true,
+          "promptChars": 3579,
+          "latencyMs": 2183,
+          "replySha256": "cffd107fa8ef6c25f948e54cecbbeaace0ad8d96903b2dbdb2d49c06ca0e55f4",
+          "replyCharacters": 94
+        },
+        {
+          "id": "heldout-feeling",
+          "variant": "candidate",
+          "synthetic": true,
+          "promptChars": 3336,
+          "latencyMs": 656,
+          "replySha256": "901c50a1903851793175616c56a956c5d94dbcb4146a109581969b38d5fd41be",
+          "replyCharacters": 58
+        }
+      ]
+    },
+    {
+      "variant": "qwen",
+      "n": 8,
+      "p50Ms": 2212.5,
+      "maxMs": 62641,
+      "turns": [
+        {
+          "id": "correction-en",
+          "variant": "qwen",
+          "synthetic": true,
+          "promptChars": 3336,
+          "latencyMs": 2369,
+          "replySha256": "ad1189f0ae10f8ed7524b38ce8c04829fddd1d4899efa05f2b0cc258a61f26b6",
+          "replyCharacters": 128
+        },
+        {
+          "id": "correction-hi",
+          "variant": "qwen",
+          "synthetic": true,
+          "promptChars": 3718,
+          "latencyMs": 1595,
+          "replySha256": "13e2f358ba04ccca5d3534b9a57d5173af00edb582f9464a0c54707f94504dde",
+          "replyCharacters": 77
+        },
+        {
+          "id": "ownership-hi",
+          "variant": "qwen",
+          "synthetic": true,
+          "promptChars": 3718,
+          "latencyMs": 1631,
+          "replySha256": "ece1cd7a0c713557d109960c5cf4ad9f5ea5e8a09d28a9c32d20c9f50f159e5e",
+          "replyCharacters": 103
+        },
+        {
+          "id": "answered-feeling",
+          "variant": "qwen",
+          "synthetic": true,
+          "promptChars": 3718,
+          "latencyMs": 2056,
+          "replySha256": "2bb81384652db10e9990a6ca79a321450e67360b32a10048351d7a85012f6a8e",
+          "replyCharacters": 88
+        },
+        {
+          "id": "draft-hinglish",
+          "variant": "qwen",
+          "synthetic": true,
+          "promptChars": 3579,
+          "latencyMs": 62641,
+          "replySha256": "03a796b6dc7acb44732045fc036ed8b0c25e32d1dbd892f43c4f12cd06a81c1d",
+          "replyCharacters": 80
+        },
+        {
+          "id": "heldout-correction",
+          "variant": "qwen",
+          "synthetic": true,
+          "promptChars": 3336,
+          "latencyMs": 1143,
+          "replySha256": "18e40fefabf0472aaa171b141f5bb0a4ab5e7f05f29d0402fbd52a11112516d8",
+          "replyCharacters": 103
+        },
+        {
+          "id": "heldout-ownership",
+          "variant": "qwen",
+          "synthetic": true,
+          "promptChars": 3579,
+          "latencyMs": 4882,
+          "replySha256": "5df68f62c328c686f5cff9a8263ae25b56cddcf23b805377dc444b8d29a4769b",
+          "replyCharacters": 82
+        },
+        {
+          "id": "heldout-feeling",
+          "variant": "qwen",
+          "synthetic": true,
+          "promptChars": 3336,
+          "latencyMs": 22256,
+          "replySha256": "522dea66fed2d72cc7b295472c59b56cd3769777e266f608d074443fb25ece55",
+          "replyCharacters": 117
+        }
+      ]
+    },
+    {
+      "variant": "grounded",
+      "n": 8,
+      "p50Ms": 1189.5,
+      "maxMs": 2046,
+      "turns": [
+        {
+          "id": "correction-en",
+          "variant": "grounded",
+          "synthetic": true,
+          "promptChars": 3784,
+          "latencyMs": 1836,
+          "replySha256": "aa34232e1fc5f789b9a9bbdb0f341df941e5822b733f5d5d4bc3391abc79ab23",
+          "replyCharacters": 60
+        },
+        {
+          "id": "correction-hi",
+          "variant": "grounded",
+          "synthetic": true,
+          "promptChars": 4166,
+          "latencyMs": 1802,
+          "replySha256": "84dbc201663705361d6db4776cd7449a1659c0375ac3e1aa6ddb786acd0a2eb3",
+          "replyCharacters": 55
+        },
+        {
+          "id": "ownership-hi",
+          "variant": "grounded",
+          "synthetic": true,
+          "promptChars": 4166,
+          "latencyMs": 2046,
+          "replySha256": "a6320f1bc9f78c1ad60900f32efc0a4a99102dde44f7d9c8efa63f04252e9110",
+          "replyCharacters": 103
+        },
+        {
+          "id": "answered-feeling",
+          "variant": "grounded",
+          "synthetic": true,
+          "promptChars": 4166,
+          "latencyMs": 1281,
+          "replySha256": "596f31a0c181c63424b83d809d25dff7f3289d27615649ce04cd68edad4f632c",
+          "replyCharacters": 64
+        },
+        {
+          "id": "draft-hinglish",
+          "variant": "grounded",
+          "synthetic": true,
+          "promptChars": 4027,
+          "latencyMs": 1062,
+          "replySha256": "55e81521e8b661dedbe725c246c145a841c256c10c1a0aa3291d9d586fe71c67",
+          "replyCharacters": 88
+        },
+        {
+          "id": "heldout-correction",
+          "variant": "grounded",
+          "synthetic": true,
+          "promptChars": 3784,
+          "latencyMs": 689,
+          "replySha256": "2af38e65944a5210a79a558506ced99fc240227c60cc65959abceb5e059e9c08",
+          "replyCharacters": 35
+        },
+        {
+          "id": "heldout-ownership",
+          "variant": "grounded",
+          "synthetic": true,
+          "promptChars": 4027,
+          "latencyMs": 914,
+          "replySha256": "701af40ab82f32e8c47dcf580a88ef17caca202bceb1bbab800619a4801f7377",
+          "replyCharacters": 52
+        },
+        {
+          "id": "heldout-feeling",
+          "variant": "grounded",
+          "synthetic": true,
+          "promptChars": 3784,
+          "latencyMs": 1098,
+          "replySha256": "4a9d7ccb20b0ce19e7b5c745f124e34d19eac8bdcbff966211c7cd5b0736d37f",
+          "replyCharacters": 39
+        }
+      ]
+    }
+  ],
+  "review": {
+    "baseline": [
+      "Schedule change inferred extra preparation time.",
+      "User camera habit reassigned to cousin.",
+      "Mixed-script Hindi word and awkward wallet grammar."
+    ],
+    "candidate": [
+      "Shorter but still inferred preparation time."
+    ],
+    "qwen": [
+      "Rejected alternative: wrong ownership and unsupported assumptions; two responses took 62.64s and 22.26s. Never enabled in production."
+    ],
+    "grounded": [
+      "Known schedule consequences and ownership failures absent in these eight diagnostics.",
+      "The Hinglish message draft remains too formal and its address register is inconsistent; not a 10/10 or universal semantic-quality pass.",
+      "Some harmless follow-up questions and generic phrasing remain."
+    ]
+  }
+}

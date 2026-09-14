@@ -77,11 +77,26 @@ automatic semantic judge.
 
 The default call profile is described in [the avatar licence and derivative
 notice](../apps/web/public/assets/mira/avatar/LICENSE.md#call-ready-profile-default).
-It preserves geometry/rig bytes but deliberately uses smaller, high-quality
-textures. The original and pixel-identical derivative remain intact. Downloads
+The v3 default has bounded render-attribute precision and a lossless mesh
+transport; rig, topology, skin weights and v2 textures remain unchanged. The
+original, pixel-identical derivative and v2 profile remain intact. Downloads
 start alongside the lazy 3D code only after opening a video call; hang-up aborts
 the owned request. A tiny portrait remains visible during loading. Both gzip
-and raw-browser compatibility paths are size- and SHA-256-verified.
+and raw-browser compatibility paths are size- and SHA-256-verified. Browsers
+with WebAssembly use the smaller mesh transport and a local decoder. The full
+reconstructed v3 GLB is hash-verified before rendering; failure never silently
+downloads a second, larger model.
+
+An explicitly authorized finite live call diagnostic is available in
+`scripts/live-call-audio-qa.mjs`. Set `MIRA_LIVE_CALL_QA=true`, the exact approved
+`COMPANARO_URL` and `MIRA_EXPECTED_SHA`. It opens one revocable demo session,
+uses six fictional prerecorded clips (English/Hindi/Hinglish in both call
+modes), and caps calls at six chat, six STT and eight TTS requests. The actual
+browser recorder and audio decoder run, but microphone input is synthetic and
+speaker output is muted. It stops on failure rather than renewing the demo or
+bypassing provider quotas. Reports/screenshots contain only synthetic inputs.
+This must not be described as a physical microphone, accent-diversity, echo or
+subjective sound-quality test. Check provider allowance before running it.
 
 For a local Apple M4 comparison, after the browser build/check finishes:
 

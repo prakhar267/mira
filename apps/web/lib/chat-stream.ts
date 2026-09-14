@@ -30,9 +30,14 @@ export async function readChatStream(stream: ReadableStream<Uint8Array>, signal:
         if (text.length > 4000) throw new Error("Inference reply exceeded the limit");
         if (onText) await onText(text);
         // Complete sentences only; do not cut at a token/word or inside reasoning.
-        const sentences = text.match(/[^.!?।]+[.!?।](?=\s|$)/gu) ?? [];
-        if (spoken && !/<(?:think|analysis)>/i.test(text) && sentences.length >= 2 && sentences.slice(0,2).join("").length >= 60) {
-          return sentences.slice(0,2).join("").trim();
+        const sentences = text.match(/[^.!?।]+[.!?।]["”’]*(?=\s|$)/gu) ?? [];
+        const prefix = sentences.slice(0, 2).join("").trim();
+        // A punctuation token may arrive before the closing quote. Do not cut
+        // a ready-to-send draft mid-quotation, or drop its closing quote.
+        const quoted = (prefix.match(/"/g)?.length ?? 0) % 2 !== 0
+          || (prefix.match(/“/g)?.length ?? 0) !== (prefix.match(/”/g)?.length ?? 0);
+        if (spoken && !quoted && !/<(?:think|analysis)>/i.test(text) && sentences.length >= 2 && prefix.length >= 60) {
+          return prefix;
         }
       }
       if (chunk.done) {

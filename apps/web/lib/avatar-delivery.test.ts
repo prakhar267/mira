@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { avatarDelivery, fetchAvatarDelivery } from "./avatar-delivery";
 import losslessDelivery from "./avatar-delivery-manifest.json";
+import callV2 from "./avatar-call-v2-manifest.json";
+import { MeshoptDecoder } from "meshoptimizer/decoder";
+import { decodeAvatarMesh } from "./avatar-mesh-codec";
 // @ts-expect-error Deliberate standalone Node asset tool.
 import { decodeGlb } from "../scripts/avatar-delivery.mjs";
 
@@ -38,6 +41,7 @@ describe("verified avatar delivery profiles", () => {
   }, 30_000);
 
   it("bounds the fast profile, preserves geometry/rig and verifies texture quality against resized originals", async () => {
+    const avatarDelivery = callV2;
     const source = decodeGlb(await asset("/assets/mira/avatar/mira-anime-live-v2.vrm"));
     const compressed = await asset(avatarDelivery.path), delivered = decodeGlb(gunzipSync(compressed));
     expect(compressed.length).toBeLessThan(1_300_000);
@@ -78,19 +82,64 @@ describe("verified avatar delivery profiles", () => {
   });
 
   it("loads, bounds, verifies and decompresses the actual committed payload", async () => {
-    const compressed = await asset(avatarDelivery.path);
+    const compressed = await asset(avatarDelivery.meshPath);
     const fetchMock = vi.fn().mockResolvedValue(new Response(compressed)); vi.stubGlobal("fetch", fetchMock);
     const signal = new AbortController().signal;
-    expect(Buffer.from(await fetchAvatarDelivery(signal)).equals(gunzipSync(compressed))).toBe(true);
+    expect(Buffer.from(await fetchAvatarDelivery(signal)).equals(await asset(avatarDelivery.rawPath))).toBe(true);
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ signal, credentials: "omit", redirect: "error" });
   });
   it("rejects corrupt and truncated payloads without a second download", async () => {
-    for (const bytes of [Buffer.alloc(avatarDelivery.bytes), Buffer.alloc(10), Buffer.alloc(avatarDelivery.bytes + 1)]) {
+    for (const bytes of [Buffer.alloc(avatarDelivery.meshBytes), Buffer.alloc(10), Buffer.alloc(avatarDelivery.meshBytes + 1)]) {
       const mock = vi.fn().mockResolvedValue(new Response(bytes)); vi.stubGlobal("fetch", mock);
       await expect(fetchAvatarDelivery(new AbortController().signal)).rejects.toThrow();
       expect(mock).toHaveBeenCalledOnce();
     }
+  });
+  it("retains verified gzip compatibility without WebAssembly", async () => {
+    vi.stubGlobal("WebAssembly", undefined);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(await asset(avatarDelivery.path))));
+    expect(Buffer.from(await fetchAvatarDelivery(new AbortController().signal)).equals(await asset(avatarDelivery.rawPath))).toBe(true);
+  });
+  it("bounds precision only in render attributes; rig, weights, topology and textures stay byte-identical", async () => {
+    const old = await asset(callV2.rawPath), next = await asset(avatarDelivery.rawPath);
+    const source = decodeGlb(old), delivered = decodeGlb(next);
+    expect(delivered.model).toEqual(source.model);
+    const immutable = new Set<number>();
+    for (const mesh of source.model.meshes) for (const primitive of mesh.primitives) {
+      immutable.add(primitive.indices);
+      for (const [kind, id] of Object.entries(primitive.attributes)) if (/^(JOINTS|WEIGHTS)_/.test(kind)) immutable.add(id as number);
+    }
+    for (const skin of source.model.skins) immutable.add(skin.inverseBindMatrices);
+    for (const id of immutable) {
+      const accessor = source.model.accessors[id]; if (!accessor) continue;
+      const v = source.model.bufferViews[accessor.bufferView]; if (!v) continue;
+      expect(delivered.binary.subarray(v.byteOffset, v.byteOffset + v.byteLength).equals(source.binary.subarray(v.byteOffset, v.byteOffset + v.byteLength))).toBe(true);
+    }
+    const base = old.length - source.binary.length, allowed = new Set<number>();
+    for (const mesh of source.model.meshes) for (const primitive of mesh.primitives) {
+      for (const attributes of [primitive.attributes, ...(primitive.targets ?? [])]) for (const [kind, id] of Object.entries(attributes)) {
+        if (!/^(POSITION|NORMAL|TANGENT|TEXCOORD_\d+)$/.test(kind)) continue;
+        const a = source.model.accessors[id as number]; if (a.componentType !== 5126) continue;
+        const count = ({ VEC2: 2, VEC3: 3, VEC4: 4 } as Record<string, number>)[a.type]!;
+        for (const [viewId, length, offset] of [[a.bufferView, a.count, a.byteOffset ?? 0], [a.sparse?.values?.bufferView, a.sparse?.count, a.sparse?.values?.byteOffset ?? 0]]) {
+          if (viewId === undefined) continue;
+          const view = source.model.bufferViews[viewId], stride = view.byteStride ?? count * 4;
+          for (let i = 0; i < length; i++) for (let c = 0; c < count; c++) {
+            const position = base + view.byteOffset + offset + i * stride + c * 4;
+            allowed.add(position);
+            if (Math.abs(old.readFloatLE(position) - next.readFloatLE(position)) >= 0.000062) throw Error("Attribute precision budget exceeded");
+          }
+        }
+      }
+    }
+    for (let offset = 0; offset < old.length; offset += 4) {
+      if (old.readUInt32LE(offset) !== next.readUInt32LE(offset) && !allowed.has(offset)) throw Error(`Non-render attribute changed at ${offset}`);
+    }
+    await MeshoptDecoder.ready;
+    const packed = gunzipSync(await asset(avatarDelivery.meshPath));
+    expect(Buffer.from(decodeAvatarMesh(packed, next.length, MeshoptDecoder)).equals(next)).toBe(true);
+    expect(avatarDelivery.meshBytes).toBeLessThan(900_000);
   });
   it("does not decode an abandoned call", async () => {
     const controller = new AbortController(); controller.abort();

@@ -46,7 +46,7 @@ test("three cold mobile-emulated landing loads record vitals and asset costs", a
       expect(result.assets.filter(asset => /\/(?:loft-morning|portrait)\.png$/.test(asset.path))).toEqual([]);
       expect(scripts.reduce((total, asset) => total + asset.decodedBytes, 0)).toBeLessThan(400_000);
       // 3D belongs to an explicit call, not the public landing critical path.
-      expect(result.assets.filter(asset => /\.(?:vrm|glb)(?:\.gz)?(?:$|\?)/i.test(asset.path))).toEqual([]);
+      expect(result.assets.filter(asset => /\.(?:vrm|glb|mesh)(?:\.gz)?(?:$|\?)/i.test(asset.path))).toEqual([]);
       if (sample === 0) await page.screenshot({ path: testInfo.outputPath("landing-mobile.png") });
     } finally { await context.close(); }
   }

@@ -1,4 +1,5 @@
 import manifest from "./avatar-call-manifest.json";
+import { decodeAvatarMesh } from "./avatar-mesh-codec";
 
 export { manifest as avatarDelivery };
 
@@ -22,22 +23,29 @@ async function verify(bytes: Uint8Array<ArrayBuffer>, expected: string) {
   if (Array.from(hash, byte => byte.toString(16).padStart(2, "0")).join("") !== expected) throw new Error("Avatar integrity check failed");
 }
 
-/** Decompresses only our bounded, hash-verified static derivative. No remote
- * models, decoder bundle, image service or inference is involved. */
+/** Downloads only a bounded, hash-verified static derivative. A small local
+ * lossless decoder loads alongside it, only after the call opens. */
 export async function fetchAvatarDelivery(signal: AbortSignal) {
   signal.throwIfAborted();
   const gzip = typeof DecompressionStream === "function";
-  const path = gzip ? manifest.path : manifest.rawPath;
-  const hash = gzip ? manifest.sha256 : manifest.decodedSha256;
+  const mesh = gzip && typeof WebAssembly === "object";
+  const decoder = mesh ? import("meshoptimizer/decoder").then(async ({ MeshoptDecoder }) => {
+    await MeshoptDecoder.ready; return MeshoptDecoder;
+  }) : undefined;
+  // A failed/aborted download must not leave an unhandled dynamic-import error.
+  void decoder?.catch(() => undefined);
+  const path = mesh ? manifest.meshPath : gzip ? manifest.path : manifest.rawPath;
+  const hash = mesh ? manifest.meshSha256 : gzip ? manifest.sha256 : manifest.decodedSha256;
   const response = await fetch(`${path}?v=${hash.slice(0, 16)}`, { signal, credentials: "omit", redirect: "error" });
   if (!response.ok || !response.body) throw new Error("Avatar download unavailable");
-  const compressed = await boundedBytes(response.body, gzip ? manifest.bytes : manifest.decodedBytes);
+  const compressed = await boundedBytes(response.body, mesh ? manifest.meshBytes : gzip ? manifest.bytes : manifest.decodedBytes);
   signal.throwIfAborted();
   await verify(compressed, hash);
   signal.throwIfAborted();
   if (!gzip) return compressed.buffer;
   const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
-  const bytes = await boundedBytes(stream, manifest.decodedBytes);
+  const packed = await boundedBytes(stream, mesh ? manifest.meshPackedBytes : manifest.decodedBytes);
+  const bytes = mesh ? decodeAvatarMesh(packed, manifest.decodedBytes, (await decoder)!, signal) : packed;
   signal.throwIfAborted();
   await verify(bytes, manifest.decodedSha256);
   signal.throwIfAborted();
