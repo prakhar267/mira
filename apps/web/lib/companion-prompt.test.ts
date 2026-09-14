@@ -43,6 +43,9 @@ describe("edge companion prompting", () => {
     expect(detectCompanionLanguage("The main road is closed")).toBe("en");
     expect(detectCompanionLanguage("Riya bhi trip pe gayi thi")).toBe("hinglish");
     expect(detectCompanionLanguage("I visited Gaya last week.")).toBe("en");
+    expect(detectCompanionLanguage("waise maine kis ke saath chai pi thi?")).toBe("hinglish");
+    expect(detectCompanionLanguage("Who had chai with my mom?")).toBe("en");
+    expect(detectCompanionLanguage("Riya Delhi gai thi")).toBe("hinglish");
     expect(detectCompanionLanguage("How are you today?")).toBe("en");
     expect(detectCompanionLanguage("आज तुम कैसी हो?" )).toBe("hi");
     expect(detectCompanionLanguage("yaar aaj kaafi busy tha")).toBe("hinglish");

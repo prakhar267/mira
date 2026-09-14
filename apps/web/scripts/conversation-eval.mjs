@@ -39,6 +39,7 @@ function selectDataset(dataset,ids){
     for(const turn of scenario.turns){
       if(!turn||typeof turn.text!=="string"||!turn.text.trim()||turn.text.length>8000||!["en","hi","hinglish"].includes(turn.language)||(turn.noQuestion!==undefined&&typeof turn.noQuestion!=="boolean")||(turn.anchors!==undefined&&(!Array.isArray(turn.anchors)||!turn.anchors.length||turn.anchors.length>20||turn.anchors.some(anchor=>typeof anchor!=="string"||!anchor||anchor.length>200))))throw Error("Invalid synthetic turn.");
       if(turn.anchorGroups!==undefined&&(!Array.isArray(turn.anchorGroups)||!turn.anchorGroups.length||turn.anchorGroups.length>8||turn.anchorGroups.some(group=>!Array.isArray(group)||!group.length||group.length>10||group.some(anchor=>typeof anchor!=="string"||!anchor||anchor.length>200))))throw Error("Invalid required synthetic facts.");
+      if(turn.reviewPhrases!==undefined&&(!Array.isArray(turn.reviewPhrases)||!turn.reviewPhrases.length||turn.reviewPhrases.length>20||turn.reviewPhrases.some(phrase=>typeof phrase!=="string"||!phrase.trim()||phrase.length>200)))throw Error("Invalid synthetic review phrases.");
     }
   }
   if(ids?.some(id=>!seen.has(id)))throw Error("An explicitly selected scenario is not in the synthetic dataset.");
@@ -51,7 +52,10 @@ export function evaluateTurn(turn,reply,status=200){
   const languageOk=matchesReplyLanguage(reply,turn.language);
   const contains=anchor=>reply.toLowerCase().includes(anchor.toLowerCase());
   const anchorsOk=(!turn.anchors||turn.anchors.some(contains))&&(!turn.anchorGroups||turn.anchorGroups.every(group=>group.some(contains)));
-  return [...(status!==200||!reply.trim()?["service-error"]:[]),...(!languageOk?["language"]:[]),...(generic.test(reply)?["generic-misunderstanding"]:[]),...(!anchorsOk?["context-anchor-review"]:[]),...(turn.noQuestion&&reply.includes("?")?["unwanted-question"]:[])];
+  // These exact fixture phrases request review, not automatic truth judgments:
+  // a negation/quotation may legitimately mention one. Never reject live replies
+  // with this diagnostic-only list or silently score the flagged turn as passed.
+  return [...(status!==200||!reply.trim()?["service-error"]:[]),...(!languageOk?["language"]:[]),...(generic.test(reply)?["generic-misunderstanding"]:[]),...(!anchorsOk?["context-anchor-review"]:[]),...(turn.reviewPhrases?.some(contains)?["meaning-review"]:[]),...(turn.noQuestion&&reply.includes("?")?["unwanted-question"]:[])];
 }
 
 class EvaluationFailure extends Error{

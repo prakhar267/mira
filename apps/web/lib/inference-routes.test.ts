@@ -44,6 +44,13 @@ describe("active inference route boundaries (mock providers)", () => {
     expect(await response.json()).toMatchObject({reply:"Riya Delhi gayi thi."});
     expect(mocks.provider).toHaveBeenCalledOnce();
   });
+  it.each(["voice","video"])("detects colloquial Hinglish recall after an English turn in %s", async delivery => {
+    mocks.provider.mockResolvedValue({response:"Tumne mummy ke saath chai pi thi."});
+    const response=await chat(request({...input,delivery,messages:[{role:"user",content:"aaj mummy ke saath chai pi"},{role:"assistant",content:"Glad you had that time together."},{role:"user",content:"waise maine kis ke saath chai pi thi?"}]}));
+    expect(response.status).toBe(200);expect(await response.json()).toMatchObject({reply:"Tumne mummy ke saath chai pi thi."});
+    expect(mocks.provider).toHaveBeenCalledOnce();
+    expect(JSON.stringify(mocks.provider.mock.calls[0])).toContain("Hinglish in Roman letters");
+  });
   it.each(["voice","video"])("repairs mixed-script Hindi once without logging conversation content in %s", async delivery => {
     const bad="मुझे खेद है, Kabir ko bas itna kah sakte ho ki all the best.";
     const good="कबीर, पहली नौकरी के लिए शुभकामनाएँ!";
