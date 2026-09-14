@@ -15,6 +15,8 @@ The pre-publication check covered all 68 locally reachable commits/9 refs, 1,344
 
 The focused artifact suite passed 18/18, including omission/restoration of each hidden artifact file, with scoped lint passing. Prisma generation also passed locally. A separate bounded source review of configuration/migration identity, workflow provenance, consent/account/memory boundaries and recovery gates found no further verified release blocker; this is neither an independent security assessment nor proof of live migration behavior.
 
+The clean runner for `751ad78` passed locked installation, Prisma generation, workspace lint/typecheck/tests/build and asset budgets. Its Worker suite passed 23/24: the deletion-during-legacy-import fixture used the fixed date September 14, which now collides with the daily authoritative snapshot created by signup. The legacy read therefore correctly never began. This failure was reproduced locally before editing. The fixture now uses a still-retained previous-week date and asserts that the authoritative row is absent before starting the race; the unchanged deletion and cleanup assertions must still pass. The full local Worker rerun passed 24/24 across all five files, with scoped lint passing. No production deletion behavior is relaxed.
+
 The earlier exact-source local artifact smoke for `16c8949` passed 5/5 with zero provider requests and zero account mutations; its evidence is retained under `audit/readiness-2026-09-13-16c8949/artifact/`. This is not evidence that the same version is live.
 
 ## Remaining gates

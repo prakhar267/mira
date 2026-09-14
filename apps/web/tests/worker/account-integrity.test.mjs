@@ -68,8 +68,12 @@ describe("migration scheduling and isolated logical recovery",()=>{
   });
   it("rechecks account deletion after an in-flight legacy import and runs bounded cleanup alarm",async()=>{
     const user=await signup();
+    // Remain inside legacy retention without colliding with the daily snapshot
+    // signup creates today. A fixed date silently stopped this race on that day.
+    const backupKey=`backup:${user.account.id}:${new Date(Date.now()-7*86400000).toISOString().slice(0,10)}`;
+    expect(await runInDurableObject(stub(),(_instance,ctx)=>ctx.storage.sql.exec("SELECT key FROM records WHERE key=?",backupKey).toArray())).toEqual([]);
     await runInDurableObject(stub(),instance=>{instance.__realLegacy=instance.env.LUMA_ACCOUNTS;instance.env.LUMA_ACCOUNTS={get:()=>new Promise(resolve=>{instance.__releaseLegacy=resolve;instance.__legacyStarted=true;}),delete:async()=>{},list:async()=>({keys:[],list_complete:true})};});
-    const stale=action({action:"get",key:`backup:${user.account.id}:2026-09-14`});await vi.waitFor(async()=>expect(await runInDurableObject(stub(),instance=>instance.__legacyStarted)).toBe(true));
+    const stale=action({action:"get",key:backupKey});await vi.waitFor(async()=>expect(await runInDurableObject(stub(),instance=>instance.__legacyStarted)).toBe(true));
     await action({action:"eraseAccount",userId:user.account.id,emailKey:await sha256("synthetic-1@example.test"),keys:[]});await runInDurableObject(stub(),instance=>instance.__releaseLegacy(JSON.stringify(user.state)));expect(await stale).toEqual({value:null});
     expect(await runDurableObjectAlarm(stub())).toBe(true);expect((await action({action:"list",prefix:"purge:"})).keys).toEqual([]);
   });
