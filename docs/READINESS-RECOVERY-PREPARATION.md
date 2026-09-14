@@ -14,7 +14,9 @@ The last verified live version remains `47d4a3bb-a44a-48fd-82aa-281a30655916`, c
 
 [Authority-backed preparation](AUTHORITY-QUARANTINE.md) now imports an encrypted snapshot and independently retained suppression journal after physically destroying the synthetic source before retirement. Archive/writer/target/challenge binding, bounded replay, exact retries, credential invalidation, cancellation and nonempty-target refusal are tested. A prepared target remains permanently unavailable with `coverageVerified:false` and `servingAllowed:false`. The existing finalizer cannot open this mode.
 
-This code is internal only. It does not supply independent authority hosting/authentication, historical protection coverage, serving leases/drain, recovery admission or protected target-writer handoff.
+That v1 preparation remains permanently quarantined. The subsequent [protected archive v2 implementation](PROTECTED-RECOVERY-V2.md) adds authenticated authority transport, explicit source enrollment, frozen archive registration, current suppression replay, protected successor handoff and admission. It does not upgrade historical v1 archives. Independent production authority/archive placement and credential custody are still unconfigured.
+
+The original requirement is to replay current deletion/privacy suppression **before restored data serves**. Ordinary reads authorized before a writer fence can finish afterward; already emitted bytes cannot be recalled. Global response draining, an egress gateway, synchronized-clock leases and automatic failover are not additional release requirements invented by this implementation.
 
 ## Investigating the local runtime crash
 
@@ -40,4 +42,12 @@ Final local verification of the expanded fix passed all **358 web tests**, **32 
 
 The isolated preparation branch passed all 345 web tests and 32 actual Worker integration tests. After integrating four runtime-diagnostics regressions, the primary workspace passed **349/349 web tests across 44 files**, full zero-warning web lint and route generation/TypeScript checks. Fresh compiled-browser/CI results for this new head must be checked separately; the parent commit's 90 passing browser cases are not substituted for that verification.
 
-Remaining: resolve and verify the cold-start artifact failure; complete protection bootstrap/provenance, serving/drain fencing and source-loss admission/handoff; provision approved independent resources and key custody without spending; verify real email/alert receipt; physical voice/video, screen-reader and independent legal/security/provider review. Passing internal tests does not complete those gates.
+## Integrated v2 and remaining activation gates
+
+The reviewed v2 source-loss path was integrated after its isolated branch passed 363 web tests and 35 actual Worker tests. Three separate real SQLite files plus an encrypted filesystem vault prove that the synthetic source can be physically removed before retirement, the target can safely open after current suppression replay/admission, and subsequent target deletions remain independently acknowledged. Additional cases cover second-generation recovery, wrong targets/archives, v1 refusal, SQL restart/failure, partial replay, lost responses, bounded/stalled body streams and separate source/recovery authorization. This is usable dormant engineering, not an activated offsite backup service or an operational RTO measurement.
+
+The combined workspace passed **372/372 web tests across 47 files**, **35/35 actual Worker tests across seven files**, zero-warning full web lint, route generation/TypeScript and the Cloudflare build. Final compiled-browser, repeated-artifact and Linux CI outcomes must be recorded separately for the final head.
+
+GitHub's scheduled external health run [34816234702](https://github.com/prakhar267/mira/actions/runs/34816234702) actually succeeded after public Actions became available. Monitoring execution is now verified; delivered failure alerts are not, because no external destination/credentials are configured.
+
+Remaining: successful final-head/main CI and exact-artifact promotion; approved independent authority/archive resources and key custody; explicit protection enrollment/capture and an operational source-loss drill; real recovery-email and alert receipt; physical voice/video and screen-reader acceptance; independent legal/security/provider review. Payments remain disabled. No local passing result establishes these external gates.
