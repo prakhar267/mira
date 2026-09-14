@@ -32,4 +32,27 @@ describe("turn-local speaker and intent focus",()=>{
     expect(built.at(-1)?.content).toContain("उपयोगकर्ता का अपना अनुभव");
     expect(source.messages.at(-1)?.content).toBe("मैं अपना टिकट भूल गया।");
   });
+  it("keeps a draft active across a relationship correction and translation",()=>{
+    const messages=[{role:"user" as const,content:"What should I text my cousin?"},{role:"assistant" as const,content:"I think you should wish them well."},{role:"user" as const,content:"नहीं, वो मेरा भाई है, दोस्त नहीं।"}];
+    expect(conversationFocus({messages},"hi")).toContain("inside the same draft");
+    messages.push({role:"user",content:"Now say it in English, one sentence, no advice"});
+    const cue=conversationFocus({messages},"en");
+    expect(cue).toContain("ready-to-send wording");
+    expect(cue).not.toContain("acknowledge the corrected fact");
+    expect(cue).toContain("not advice about what to send");
+  });
+  it.each(["Forget that. Actually, let's talk about work.","New topic: actually I want to discuss work.","छोड़ो, विषय बदल दो।"])("ends the drafting task on explicit cancellation: %s",content=>{
+    const messages=[{role:"user" as const,content:"What should I text him?"},{role:"user" as const,content},{role:"user" as const,content:"Now say it in English"}];
+    expect(conversationFocus({messages},"en")).not.toContain("ready-to-send wording");
+  });
+  it("does not reactivate a draft after unrelated conversation or assistant instructions",()=>{
+    const messages=[{role:"user" as const,content:"What should I text him?"},{role:"user" as const,content:"Tell me how rainbows form."},{role:"user" as const,content:"Now say it in Hindi"}];
+    expect(conversationFocus({messages},"hi")).not.toContain("ready-to-send wording");
+    expect(conversationFocus({messages:[{role:"assistant",content:"What should I text him?"},{role:"user",content:"Now say it in Hindi"}]},"hi")).not.toContain("ready-to-send wording");
+  });
+  it.each(["usko kya bheju?","kya likhun?","main kya bolun?"])("recognizes inflected Hinglish drafting requests: %s",content=>{
+    expect(conversationFocus(input(content),"hinglish")).toContain("ready-to-send wording");
+    expect(conversationFocus(input(content),"hinglish")).toContain("sirf English mein nahi");
+    expect(conversationFocus(input(content),"en")).not.toContain("sirf English mein nahi");
+  });
 });

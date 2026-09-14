@@ -94,3 +94,44 @@ late-response and cleanup regressions remain. A consenting person still needs
 to perform [real-device acceptance](REAL-DEVICE-CALL-QA.md): phone/laptop mic and
 speaker, accents, room noise, real echo, audible interruption and lip-sync,
 and long calls. Synthetic input does not close that requirement.
+
+## First live promotion in this pass
+
+PRs #12/#13 promoted source `d33da5d0174b581871deb421d44fedd1e0293f71`,
+Cloudflare version `5b47c488-c5d4-4b4a-a376-25ff437e5ccf`, from the exact
+successful main CI artifact (335 verified files). Read-only production smoke:
+5/5 passed. Both final CI runs passed; the earlier failed artifact was not
+promoted.
+
+The six-turn actual-provider call diagnostic completed: clean English/Hindi/
+Hinglish in voice mode, then the same clips with synthetic noise in video mode.
+All six had expected transcript anchors, reply language and native audio
+playback; automatic listening resumed. All eight requested audio tracks were
+stopped and the synthetic demo session was revoked. End-of-clip to browser
+playback was 7.686 / 5.316 / 5.389 / 4.414 / 5.361 / 5.488 seconds (median
+5.375s). These are small-sample event proxies, not independently measured
+audible latency. The 5s P95 aspiration is **not met**. Output was muted.
+
+A separate 12-turn production conversation test completed all requests,
+with P50 2.263s/P95 3.376s (chat HTTP only). Eleven passed the heuristic checks;
+the final translated draft lost its purpose. Human inspection of the fictional
+outputs also found awkward Hindi advice and gendered second-person phrasing,
+so 11/12 is **not** an 11/12 naturalness score. The test account was deleted
+and its stale cookie rejected. No transcript storage or saved memory was used.
+
+### Draft continuity correction
+
+The live failure exposed conflicting turn-local cues: a relationship correction
+was told to acknowledge the fact, and a later translation was told only to
+respect ownership, losing the earlier drafting task. The focus builder now
+tracks a bounded chain of user-requested draft corrections/rewrites. It keeps
+the message addressed to the recipient, applies corrections within that draft,
+and does not substitute advice or a biography recap. An unrelated user turn or
+explicit cancellation ends the chain; an assistant message cannot start it.
+Regression tests cover Hindi corrections, English rewrites, cancellation,
+unrelated topics, assistant-origin text and inflected Hinglish requests.
+
+This is a targeted continuity fix, not a claim to have eliminated every
+grammar/gender assumption or the remaining speech latency. Its post-promotion
+result belongs in the accompanying release comment, separate from the
+preceding measurements and source version.
