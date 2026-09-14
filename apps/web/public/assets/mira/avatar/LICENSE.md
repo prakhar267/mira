@@ -37,7 +37,7 @@ No material uses that thumbnail. The resulting GLB is gzip-compressed for
 transport, without a runtime decoder download or paid image service.
 
 - Compressed delivery: 3,257,335 bytes.
-- Gzip SHA-256: `e9bb7d483c5b1ef022d42e43b8c92d48862970149bb22cd5f9dcb6e796618728`.
+- Gzip SHA-256: `f3e3b66ff212464399fa0102ef3edff0abb032914b8e428a39594f6e5b374d9d`.
 - Decoded GLB: 4,946,016 bytes; SHA-256 `3defff1a0f5e5f3d453ab8f944a1e6ef0e021ccceecf15a15ef16bc4337053b4`.
 - `mira-anime-portrait-v1.webp` is the same thumbnail encoded losslessly,
   542,802 bytes; SHA-256 `e6b32a6793d2c81c217e744025bf8040c1271792b01da53b76b1523da459f6cf`.

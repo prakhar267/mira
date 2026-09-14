@@ -80,6 +80,11 @@ export async function buildAvatarDelivery(source) {
   glb.writeUInt32LE(length, 20 + jsonLength); glb.writeUInt32LE(0x004e4942, 24 + jsonLength);
   Buffer.concat(payloads).copy(glb, 28 + jsonLength);
   const gzip = gzipSync(glb, { level: 9 });
+  // RFC 1952 OS=255 means unknown. zlib otherwise stamps the host OS (19 on
+  // macOS, 3 on Linux), changing the hash of identical compressed content.
+  // No header CRC is present; neither the payload nor its CRC is changed.
+  assert.equal(gzip[3], 0);
+  gzip[9] = 255;
   assert.ok(gunzipSync(gzip).equals(glb), "Gzip must preserve every GLB byte");
   assert.ok(gzip.length < 3_500_000 && portrait.length < 600_000, "Delivery budgets exceeded");
   const manifest = { sourceSha256: sourceDigest, path: "/assets/mira/avatar/mira-anime-delivery-v1.glb.gz", bytes: gzip.length,
@@ -99,7 +104,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const url = new URL(path, import.meta.url);
     // A mismatch should be a bounded error, not a multi-megabyte binary diff
     // that can exhaust CI log/memory budgets before reporting the cause.
-    if (process.argv.includes("--check")) assert.ok((await readFile(url)).equals(bytes), `Regenerate ${path}: encoded bytes differ`);
+    if (process.argv.includes("--check")) {
+      const committed = await readFile(url);
+      assert.ok(committed.equals(bytes), `Regenerate ${path}: committed ${committed.length} bytes/${digest(committed)}; generated ${bytes.length} bytes/${digest(bytes)}`);
+    }
     else await writeFile(url, bytes);
   }
   console.log(JSON.stringify({ sourceBytes: 9_001_324, deliveryBytes: result.gzip.length, decodedBytes: result.manifest.decodedBytes, portraitBytes: result.portrait.length, check: process.argv.includes("--check") }));

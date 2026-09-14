@@ -50,6 +50,17 @@ corruption/truncation/oversize/cancellation, and decode all material textures in
 Chromium, Firefox and WebKit. The existing actual-renderer lifecycle suite is
 retained. A new test is not a passing test until its run is recorded.
 
+Local Apple M4 / Metal, synthetic-media observations: cold ready time was
+**958.8 ms** on an unshaped connection and **23,957.9 ms** at 1.6 Mbps / 150 ms
+(previous baseline **56,082 ms**). The slow run still needs improvement before
+slow-network acceptance. These are mobile-sized desktop lab runs, not phones
+or audible speech/lip-sync tests. The avatar rig and decoded pixels are the same.
+
+The first Linux CI asset check exposed host-specific gzip headers. The builder
+now sets the RFC 1952 OS byte to 255 (unknown), rather than macOS 19 / Linux 3;
+this does not change decoded content. CI must still verify identical generated
+bytes, pixel equality and the complete release checks after this change.
+
 ## Rechecked external gates
 
 Cloudflare is now signed in. R2 redirects to an activation screen requiring a
@@ -72,6 +83,10 @@ incident response ownership, physical-device acceptance and independent human
 security/legal/privacy/accessibility sign-off are still absent. Cloudflare
 sign-in does not supply these. Unrelated product domains, mail credentials or
 recipient records are not repurposed.
+
+The existing Resend usage tab redirected to sign-in when opening Domains; its
+cached quota display is not proof of current sender authorization. No email
+credentials were created, no unrelated domain was reused and no mail was sent.
 
 Source commits, CI success and production deployment are separate events. The
 release/promotion record must identify the exact main artifact before claiming

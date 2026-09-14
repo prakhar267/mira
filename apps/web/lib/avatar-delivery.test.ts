@@ -13,6 +13,7 @@ describe("pixel-identical compressed avatar delivery", () => {
   it("preserves every geometry view, rig, expression and licence; textures decode to identical RGBA pixels", async () => {
     const source = decodeGlb(await asset("/assets/mira/avatar/mira-anime-live-v2.vrm"));
     const compressed = await asset(avatarDelivery.path), delivered = decodeGlb(gunzipSync(compressed));
+    expect([...compressed.subarray(0, 10)]).toEqual([31, 139, 8, 0, 0, 0, 0, 0, 2, 255]);
     expect(compressed.length).toBeLessThan(3_500_000);
     for (const key of ["asset", "accessors", "nodes", "meshes", "skins", "materials", "scenes", "samplers", "extensions"]) expect(delivered.model[key]).toEqual(source.model[key]);
     expect(delivered.model.bufferViews).toHaveLength(source.model.bufferViews.length - 1);
