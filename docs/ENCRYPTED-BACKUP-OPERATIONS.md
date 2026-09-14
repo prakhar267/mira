@@ -2,6 +2,8 @@
 
 Updated 14 September 2026. This implementation is an operator-driven encrypted archive and **controlled transfer/recovery** path, with a dormant independent suppression-authority/acknowledgement implementation. It is not a claim that offsite disaster recovery is active. No real account data has been exported, no key/destination provisioned, no recovery routing changed, and no production source retired by this implementation work.
 
+**Current v2 addition:** [Protected archive v2](PROTECTED-RECOVERY-V2.md) now implements explicit protected-source capture and independent exact archive registration, authenticated authority transport, uniquely fenced successor handoff, bounded replay, credential invalidation, protected target admission and a guarded server-side routing selector. Its source-destruction test opens a usable protected target and independently acknowledges subsequent deletion. Production activation remains unconfigured. The v1 transfer and permanent-quarantine paths documented below remain unchanged; their limitations must not be mistaken for missing v2 code.
+
 ## What exists
 
 - The existing `MIRA_STORE` remains authoritative. An additive `recovery_events` journal records account deletion, conversation deletion, memory forgetting/correction, and privacy-flag changes in the same SQLite transaction as the change. It contains IDs, flags and sequence/revision numbers, not conversation text, corrected memory, email addresses or credentials. Ordinary autosaves with unchanged privacy flags do not append privacy events.
@@ -62,13 +64,17 @@ This command is deliberately different from ordinary backup:
 
 If a command fails after retirement, keep both source and target isolated. Re-run against the same archive/target and retained ledger directory to resume; do not invent a new challenge or delete partially restored state. A missing target-bound proof, missing encryption key, or corrupted/incomplete retained archive is an explicit operator incident, not permission to bypass quarantine.
 
-## What this does not solve yet
+## Version-one limitations (not v2 admission)
+
+An additional [internal authority-backed preparation path](AUTHORITY-QUARANTINE.md) can now replay a retained authority journal after actual source-file loss, but only into permanent quarantine. It has no route or activation path, always reports unverified archive protection coverage and forbidden serving, and cannot use legacy finalization to open the target. This is not completed recovery admission or operational offsite protection.
 
 If the source is lost **before** obtaining current retirement/cutover proof, and no independent trusted latest-ledger authority survives, the implementation refuses to open a historical restore. This is deliberate deletion safety, not completed source-loss disaster recovery. A real independent destination with trustworthy newest-watermark evidence, owner-approved RPO/RTO, retention review and source-loss/offsite drill remain activation gates. The mounted-vault adapter is implementable without buying or provisioning a new service, but an unconfigured offsite destination cannot be represented as operational.
 
 Account backups contain personal data and password verifiers inside encryption. Encryption is not erasure of older physical backup bytes. Access and archive/key-retirement policy need independent legal/security review. Source retirement and target validation do not erase data already processed by chat, speech or email providers. Billing reconciliation, support history and operational monitoring must be restored separately; payments remain disabled.
 
-## Source-loss admission design and indispensable activation decisions
+## Historical pre-v2 source-loss design and activation decisions
+
+The following checklist records the earlier design motivation. The current implementable v2 boundary, supported ordinary linearizable semantics and remaining deployment gates are specified in [PROTECTED-RECOVERY-V2.md](PROTECTED-RECOVERY-V2.md). In particular, global byte-level response draining/serving leases are not prerequisites invented by the original deletion-before-restored-serving requirement; requests already authorized before revocation can finish afterward.
 
 The current implementation implements the ordered authority journal and source acknowledgement portion below, **not the complete recovery protocol**. [The September 14 implementation and evidence](SUPPRESSION-AUTHORITY.md) distinguish tested code from the missing activation, serving/drain fence and recovery-admission engineering. There is no production enrollment route or configured independent authority.
 

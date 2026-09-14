@@ -16,6 +16,9 @@ declare module "cloudflare:workers" {
     MIRA_INFERENCE_DISABLED?: string;
     MIRA_BACKUP_KEY?: string;
     MIRA_BACKUP_KEY_ID?: string;
+    MIRA_PROTECTED_RECOVERY_ENABLED?: string;
+    MIRA_RECOVERY_AUTHORITY_TOKEN?: string;
+    MIRA_STORE_OBJECT_NAME?: string;
     MIRA_TEST_PROVIDERS?: { fetch(request: Request): Promise<Response> };
     MIRA_ALERT_WEBHOOK?: string;
     MIRA_SUPPORT_OWNER?: string;

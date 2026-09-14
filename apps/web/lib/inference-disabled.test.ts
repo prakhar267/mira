@@ -29,7 +29,12 @@ describe("server-enforced inference shutdown (actual policy and routes, syntheti
       mocks.env.MIRA_INFERENCE_DISABLED = "false";
       expect(await authorizeInference(request())).toMatchObject({ mode: "account", id: "owner", memoryConsent: true });
       vi.clearAllMocks(); mocks.env.MIRA_INFERENCE_DISABLED = "true";
-      const response = await route(request());
+      const input = request();
+      const response = await route(input);
+      if (name !== "capabilities") {
+        expect(input.bodyUsed).toBe(true);
+        expect(input.body?.locked).toBe(false);
+      }
       expect(response.status).toBe(503);
       expect(await response.json()).toMatchObject({ code: "INFERENCE_DISABLED", requestId: expect.any(String) });
       expect(mocks.account).not.toHaveBeenCalled(); expect(mocks.state).not.toHaveBeenCalled(); expect(mocks.get).not.toHaveBeenCalled();

@@ -11,7 +11,10 @@ const request=async(path,init={})=>fetch(`${baseUrl}${path}`,{...init,signal:Abo
 const run=async(name,task)=>{try{const detail=await task();results.push({name,passed:true,detail});console.log(`PASS ${name} — ${detail}`);}catch(error){const cause=error instanceof Error?error.cause:null;const code=cause&&typeof cause==="object"&&"code" in cause&&typeof cause.code==="string"&&/^[A-Z0-9_]{1,80}$/.test(cause.code)?cause.code:null;const detail=`${error instanceof Error?error.message:"Check failed"}${code?` (${code})`:""}`;results.push({name,passed:false,detail});console.log(`FAIL ${name} — ${detail}`);}};
 
 await run("public site and security headers",async()=>{
-  const response=await request("/");await response.arrayBuffer();
+  const response=await request("/");const bytes=await response.arrayBuffer();
+  // Only this credential-isolated synthetic runtime may print an error body.
+  // Production checks never retain response bodies (which can contain data).
+  if(!response.ok&&process.env.MIRA_SYNTHETIC_DIAGNOSTICS==="true"&&baseUrl==="http://127.0.0.1:4398")console.error(`Isolated homepage failure: ${JSON.stringify(new TextDecoder().decode(new Uint8Array(bytes,0,Math.min(bytes.byteLength,8192))))}`);
   check(response.ok,`home HTTP ${response.status}`);
   check(response.headers.get("content-security-policy")?.includes("default-src 'self'"),"CSP missing");
   check(response.headers.get("strict-transport-security")?.includes("max-age=63072000"),"HSTS missing");

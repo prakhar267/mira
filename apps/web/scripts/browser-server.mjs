@@ -2,11 +2,12 @@ import {mkdtemp,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join,resolve} from "node:path";
 import {spawn} from "node:child_process";
+import {retainRuntimeFailure} from "./runtime-diagnostics.mjs";
 
 // Browser acceptance exercises compiled application bytes, not thousands of
 // on-demand Vite modules. All inference/media/account fixtures are synthetic.
-// --local alone does NOT disable remote AI. A server-side inference kill switch
-// and synthetic HTTP fixtures prevent egress; no secret file is inherited.
+// A server-side inference kill switch, blocked runtime egress and synthetic
+// HTTP fixtures isolate inference; no secret file is inherited.
 const cwd=resolve(import.meta.dirname,"..");
 const directory=await mkdtemp(join(tmpdir(),"mira-browser-runtime-"));
 const envFile=join(directory,"empty.env");await writeFile(envFile,"# No credentials\n");
@@ -15,6 +16,7 @@ const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR
   XDG_CONFIG_HOME:join(directory,"config"),XDG_CACHE_HOME:join(directory,"cache"),
   // Do not register this synthetic Worker alongside other local dev sessions.
   WRANGLER_REGISTRY_PATH:join(directory,"registry"),
+  WRANGLER_LOG_PATH:join(directory,"wrangler.log"),WRANGLER_WRITE_LOGS:"true",WRANGLER_LOG_SANITIZE:"true",
   // Explicit non-credential prevents Wrangler from using cached owner OAuth.
   CLOUDFLARE_API_TOKEN:"mira-synthetic-only-no-cloud-access",
   CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV:"false",WRANGLER_SEND_METRICS:"false",CI:"true"};
@@ -29,8 +31,21 @@ if(process.argv.includes("--prebuilt")) {
   const result=await new Promise((resolve,reject)=>{build.on("error",reject);build.on("exit",resolve);});
   if(result!==0)throw new Error(`Browser artifact build failed (${result})`);
 }
-const server=spawn(process.execPath,[join(cwd,"node_modules/wrangler/bin/wrangler.js"),"dev","--config","dist/server/wrangler.json","--local","--no-bundle","--ip","127.0.0.1","--port","4397","--inspector-port","0","--persist-to",join(directory,"state"),"--env-file",envFile,"--var","MIRA_INFERENCE_DISABLED:true"],{cwd,env,stdio:"inherit",detached:process.platform!=="win32"});
-const stop=()=>{if(server.pid)try{if(process.platform!=="win32")process.kill(-server.pid,"SIGTERM");else server.kill("SIGTERM");}catch{/* Already stopped. */}};
+const server=spawn(process.execPath,[join(cwd,"scripts/built-artifact-runtime.mjs"),join(cwd,"dist/server/wrangler.json"),directory,"4397"],{cwd,env,stdio:["ignore","pipe","pipe"],detached:process.platform!=="win32"});
+let output="";
+server.stdout.on("data",chunk=>{output=(output+chunk).slice(-16000);process.stdout.write(chunk);});
+server.stderr.on("data",chunk=>{output=(output+chunk).slice(-16000);process.stderr.write(chunk);});
+let stopping=false;
+const stop=()=>{stopping=true;if(server.pid)try{if(process.platform!=="win32")process.kill(-server.pid,"SIGTERM");else server.kill("SIGTERM");}catch{/* Already stopped. */}};
 process.on("SIGINT",stop);process.on("SIGTERM",stop);
 server.on("error",error=>{stop();throw error;});
-server.on("exit",code=>{process.exitCode=code??0;});
+server.on("exit",(code,signal)=>{process.exitCode=code??(signal&&!stopping?1:0);});
+// Preserve the fatal cause from this credential-isolated synthetic runtime.
+// `close` follows stdio/log flush; the normal console can omit Error.cause.
+server.on("close",async(code,signal)=>{
+  if(stopping||code===0)return;
+  try{
+    await retainRuntimeFailure({directory:join(cwd,"test-results/browser-runtime"),logPath:join(directory,"wrangler.log"),consoleTail:output,exitCode:code,signal});
+    console.error("Isolated browser runtime cause retained in test-results/browser-runtime/runtime-diagnostics.json");
+  }catch{console.error("Could not retain isolated browser runtime diagnostics.");}
+});

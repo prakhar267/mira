@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { SqlStorage } from "./store-engine";
 import { recoveryEventSchema } from "./recovery-journal";
+import { archiveRegistrationSchema, archiveRegistrationReceiptSchema, recoveryHandoffRequestSchema, recoveryHandoffSchema, recoveryAdmissionSchema, type ArchiveRegistrationReceipt, type RecoveryHandoff, type RecoveryAdmission } from "./protected-recovery-protocol";
 import {
   advanceCheckpoint, appendReceiptSchema, appendRequestSchema, canonicalEvent, checkpointSchema,
   genesisCheckpoint, receiptSchema, writerSchema,
@@ -51,8 +52,9 @@ export interface SuppressionPage {
  * This class is NOT a network endpoint or an authentication layer. Its caller
  * must authorize enrollment, appends, reads and especially permanent fencing.
  * A digest is integrity evidence, not a signature or proof of latest state.
- * Separate durable placement, transport authentication and serving/drain fences
- * are still required before using an authority for source-loss recovery. */
+ * Protected v2 recovery supplies authenticated transport, archive registration
+ * and successor admission separately. Durable independent placement remains an
+ * operator activation requirement; this core alone is not offsite protection. */
 export class SuppressionAuthorityEngine {
   private readonly authorityId: string;
   constructor(private readonly sql: SqlStorage, private readonly transaction: <T>(work: () => T) => T, authorityId: string) {
@@ -61,9 +63,11 @@ export class SuppressionAuthorityEngine {
       sql.exec("CREATE TABLE IF NOT EXISTS suppression_authority_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), version INTEGER NOT NULL CHECK(version=1), authority_id TEXT NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS suppression_authority_writers (source TEXT PRIMARY KEY, writer_id TEXT NOT NULL, epoch INTEGER NOT NULL, genesis_digest TEXT NOT NULL, head_sequence INTEGER NOT NULL, head_digest TEXT NOT NULL, fenced INTEGER NOT NULL CHECK(fenced IN (0,1)), target TEXT, challenge TEXT)");
       sql.exec("CREATE TABLE IF NOT EXISTS suppression_authority_entries (source TEXT NOT NULL, sequence INTEGER NOT NULL, value TEXT NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(source,sequence))");
+      sql.exec("CREATE TABLE IF NOT EXISTS suppression_archives (archive_id TEXT PRIMARY KEY, value TEXT NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS suppression_handoffs (source TEXT PRIMARY KEY, successor TEXT UNIQUE NOT NULL, value TEXT NOT NULL, admission TEXT)");
       const identity = sql.exec("SELECT version,authority_id FROM suppression_authority_identity WHERE singleton=1").toArray()[0];
       if (!identity) {
-        if (sql.exec("SELECT source FROM suppression_authority_writers LIMIT 1").toArray().length || sql.exec("SELECT source FROM suppression_authority_entries LIMIT 1").toArray().length) fail("SUPPRESSION_AUTHORITY_CORRUPT");
+        if (sql.exec("SELECT source FROM suppression_authority_writers LIMIT 1").toArray().length || sql.exec("SELECT source FROM suppression_authority_entries LIMIT 1").toArray().length || sql.exec("SELECT archive_id FROM suppression_archives LIMIT 1").toArray().length || sql.exec("SELECT source FROM suppression_handoffs LIMIT 1").toArray().length) fail("SUPPRESSION_AUTHORITY_CORRUPT");
         sql.exec("INSERT INTO suppression_authority_identity(singleton,version,authority_id) VALUES(1,1,?)", this.authorityId);
       } else {
         if (identity.version !== 1) fail("SUPPRESSION_AUTHORITY_CORRUPT");
@@ -141,7 +145,13 @@ export class SuppressionAuthorityEngine {
       const row = this.requireWriter(writer, true);
       this.assertCheckpoint(row, request.after);
       let head = row.head_sequence, digest = row.head_digest;
+      const lineage = this.sql.exec("SELECT value,admission FROM suppression_handoffs WHERE successor=?", writer.source).toArray()[0];
+      const parent = lineage ? stored(recoveryHandoffSchema, JSON.parse(String(lineage.value))) : undefined;
       for (const next of prepared) {
+        if (parent && next.entry.sequence <= parent.previous.sequence) {
+          const inherited = this.entry(parent.previous.source, next.entry.sequence);
+          if (!inherited || canonicalEvent(this.event(inherited).event) !== canonicalEvent(next.entry.event)) fail("SUPPRESSION_INHERITANCE_CONFLICT");
+        } else if (parent && !lineage!.admission) fail("SUPPRESSION_SUCCESSOR_NOT_ADMITTED");
         if (next.entry.sequence <= row.head_sequence) {
           const existing = this.entry(writer.source, next.entry.sequence);
           if (!existing) fail("SUPPRESSION_AUTHORITY_CORRUPT");
@@ -154,6 +164,75 @@ export class SuppressionAuthorityEngine {
       }
       if (head !== row.head_sequence) this.sql.exec("UPDATE suppression_authority_writers SET head_sequence=?,head_digest=? WHERE source=?", head, digest, writer.source);
       return stored(appendReceiptSchema, { ...writer, ...end, head: { sequence: head, digest } });
+    });
+  }
+
+  /** The source registers only after capture under its export lease and a full
+   * independent acknowledgement. Authentication belongs to the service adapter.
+   * Registrations are immutable and cannot bless a different historical file. */
+  registerArchive(raw: unknown): ArchiveRegistrationReceipt {
+    const registration = input(archiveRegistrationSchema, raw), writer = this.parseWriter(registration.writer);
+    return this.transaction(() => {
+      const row = this.requireWriter(writer, true);
+      this.assertCheckpoint(row, registration.checkpoint);
+      const found = this.sql.exec("SELECT value FROM suppression_archives WHERE archive_id=?", registration.archiveId).toArray()[0];
+      if (found) {
+        const saved = stored(archiveRegistrationReceiptSchema, JSON.parse(String(found.value)));
+        if (JSON.stringify(saved) !== JSON.stringify({ ...registration, registered: true })) fail("SUPPRESSION_ARCHIVE_CONFLICT");
+        return saved;
+      }
+      if (registration.checkpoint.sequence !== row.head_sequence) fail("SUPPRESSION_ARCHIVE_NOT_CURRENT");
+      const receipt = { ...registration, registered: true as const };
+      this.sql.exec("INSERT INTO suppression_archives VALUES(?,?)", registration.archiveId, JSON.stringify(receipt));
+      return receipt;
+    });
+  }
+
+  /** One immutable successor per lost generation. No request to the old source
+   * is required. Old reads already authorized may finish; new acknowledgements
+   * are denied by the existing writer fence. This is not byte-level revocation. */
+  async handoff(raw: unknown): Promise<RecoveryHandoff> {
+    const request = input(recoveryHandoffRequestSchema, raw), writer = this.parseWriter(request.registration.writer), successor = this.parseWriter(request.successor);
+    if (successor.source === writer.source || successor.epoch !== 1) fail("SUPPRESSION_HANDOFF_INVALID");
+    const genesis = await genesisCheckpoint(successor);
+    return this.transaction(() => {
+      const row = this.requireWriter(writer, false);
+      const found = this.sql.exec("SELECT value FROM suppression_archives WHERE archive_id=?", request.registration.archiveId).toArray()[0];
+      if (!found) fail("SUPPRESSION_ARCHIVE_UNREGISTERED");
+      const registration = stored(archiveRegistrationReceiptSchema, JSON.parse(String(found.value)));
+      if (JSON.stringify(registration) !== JSON.stringify({ ...request.registration, registered: true })) fail("SUPPRESSION_ARCHIVE_CONFLICT");
+      this.assertCheckpoint(row, registration.checkpoint);
+      const previous = this.receipt(writer, row);
+      const receipt = stored(recoveryHandoffSchema, { ...request, version: 2, registration, previous, fenced: true });
+      const old = this.sql.exec("SELECT value FROM suppression_handoffs WHERE source=?", writer.source).toArray()[0];
+      if (old) {
+        const saved = stored(recoveryHandoffSchema, JSON.parse(String(old.value)));
+        if (JSON.stringify(saved) !== JSON.stringify(receipt)) fail("SUPPRESSION_HANDOFF_CONFLICT");
+        this.requireWriter(successor, true);
+        return saved;
+      }
+      if (row.fenced || this.row(successor.source) || this.sql.exec("SELECT sequence FROM suppression_authority_entries WHERE source=? LIMIT 1", successor.source).toArray().length) fail("SUPPRESSION_HANDOFF_CONFLICT");
+      this.sql.exec("UPDATE suppression_authority_writers SET fenced=1,target=?,challenge=? WHERE source=?", request.target, request.challenge, writer.source);
+      this.sql.exec("INSERT INTO suppression_authority_writers(source,writer_id,epoch,genesis_digest,head_sequence,head_digest,fenced,target,challenge) VALUES(?,?,1,?,0,?,0,NULL,NULL)", successor.source, successor.writerId, genesis.digest, genesis.digest);
+      this.sql.exec("INSERT INTO suppression_handoffs VALUES(?,?,?,NULL)", writer.source, successor.source, JSON.stringify(receipt));
+      return receipt;
+    });
+  }
+
+  admit(raw: unknown, rawCheckpoint: unknown): RecoveryAdmission {
+    const handoff = input(recoveryHandoffSchema, raw), checkpoint = input(checkpointSchema, rawCheckpoint);
+    return this.transaction(() => {
+      const old = this.requireWriter(this.parseWriter(handoff.registration.writer), false);
+      const successor = this.requireWriter(this.parseWriter(handoff.successor), true);
+      const saved = this.sql.exec("SELECT value,admission FROM suppression_handoffs WHERE source=?", handoff.previous.source).toArray()[0];
+      if (!saved || JSON.stringify(stored(recoveryHandoffSchema, JSON.parse(String(saved.value)))) !== JSON.stringify(handoff) || !old.fenced || old.target !== handoff.target || old.challenge !== handoff.challenge) fail("SUPPRESSION_HANDOFF_CONFLICT");
+      this.assertCheckpoint(successor, checkpoint);
+      if (checkpoint.sequence < handoff.previous.sequence) fail("SUPPRESSION_INHERITANCE_INCOMPLETE");
+      if (saved.admission) return stored(recoveryAdmissionSchema, JSON.parse(String(saved.admission)));
+      if (checkpoint.sequence !== successor.head_sequence) fail("SUPPRESSION_CHECKPOINT_CONFLICT");
+      const admission = stored(recoveryAdmissionSchema, { version: 2, handoff, checkpoint, admitted: true });
+      this.sql.exec("UPDATE suppression_handoffs SET admission=? WHERE source=?", JSON.stringify(admission), handoff.previous.source);
+      return admission;
     });
   }
 

@@ -8,7 +8,7 @@ Mira is an original AI companion, not a real person or a substitute for professi
 
 ## Current website
 
-September 13 hardening is a source update pending verified release; the live link can still run the earlier release. The [latest follow-through](docs/READINESS-FOLLOWTHROUGH.md) separates actual streaming, encrypted archive tooling and accessibility improvements from the external launch gates.
+The initial hardening release is deployed ([verified release evidence](docs/READINESS-RELEASE.md)). Subsequent streaming, protected-recovery and test-runtime work is tracked in [PR #3](https://github.com/prakhar267/mira/pull/3) and the [recovery/readiness report](docs/READINESS-RECOVERY-PREPARATION.md). Source availability does not itself prove deployment: check the PR's exact-commit promotion evidence and the live `/api/health` commit. Independent backup activation, real-device call acceptance, email/alert receipt and independent reviews remain separate gates; payments stay disabled.
 
 The [continuation](docs/READINESS-CONTINUATION.md) records further loading improvements and source-loss denial evidence, without claiming the outstanding physical-device, independent-review or production gates are complete.
 

@@ -59,9 +59,12 @@ jobs:
         run: node apps/web/scripts/dependency-smoke.mjs
 
       - name: Execute the built artifact in isolated local Workers runtime
-        run: node apps/web/scripts/artifact-smoke.mjs
-        env:
-          QA_DIRECTORY: audit/readiness-${{ github.run_id }}/artifact/
+        # Fixed independent cold starts, not retries: the first failure stops
+        # promotion. A single lucky start must not hide an intermittent crash.
+        run: |
+          for verification in 1 2 3; do
+            QA_DIRECTORY="apps/web/test-results/artifact-$verification" node apps/web/scripts/artifact-smoke.mjs
+          done
 
       - name: Seal the source-verified and locally smoke-tested artifact
         run: node apps/web/scripts/release-artifact.mjs create apps/web/dist
@@ -95,5 +98,6 @@ jobs:
             apps/web/test-results
             audit/readiness-*/dependency-audit.json
             audit/readiness-*/artifact/production-smoke.json
+            audit/readiness-*/artifact/runtime-diagnostics.json
           if-no-files-found: warn
           retention-days: 7

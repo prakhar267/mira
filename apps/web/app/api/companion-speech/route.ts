@@ -6,6 +6,7 @@ import { authorizeInference } from "@/lib/inference-policy";
 import { parseSpeechPayload } from "@/lib/inference-payloads";
 import { unsafeCompanionOutput } from "@/lib/companion-safety";
 import { providerFetch } from "@/lib/provider-fetch";
+import { discardUnusedRequestBody } from "@/lib/unused-request-body";
 
 const VOICE = {
   model: "inworld-tts-2-flash",
@@ -77,5 +78,7 @@ export async function POST(request: Request) {
     console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-speech" }));
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-speech", startedAt, cause);
     return respond({ error: "Mira ki voice abhi connect nahi ho paayi. Please phir try karo." }, 503, { provider: VOICE.provider, model: VOICE.model });
+  } finally {
+    await discardUnusedRequestBody(request);
   }
 }

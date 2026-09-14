@@ -1,5 +1,6 @@
 export { MockAI, MockProviders } from "./mock-providers.mjs";
 export { MiraStore } from "../../worker.ts";
+export {SyntheticRecoveryAuthority} from "./synthetic-recovery-authority.mjs";
 import * as signup from "../../app/api/account/signup/route.ts";
 import * as login from "../../app/api/account/login/route.ts";
 import * as logout from "../../app/api/account/logout/route.ts";

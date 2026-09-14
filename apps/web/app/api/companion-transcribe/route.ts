@@ -6,6 +6,7 @@ import { withInferenceCapacity } from "@/lib/capacity";
 import { authorizeInference } from "@/lib/inference-policy";
 import { parseTranscriptionPayload } from "@/lib/inference-payloads";
 import { providerFetch } from "@/lib/provider-fetch";
+import { discardUnusedRequestBody } from "@/lib/unused-request-body";
 
 const CLOUDFLARE_MODEL = "@cf/openai/whisper-large-v3-turbo";
 
@@ -83,5 +84,7 @@ export async function POST(request: Request) {
     console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-transcribe" }));
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-transcribe", startedAt, cause);
     return respond({ error: "Voice input abhi connect nahi ho paaya. Please phir try karo." }, 503, { provider: "unavailable", model: `${INWORLD_STT_MODEL},${CLOUDFLARE_MODEL}` });
+  } finally {
+    await discardUnusedRequestBody(request);
   }
 }

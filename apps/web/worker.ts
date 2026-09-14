@@ -1,4 +1,5 @@
 import handler from "vinext/server/fetch-handler";
+import {withRequestBodyCleanup} from "./lib/unused-request-body";
 import { StoreEngine, type SqlStorage, type InferenceReservation } from "./lib/store-engine";
 import { decodeAccountState, type MemoryCommand } from "./lib/account-state-schema";
 import {runOperationalMonitor} from "./lib/operational-monitor";
@@ -9,6 +10,8 @@ import { BackupEngine } from "./lib/backup-engine";
 import { runBackupOperation, type BackupEnvironment } from "./lib/backup-operations";
 import { SourceSuppressionReplicator } from "./lib/suppression-replication";
 import { suppressionTransport, type SuppressionEnvironment } from "./lib/suppression-transport";
+import {runProtectedRecovery,type ProtectedRecoveryEnvironment} from "./lib/protected-recovery";
+import {recoveryAuthorityTransport,type RecoveryTransportEnvironment} from "./lib/recovery-authority-transport";
 export {MiraRecoveryDrill} from "./lib/recovery-drill";
 
 interface LegacyKV {
@@ -25,7 +28,7 @@ export class MiraStore {
   private mail: MailOutboxEngine;
   private backup: BackupEngine;
   private replication: SourceSuppressionReplicator;
-  constructor(private ctx: State, private env: LaunchEnvironment & BackupEnvironment & SuppressionEnvironment & { LUMA_ACCOUNTS?: LegacyKV }) {
+  constructor(private ctx: State, private env: LaunchEnvironment & BackupEnvironment & SuppressionEnvironment & ProtectedRecoveryEnvironment & RecoveryTransportEnvironment & { LUMA_ACCOUNTS?: LegacyKV;MIRA_STORE_OBJECT_NAME?:string }) {
     this.engine = new StoreEngine(ctx.storage.sql);
     this.mail = new MailOutboxEngine(ctx.storage.sql);
     this.backup = new BackupEngine(ctx.storage.sql, this.engine);
@@ -68,12 +71,16 @@ export class MiraStore {
     // This class is reachable only by the Worker binding, never a public route.
     const data = await request.json() as { action: string; key?: string; value?: string; ttl?: number; prefix?: string; cursor?: string; limit?: number; max?: number; seconds?: number; name?: string; failed?: boolean; duration?: number; hash?: string; salt?: string; account?: { id: string }; userId?: string; timestamp?: string; subscription?: Record<string, unknown>; emailKey?:string; keys?:string[];state?:unknown;revision?:number;sessionKey?:string;sessionValue?:string;command?:MemoryCommand;attemptId?:string };
       try {
+        if(data.action==="protectedRecovery")return Response.json(await runProtectedRecovery(this.backup,this.replication,work=>this.ctx.storage.transactionSync(work),this.env,()=>recoveryAuthorityTransport(this.env),data));
         if (data.action === "backup") {
           // The existing retirement proof knows nothing about an independent
           // authority/serving fence. Do not silently use it for protected data.
           this.replication.assertLegacyRecoveryAllowed();
           return Response.json(await runBackupOperation(this.backup, work => this.ctx.storage.transactionSync(work), this.env, data as unknown as Record<string, unknown>));
         }
+        const selection=(data as unknown as {selectedTarget?:string}).selectedTarget??this.env.MIRA_STORE_OBJECT_NAME??"mira-production-v1";
+        if(this.env.MIRA_STORE_OBJECT_NAME&&selection!==this.env.MIRA_STORE_OBJECT_NAME)throw new Error("RECOVERY_TARGET_CONFIGURATION_INVALID");
+        this.ctx.storage.transactionSync(()=>this.backup.assertSelectedTarget(selection));
         await this.replication.flush();
         this.ctx.storage.transactionSync(() => this.backup.assertAvailable());
         if (data.key && ["get", "claimEmail", "bootstrap", "resetPassword"].includes(data.action)) await this.importLegacy(data.key);
@@ -130,7 +137,7 @@ export class MiraStore {
         }
         await this.replication.flush();
         return Response.json(result);
-      } catch(cause) { const code=cause instanceof Error&&(/^(?:BACKUP_|RESTORE_|CUTOVER_|SUPPRESSION_|SOURCE_ALREADY_RETIRED|RECOVERY_MAINTENANCE)/.test(cause.message)||["TRANSCRIPT_LIMIT","CONVERSATION_REMOVED","ACCOUNT_VERIFICATION_REQUIRED"].includes(cause.message))?cause.message:"STORAGE_UNAVAILABLE";return Response.json({ error:code==="ACCOUNT_VERIFICATION_REQUIRED"?"Verify your email after recovery before enabling AI processing.":"Storage operation unavailable",code }, { status:code==="ACCOUNT_VERIFICATION_REQUIRED"?403:code==="TRANSCRIPT_LIMIT"?413:code==="CONVERSATION_REMOVED"?409:503 }); }
+      } catch(cause) { const code=cause instanceof Error&&(/^(?:BACKUP_|RESTORE_|CUTOVER_|SUPPRESSION_|RECOVERY_|SOURCE_ALREADY_RETIRED)/.test(cause.message)||["TRANSCRIPT_LIMIT","CONVERSATION_REMOVED","ACCOUNT_VERIFICATION_REQUIRED"].includes(cause.message))?cause.message:"STORAGE_UNAVAILABLE";return Response.json({ error:code==="ACCOUNT_VERIFICATION_REQUIRED"?"Verify your email after recovery before enabling AI processing.":"Storage operation unavailable",code }, { status:code==="ACCOUNT_VERIFICATION_REQUIRED"?403:code==="TRANSCRIPT_LIMIT"?413:code==="CONVERSATION_REMOVED"?409:503 }); }
   }
   private async migrateBatch(){
     if(this.replication.isProtected())return;
@@ -200,4 +207,5 @@ export class MiraStore {
     console.log(JSON.stringify({event:"mira-monitor",source:state.source,checkedAt:state.checkedAt,database:state.database,alerts:state.alerts.map(a=>a.id),delivery:state.delivery}));
   }
 }
-export default handler;
+const workerHandler = { ...handler, fetch: withRequestBodyCleanup(handler.fetch.bind(handler)) };
+export default workerHandler;
