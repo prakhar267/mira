@@ -71,6 +71,16 @@ the bounded-worker rerun passed without weakening that test. Worker tests:
 checking and deterministic asset checks passed. CI must rebuild and seal the
 final source before promotion.
 
+The first main-branch run after PR #12 failed one Firefox test despite the PR
+run passing: the trace shows `/sw.js` intercepting the synthetic
+`/__qa/avatar-loader.js` module, which exists only in Playwright's route. The
+transport diagnostic now explicitly blocks service workers, matching the
+other HTTP-mocked suites, and asserts that no controller owns it. Application
+service-worker behavior is unchanged; the separate real-avatar performance
+suite still loads the actual bundled application. No test retry, timeout or
+integrity assertion was relaxed. This harness correction must pass CI before
+promotion; the failed run is not a release artifact.
+
 The opt-in [live-call diagnostic](../apps/web/scripts/live-call-audio-qa.mjs)
 feeds six fictional clips through the actual production call UI, native
 browser recorder, STT, chat and Priya playback, including language switches
