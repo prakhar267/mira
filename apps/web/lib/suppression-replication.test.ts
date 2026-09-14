@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { mkdtempSync, rmSync, unlinkSync } from "node:fs";
+import { copyFileSync, mkdtempSync, rmSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -116,6 +116,47 @@ describe("durable independent acknowledgement of real account mutations",()=>{
     source!.sql.exec("DELETE FROM recovery_events WHERE seq=2");await expect(replication.flush()).rejects.toThrow("SOURCE_ROLLBACK");
     source!.sql.exec("UPDATE suppression_protection SET value=?",JSON.stringify({version:999}));expect(()=>replication.isProtected()).toThrow("PROTECTION_INVALID");
   });
+  it("denies a physically rewound source even when its local journal and acknowledged checkpoint agree",async()=>{
+    seed();source!.transaction(()=>store.memoryCommand("synthetic-adult",{action:"create",content:"Synthetic memory must stay forgotten"},read().revision));
+    const memoryId=read().state.memories[0]!.id;
+    await replication.beginProtection(writer);await replication.flush();
+    const sourcePath=join(directory,"source.sqlite"),oldCopy=join(directory,"source-before-forget.sqlite");
+    const reopen=()=>{source=database(sourcePath);store=new StoreEngine(source.sql);journal=new RecoveryJournal(source.sql);replication=new SourceSuppressionReplicator(source.sql,source.transaction,sourceId,()=>transport);};
+    source!.db.close();source=undefined;copyFileSync(sourcePath,oldCopy);reopen();
+    await protectedMutation(()=>store.memoryCommand("synthetic-adult",{action:"forget",id:memoryId},read().revision));
+    expect(replication.status().acknowledgedSequence).toBe(2);
+    source!.db.close();source=undefined;copyFileSync(oldCopy,sourcePath);reopen();
+    expect(replication.status()).toMatchObject({journalSequence:1,acknowledgedSequence:1,pending:0});
+    expect(store.get("state:synthetic-adult")).toContain("Synthetic memory must stay forgotten");
+    await expect(protectedMutation(()=>store.readAccountState("synthetic-adult"))).rejects.toThrow("SUPPRESSION_SOURCE_ROLLBACK");
+    expect(replication.status().acknowledgedSequence).toBe(1);
+    expect(authority.read(writer,await genesisCheckpoint(writer)).entries[1]!.event).toEqual({kind:"memory",userId:"synthetic-adult",id:memoryId});
+  });
+  it("reconstructs through a newer remote head without skipping local events or treating a lost receipt as a source rollback",async()=>{
+    seed();await replication.beginProtection(writer);
+    let advanced=false;
+    transport={authorityId,async append(request){
+      if(!advanced){
+        advanced=true;
+        source!.transaction(()=>journal.append({kind:"memory",userId:"synthetic-adult",id:"concurrent-forget"}));
+        // Another request persisted the full contiguous range, but its receipt
+        // was not saved locally. The first request still ends at sequence 1.
+        await authority.append({writer,after:await genesisCheckpoint(writer),entries:journal.page(0,2)});
+      }
+      return authority.append(request);
+    }};
+    await replication.flush();expect(replication.status()).toMatchObject({acknowledgedSequence:2,pending:0});
+  });
+  it("rejects missing, older or conflicting independent heads rather than trusting an old-format prefix receipt",async()=>{
+    seed();await replication.beginProtection(writer);
+    const genesis=await genesisCheckpoint(writer);
+    transport={authorityId,async append(request){const accepted=await authority.append(request);return {...accepted,head:genesis};}};
+    await expect(replication.flush()).rejects.toThrow("RECEIPT_INVALID");
+    transport={authorityId,async append(request){const accepted=await authority.append(request);return {...accepted,head:{...accepted.head,digest:genesis.digest}};}};
+    await expect(replication.flush()).rejects.toThrow("RECEIPT_INVALID");
+    transport={authorityId,async append(request){const accepted=await authority.append(request);return {authorityId:accepted.authorityId,source:accepted.source,writerId:accepted.writerId,epoch:accepted.epoch,sequence:accepted.sequence,digest:accepted.digest};}};
+    await expect(replication.flush()).rejects.toThrow("RECEIPT_INVALID");expect(replication.status().acknowledgedSequence).toBe(0);
+  });
   it("journals legacy deleted memories during a read migration exactly once without their content",async()=>{
     const state=structuredClone(initialState);state.messages=[];state.memories=[{...initialState.memories[0]!,id:"legacy-forgotten",status:"deleted",content:"Synthetic legacy erased content"}];
     source!.transaction(()=>{store.put("account:synthetic-adult",'{"id":"synthetic-adult"}');store.put("state:synthetic-adult",JSON.stringify(state));});
@@ -146,5 +187,69 @@ describe("dormant HTTPS suppression transport",()=>{
     const after=await genesisCheckpoint(writer);
     await expect(suppressionTransport(configuration,vi.fn(async()=>new Response("x".repeat(4097))))!.append({writer,after,entries:[]})).rejects.toThrow("RECEIPT_INVALID");
     await expect(suppressionTransport(configuration,vi.fn(async()=>new Response("sensitive provider details",{status:503})))!.append({writer,after,entries:[]})).rejects.toThrow("AUTHORITY_UNAVAILABLE");
+  });
+});
+
+describe("configured protection survives rollback past activation",()=>{
+  it("refuses normal, raw and legacy access after the local protection row disappears and the source restarts",async()=>{
+    seed();await replication.beginProtection(writer);await replication.flush();
+    source!.transaction(()=>source!.sql.exec("DELETE FROM suppression_protection"));
+    source!.db.close();source=database(join(directory,"source.sqlite"));
+    store=new StoreEngine(source.sql);journal=new RecoveryJournal(source.sql);
+    replication=new SourceSuppressionReplicator(source.sql,source.transaction,sourceId,()=>transport);
+    requests.length=0;
+    const normalRead=vi.fn(()=>store.get("account:synthetic-adult"));
+    const normalMutation=vi.fn(()=>store.eraseAccount("synthetic-adult","synthetic-adult",[]));
+
+    expect(()=>replication.isProtected()).toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    expect(()=>replication.status()).toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    await expect(replication.flush()).rejects.toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    await expect(protectedMutation(normalRead)).rejects.toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    await expect(protectedMutation(normalMutation)).rejects.toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    for(const key of ["account:synthetic-adult","state:synthetic-adult","session:synthetic"])
+      expect(()=>replication.assertRawMutationAllowed(key)).toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    expect(()=>replication.assertLegacyRecoveryAllowed()).toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    expect(normalRead).not.toHaveBeenCalled();expect(normalMutation).not.toHaveBeenCalled();
+    expect(requests).toEqual([]);expect(journal.watermark()).toBe(1);
+    expect(store.get("account:synthetic-adult")).not.toBeNull();
+    expect(source.sql.exec("SELECT * FROM suppression_protection").toArray()).toEqual([]);
+  });
+
+  it("allows only explicit internal provisioning to establish the missing row, while truly unconfigured dormant operation remains available",async()=>{
+    const originalTransport=transport;
+    expect(()=>replication.status()).toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    await expect(replication.flush()).rejects.toThrow("SUPPRESSION_PROTECTION_REQUIRED");
+    expect(requests).toEqual([]);
+    transport=undefined;
+    expect(replication.isProtected()).toBe(false);
+    expect(replication.status()).toMatchObject({protected:false,acknowledgedSequence:null});
+    expect(()=>replication.assertRawMutationAllowed("state:synthetic-adult")).not.toThrow();
+    expect(()=>replication.assertLegacyRecoveryAllowed()).not.toThrow();
+    await replication.flush();expect(requests).toEqual([]);
+    transport=originalTransport;
+    await replication.beginProtection(writer);await replication.flush();
+    expect(replication.status()).toMatchObject({protected:true,acknowledgedSequence:0,pending:0});
+    expect(requests).toHaveLength(1);
+  });
+
+  it("fails closed for partially configured authorities with no local protection row and never sends an append",async()=>{
+    const network=vi.fn<typeof fetch>(async()=>{throw new Error("Synthetic network must not run");});
+    const partial:Parameters<typeof suppressionTransport>[0][]=[
+      {MIRA_SUPPRESSION_AUTHORITY_URL:"https://independent.example.test/journal/append"},
+      {MIRA_SUPPRESSION_AUTHORITY_ID:authorityId},
+      {MIRA_SUPPRESSION_AUTHORITY_TOKEN:"synthetic-test-only-token-123456789"},
+      {MIRA_SUPPRESSION_AUTHORITY_URL:"https://independent.example.test/journal/append",MIRA_SUPPRESSION_AUTHORITY_ID:authorityId},
+    ];
+    for(const configuration of partial){
+      replication=new SourceSuppressionReplicator(source!.sql,source!.transaction,sourceId,()=>suppressionTransport(configuration,network));
+      expect(()=>replication.isProtected()).toThrow();expect(()=>replication.status()).toThrow();
+      await expect(replication.flush()).rejects.toThrow();
+      expect(()=>replication.assertRawMutationAllowed("state:synthetic-adult")).toThrow();
+      expect(()=>replication.assertLegacyRecoveryAllowed()).toThrow();
+      const work=vi.fn(()=>store.get("account:synthetic-adult"));
+      await expect(protectedMutation(work)).rejects.toThrow();expect(work).not.toHaveBeenCalled();
+    }
+    expect(network).not.toHaveBeenCalled();expect(requests).toEqual([]);
+    expect(source!.sql.exec("SELECT * FROM suppression_protection").toArray()).toEqual([]);
   });
 });

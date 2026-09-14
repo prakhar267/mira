@@ -6,11 +6,15 @@ const sequence = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const writerSchema = z.object({authorityId:id,source:id,writerId:id,epoch:sequence.positive()}).strict();
 export const checkpointSchema = z.object({sequence,digest:z.string().regex(/^[A-Za-z0-9+/]{43}=$/)}).strict();
 export const receiptSchema = writerSchema.extend(checkpointSchema.shape).strict();
+// An append acknowledges the reconstructed request end AND reports the current
+// independent head. A historical source prefix must not hide a newer deletion.
+export const appendReceiptSchema = receiptSchema.extend({head:checkpointSchema}).strict();
 export const journalEntrySchema = z.object({sequence:sequence.positive(),event:recoveryEventSchema}).strict();
 export const appendRequestSchema = z.object({writer:writerSchema,after:checkpointSchema,entries:z.array(journalEntrySchema).max(128)}).strict();
 export type Writer = z.infer<typeof writerSchema>;
 export type Checkpoint = z.infer<typeof checkpointSchema>;
 export type Receipt = z.infer<typeof receiptSchema>;
+export type AppendReceipt = z.infer<typeof appendReceiptSchema>;
 export type JournalEntry = z.infer<typeof journalEntrySchema>;
 export type AppendRequest = z.infer<typeof appendRequestSchema>;
 

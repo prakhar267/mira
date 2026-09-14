@@ -53,21 +53,24 @@ describe("independent suppression authority core", () => {
     expect(count(reopened)).toBe(2);
   });
 
-  it("accepts exact, reordered-property, prefix and overlapping retries but returns only the request-end receipt", async () => {
+  it("accepts exact, reordered-property, prefix and overlapping retries with separate request-end and current-head checkpoints", async () => {
     const db = database("authority.sqlite"), genesis = await genesisCheckpoint(writer);
     await db.engine.enroll(writer.source, writer.writerId);
     const initial: AppendRequest = { writer, after: genesis, entries: entries.slice(0, 3) };
     const accepted = await db.engine.append(initial);
+    const current = await advanceCheckpoint(writer, genesis, entries.slice(0, 3));
+    expect(accepted).toEqual({ ...writer, ...current, head: current });
     expect(await db.engine.append(initial)).toEqual(accepted);
     // Property order is not journal identity; an event's semantic values are.
-    expect(await db.engine.append({ writer, after: genesis, entries: [{ sequence: 1, event: { userId: "deleted-user", kind: "account" } }] })).toEqual({ ...writer, ...await advanceCheckpoint(writer, genesis, entries.slice(0, 1)) });
-    expect(await db.engine.append({ writer, after: genesis, entries: [] })).toEqual({ ...writer, ...genesis });
+    expect(await db.engine.append({ writer, after: genesis, entries: [{ sequence: 1, event: { userId: "deleted-user", kind: "account" } }] })).toEqual({ ...writer, ...await advanceCheckpoint(writer, genesis, entries.slice(0, 1)), head: current });
+    expect(await db.engine.append({ writer, after: genesis, entries: [] })).toEqual({ ...writer, ...genesis, head: current });
     const first = await advanceCheckpoint(writer, genesis, entries.slice(0, 1));
     const overlap = await db.engine.append({ writer, after: first, entries: entries.slice(1) });
-    expect(overlap).toEqual({ ...writer, ...await advanceCheckpoint(writer, genesis, entries) });
+    const next = await advanceCheckpoint(writer, genesis, entries);
+    expect(overlap).toEqual({ ...writer, ...next, head: next });
     expect(count(db)).toBe(4);
     const page = db.engine.read(writer, genesis);
-    expect(page).toEqual({ entries, checkpoint: { sequence: overlap.sequence, digest: overlap.digest }, head: overlap, fenced: false, hasMore: false });
+    expect(page).toEqual({ entries, checkpoint: next, head: { ...writer, ...next }, fenced: false, hasMore: false });
   });
 
   it("recovers from a lost receipt across an actual SQLite close/reopen without duplicating events", async () => {
@@ -77,7 +80,8 @@ describe("independent suppression authority core", () => {
     await db.engine.append(request); // The source never receives/persists this result.
     db.close();
     const reopened = database("authority.sqlite");
-    expect(await reopened.engine.append(request)).toEqual({ ...writer, ...await advanceCheckpoint(writer, genesis, entries) });
+    const expected = await advanceCheckpoint(writer, genesis, entries);
+    expect(await reopened.engine.append(request)).toEqual({ ...writer, ...expected, head: expected });
     expect(count(reopened)).toBe(4);
   });
 
@@ -91,8 +95,8 @@ describe("independent suppression authority core", () => {
     source.close(); await unlink(source.path);
     authority.close();
     const survivingAuthority = database("authority.sqlite");
-    expect(survivingAuthority.engine.read(writer, genesis)).toMatchObject({ entries, head: receipt });
-    expect(survivingAuthority.engine.fence(writer, "restoration-target", "fresh-challenge")).toMatchObject({ ...receipt, fenced: true });
+    expect(survivingAuthority.engine.read(writer, genesis)).toMatchObject({ entries, head: { ...writer, ...receipt.head } });
+    expect(survivingAuthority.engine.fence(writer, "restoration-target", "fresh-challenge")).toMatchObject({ ...writer, ...receipt.head, fenced: true });
     // This proves independent journal survival and writer revocation only. No
     // BackupEngine admission or permission to serve restored data is exercised.
   });
@@ -173,7 +177,8 @@ describe("independent suppression authority core", () => {
     expect(count(db)).toBe(0);
     expect(await db.engine.enroll(writer.source, writer.writerId)).toEqual({ ...writer, ...genesis });
     db.sql.exec("DROP TRIGGER synthetic_storage_failure");
-    expect(await db.engine.append({ writer, after: genesis, entries })).toEqual({ ...writer, ...await advanceCheckpoint(writer, genesis, entries) });
+    const expected = await advanceCheckpoint(writer, genesis, entries);
+    expect(await db.engine.append({ writer, after: genesis, entries })).toEqual({ ...writer, ...expected, head: expected });
   });
 
   it("permanently fences a pinned target/challenge/head, including after process restart", async () => {
@@ -181,7 +186,7 @@ describe("independent suppression authority core", () => {
     await db.engine.enroll(writer.source, writer.writerId);
     const accepted = await db.engine.append({ writer, after: genesis, entries });
     const fence = db.engine.fence(writer, "target-a", "challenge-a");
-    expect(fence).toEqual({ ...accepted, fenced: true, target: "target-a", challenge: "challenge-a" });
+    expect(fence).toEqual({ ...writer, ...accepted.head, fenced: true, target: "target-a", challenge: "challenge-a" });
     expect(db.engine.fence(writer, "target-a", "challenge-a")).toEqual(fence);
     expect(() => db.engine.fence(writer, "target-b", "challenge-a")).toThrow("SUPPRESSION_FENCE_CONFLICT");
     expect(() => db.engine.fence(writer, "target-a", "challenge-b")).toThrow("SUPPRESSION_FENCE_CONFLICT");
@@ -192,7 +197,7 @@ describe("independent suppression authority core", () => {
     for (const retry of [[], entries.slice(0, 1), entries]) await expect(reopened.engine.append({ writer, after: genesis, entries: retry })).rejects.toThrow("SUPPRESSION_WRITER_FENCED");
     await expect(reopened.engine.enroll(writer.source, writer.writerId)).rejects.toThrow("SUPPRESSION_WRITER_FENCED");
     await expect(reopened.engine.enroll(writer.source, "replacement-writer")).rejects.toThrow("SUPPRESSION_WRITER_MISMATCH");
-    expect(reopened.engine.read(writer, genesis)).toMatchObject({ entries, fenced: true, head: accepted });
+    expect(reopened.engine.read(writer, genesis)).toMatchObject({ entries, fenced: true, head: { ...writer, ...accepted.head } });
     expect(count(reopened)).toBe(4);
   });
 
@@ -254,5 +259,25 @@ describe("independent suppression authority core", () => {
     expect(() => db.engine.read(writer, genesis)).toThrow("SUPPRESSION_AUTHORITY_CORRUPT");
     expect(db.sql.exec("SELECT fenced FROM suppression_authority_writers").toArray()).toEqual([{ fenced: 0 }]);
     expect(count(db)).toBe(4);
+  });
+
+  it("reveals a later independent deletion when a rolled-back source retries its old acknowledged prefix", async () => {
+    const db = database("authority.sqlite"), genesis = await genesisCheckpoint(writer);
+    await db.engine.enroll(writer.source, writer.writerId);
+    const beforeDeletion: JournalEntry[] = [{ sequence: 1, event: { kind: "privacy", userId: "deleted-later", revision: 1, ai: true, memory: true, history: true } }];
+    const prefix = await advanceCheckpoint(writer, genesis, beforeDeletion);
+    await db.engine.append({ writer, after: genesis, entries: beforeDeletion });
+    const deletion: JournalEntry[] = [{ sequence: 2, event: { kind: "account", userId: "deleted-later" } }];
+    const latest = await advanceCheckpoint(writer, prefix, deletion);
+    await db.engine.append({ writer, after: prefix, entries: deletion });
+    db.close();
+    const surviving = database("authority.sqlite");
+
+    // A rolled-back source still has a valid old ack digest. The authority must
+    // not conceal its newer deletion merely because this retry has no entries.
+    expect(await surviving.engine.append({ writer, after: prefix, entries: [] })).toEqual({ ...writer, ...prefix, head: latest });
+    expect(await surviving.engine.append({ writer, after: genesis, entries: beforeDeletion })).toEqual({ ...writer, ...prefix, head: latest });
+    expect(count(surviving)).toBe(2);
+    expect(surviving.engine.read(writer, prefix)).toEqual({ entries: deletion, checkpoint: latest, head: { ...writer, ...latest }, fenced: false, hasMore: false });
   });
 });

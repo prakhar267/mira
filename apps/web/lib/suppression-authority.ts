@@ -2,9 +2,9 @@ import { z } from "zod";
 import type { SqlStorage } from "./store-engine";
 import { recoveryEventSchema } from "./recovery-journal";
 import {
-  advanceCheckpoint, appendRequestSchema, canonicalEvent, checkpointSchema,
+  advanceCheckpoint, appendReceiptSchema, appendRequestSchema, canonicalEvent, checkpointSchema,
   genesisCheckpoint, receiptSchema, writerSchema,
-  type Checkpoint, type JournalEntry, type Receipt, type Writer,
+  type AppendReceipt, type Checkpoint, type JournalEntry, type Receipt, type Writer,
 } from "./suppression-protocol";
 
 export class SuppressionAuthorityError extends Error {
@@ -123,10 +123,12 @@ export class SuppressionAuthorityEngine {
     });
   }
 
-  /** Returns the request-END checkpoint, not a newer head which the source has
-   * not reconstructed. Exact old duplicates and empty appends still recheck the
-   * current active writer; they cannot bypass a fence or invalid checkpoint. */
-  async append(raw: unknown): Promise<Receipt> {
+  /** The top-level checkpoint is the request-END, which the source reconstructs.
+   * Its separate `head` is the authority's current checkpoint from this SAME
+   * commit transaction: old/empty retries must reveal later independent events
+   * so a source cannot silently serve after both its journal and ack roll back.
+   * Neither checkpoint is permission to serve or bypass writer revocation. */
+  async append(raw: unknown): Promise<AppendReceipt> {
     const request = input(appendRequestSchema, raw), writer = this.parseWriter(request.writer);
     let end = request.after;
     const prepared: { entry: JournalEntry; digest: string }[] = [];
@@ -151,7 +153,7 @@ export class SuppressionAuthorityEngine {
         }
       }
       if (head !== row.head_sequence) this.sql.exec("UPDATE suppression_authority_writers SET head_sequence=?,head_digest=? WHERE source=?", head, digest, writer.source);
-      return { ...writer, ...end };
+      return stored(appendReceiptSchema, { ...writer, ...end, head: { sequence: head, digest } });
     });
   }
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { SqlStorage } from "./store-engine";
 import { RecoveryJournal } from "./recovery-journal";
-import { advanceCheckpoint, checkpointSchema, genesisCheckpoint, receiptSchema, writerSchema, type SuppressionTransport, type Writer } from "./suppression-protocol";
+import { advanceCheckpoint, appendReceiptSchema, checkpointSchema, genesisCheckpoint, writerSchema, type SuppressionTransport, type Writer } from "./suppression-protocol";
 
 const protectionSchema=z.object({version:z.literal(1),writer:writerSchema,acknowledged:checkpointSchema}).strict();
 type Protection=z.infer<typeof protectionSchema>;
@@ -29,9 +29,17 @@ export class SourceSuppressionReplicator {
   private save(protection:Protection) {
     this.sql.exec("INSERT INTO suppression_protection(id,value) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",JSON.stringify(protection));
   }
-  isProtected(){return this.load()!==undefined;}
+  private expectedProtection():Protection|undefined {
+    const state=this.load();
+    // Configuration lives outside the restorable source SQL. A snapshot from
+    // before activation must not silently turn a configured generation off.
+    // Provisioning is deliberately separate and cannot be triggered by reads.
+    if(!state&&this.transport())throw new Error("SUPPRESSION_PROTECTION_REQUIRED");
+    return state;
+  }
+  isProtected(){return this.expectedProtection()!==undefined;}
   status(){
-    const state=this.load(),head=this.journal.watermark();
+    const state=this.expectedProtection(),head=this.journal.watermark();
     return {protected:Boolean(state),journalSequence:head,acknowledgedSequence:state?.acknowledged.sequence??null,pending:state?Math.max(0,head-state.acknowledged.sequence):null};
   }
   /** Internal provisioning primitive for an independently enrolled generation.
@@ -59,9 +67,9 @@ export class SourceSuppressionReplicator {
   assertLegacyRecoveryAllowed() {
     if(this.isProtected())throw new Error("SUPPRESSION_RECOVERY_ADMISSION_REQUIRED");
   }
-  flush():Promise<void> {
-    // No authority configured is allowed ONLY while no durable protection row
-    // exists. Removing a secret, binding or env flag never disables protection.
+  async flush():Promise<void> {
+    // Dormant operation requires BOTH absent external configuration and absent
+    // durable protection. Either witness alone is enough to deny a downgrade.
     if(!this.isProtected())return Promise.resolve();
     const through=this.journal.watermark();
     const run=this.pending.then(()=>this.flushThrough(through));
@@ -85,13 +93,20 @@ export class SourceSuppressionReplicator {
       let raw:unknown;
       try {raw=await transport.append({writer:state.writer,after:state.acknowledged,entries});}
       catch {throw new Error("SUPPRESSION_ACK_PENDING");}
-      const receipt=receiptSchema.safeParse(raw);
-      if(!receipt.success||JSON.stringify(receipt.data)!==JSON.stringify({...state.writer,...expected}))throw new Error("SUPPRESSION_RECEIPT_INVALID");
+      const receipt=appendReceiptSchema.safeParse(raw);
+      if(!receipt.success)throw new Error("SUPPRESSION_RECEIPT_INVALID");
+      const {head:independentHead,...accepted}=receipt.data;
+      if(JSON.stringify(accepted)!==JSON.stringify({...state.writer,...expected})||independentHead.sequence<expected.sequence||(independentHead.sequence===expected.sequence&&independentHead.digest!==expected.digest))throw new Error("SUPPRESSION_RECEIPT_INVALID");
       this.transaction(()=>{
         const latest=this.load();
         if(!latest||JSON.stringify(latest)!==JSON.stringify(state))throw new Error("SUPPRESSION_CHECKPOINT_CHANGED");
+        // A whole-source rollback can rewind BOTH local journal and checkpoint.
+        // The independently current head must still be represented locally;
+        // merely accepting an old hash-chain prefix is insufficient evidence.
+        if(independentHead.sequence>this.journal.watermark())throw new Error("SUPPRESSION_SOURCE_ROLLBACK");
         if(expected.sequence!==state.acknowledged.sequence)this.save({...state,acknowledged:expected});
       });
+      through=Math.max(through,independentHead.sequence);
       if(expected.sequence>=through)return;
     }
     // Bounded replay makes durable progress, but never reports success partway.

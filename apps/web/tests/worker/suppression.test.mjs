@@ -107,4 +107,40 @@ describe("actual MiraStore suppression response boundary",()=>{
     await runInDurableObject(source(),instance=>expect(instance.engine.row("account:stale-legacy-user")).toBeUndefined());
     expect(fetch).not.toHaveBeenCalled();
   });
+  it("refuses an older source snapshot whose journal AND acknowledgement were rewound after a durable forget",async()=>{
+    await seed();await action({action:"memoryCommand",userId:"synthetic-adult",revision:1,command:{action:"create",content:"Synthetic forgotten before source rollback"}});
+    const writer=await protect();
+    const before=await runInDurableObject(source(),(instance,ctx)=>({
+      state:instance.engine.get("state:synthetic-adult"),
+      protection:ctx.storage.sql.exec("SELECT value FROM suppression_protection WHERE id=1").toArray()[0].value,
+      memoryId:instance.engine.readAccountState("synthetic-adult").state.memories[0].id,
+    }));
+    expect((await action({action:"memoryCommand",userId:"synthetic-adult",revision:2,command:{action:"forget",id:before.memoryId}})).status).toBe(200);
+    expect((await remoteJournal(writer)).head.sequence).toBe(2);
+    await runInDurableObject(source(),(instance,ctx)=>ctx.storage.transactionSync(()=>{
+      ctx.storage.sql.exec("UPDATE records SET value=? WHERE key='state:synthetic-adult'",before.state);
+      ctx.storage.sql.exec("DELETE FROM memory_suppressions WHERE user_id='synthetic-adult'");
+      ctx.storage.sql.exec("UPDATE privacy_suppressions SET revision=2 WHERE user_id='synthetic-adult'");
+      ctx.storage.sql.exec("DELETE FROM recovery_events WHERE seq>1");
+      ctx.storage.sql.exec("UPDATE suppression_protection SET value=? WHERE id=1",before.protection);
+      expect(instance.replication.status()).toMatchObject({journalSequence:1,acknowledgedSequence:1,pending:0});
+    }));
+    const denied=await action({action:"stateRead",userId:"synthetic-adult"});
+    expect(denied).toMatchObject({status:503,body:{code:"SUPPRESSION_SOURCE_ROLLBACK"}});
+    expect(JSON.stringify(denied)).not.toContain("Synthetic forgotten");expect(fetch).not.toHaveBeenCalled();
+  });
+  it("refuses an activated source restored to before its local protection row existed",async()=>{
+    await seed();await protect();
+    await runInDurableObject(source(),(instance,ctx)=>{
+      ctx.storage.sql.exec("DELETE FROM suppression_protection");
+      // Reconstruct as a process restart, retaining the externally configured
+      // authority. An old database cannot choose an unprotected generation.
+      instance.replication=new SourceSuppressionReplicator(ctx.storage.sql,work=>ctx.storage.transactionSync(work),instance.backup.source(),()=>({authorityId,append:async()=>{throw Error("Must fail before any authority request");}}));
+    });
+    const denied=await action({action:"stateRead",userId:"synthetic-adult"});
+    expect(denied).toMatchObject({status:503,body:{code:"SUPPRESSION_PROTECTION_REQUIRED"}});
+    expect(JSON.stringify(denied)).not.toContain("synthetic-adult");
+    expect((await action({action:"put",key:"state:synthetic-adult",value:"{}"})).body.code).toBe("SUPPRESSION_PROTECTION_REQUIRED");
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });
