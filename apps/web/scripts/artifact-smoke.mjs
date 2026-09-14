@@ -38,9 +38,16 @@ try{
   }
   if(!ready)throw new Error(`Local artifact failed readiness: ${output}`);
   // Probe the server boundary, not merely the browser mocks or credential absence.
-  const denied=await fetch(`${base}/api/companion-chat`,{method:"POST",headers:{"content-type":"application/json",origin:base},body:"{}",signal:AbortSignal.timeout(5000)});
-  const deniedBody=await denied.json();
-  if(denied.status!==503||deniedBody.code!=="INFERENCE_DISABLED")throw new Error("Local artifact did not refuse external inference");
+  // Rejected POSTs still own request streams. Exercise successive small/large
+  // bodies before GETs: an unread body can poison the local proxy connection.
+  const inferenceRoutes=["companion-chat","companion-speech","companion-transcribe","companion-memory"];
+  for(let probe=0;probe<24;probe++){
+    const route=inferenceRoutes[probe%inferenceRoutes.length];
+    const denied=await fetch(`${base}/api/${route}`,{method:"POST",headers:{"content-type":"application/json",origin:base},body:Math.floor(probe/inferenceRoutes.length)%2?JSON.stringify({synthetic:"x".repeat(8192)}):"{}",signal:AbortSignal.timeout(5000)});
+    const deniedBody=await denied.json();
+    if(denied.status!==503||deniedBody.code!=="INFERENCE_DISABLED")throw new Error("Local artifact did not refuse external inference");
+  }
+  console.log("24 rejected POST bodies: expected inference-disabled responses, zero inference calls.");
   const smoke=spawn(process.execPath,[join(web,"scripts/production-smoke.mjs")],{cwd:resolve(web,"../.."),env:{...env,COMPANARO_URL:base,MIRA_EXPECTED_SHA:process.env.GITHUB_SHA??"unreleased",MIRA_SYNTHETIC_DIAGNOSTICS:"true",QA_DIRECTORY:evidence},stdio:"inherit"});
   const code=await new Promise((resolve,reject)=>{smoke.on("error",reject);smoke.on("exit",resolve);});
   // This server has isolated synthetic credentials and no real user requests.

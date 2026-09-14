@@ -6,6 +6,7 @@ import { withInferenceCapacity } from "@/lib/capacity";
 import { withProviderDeadline } from "@/lib/provider-resilience";
 import { assessCompanionSafety } from "@/lib/companion-safety";
 import { assertCurrentMemoryContext } from "@/lib/inference-context";
+import { discardUnusedRequestBody } from "@/lib/unused-request-body";
 
 const MODEL = "@cf/baai/bge-reranker-base";
 
@@ -41,5 +42,7 @@ export async function POST(request: Request) {
     console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-memory" }));
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-memory", startedAt, cause);
     return respond({ error: "Memory retrieval is temporarily unavailable." }, 503, { model: MODEL });
+  } finally {
+    await discardUnusedRequestBody(request);
   }
 }

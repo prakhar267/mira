@@ -10,6 +10,7 @@ import { assessCompanionSafety, safeOutputReplacement, unsafeCompanionOutput } f
 import { assertCurrentMemoryContext } from "@/lib/inference-context";
 import { chatDeliveryStream } from "@/lib/chat-delivery-stream";
 import { CHAT_STREAM_TYPE } from "@/lib/chat-stream-protocol";
+import { discardUnusedRequestBody } from "@/lib/unused-request-body";
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
@@ -145,5 +146,7 @@ export async function POST(request: Request) {
     console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-chat" }));
     if (error instanceof EdgeRequestError) return edgeError(requestId, "companion-chat", startedAt, error);
     return respond({ error: "Mira could not form a fresh reply just now." }, 503, { model: MODEL });
+  } finally {
+    await discardUnusedRequestBody(request);
   }
 }

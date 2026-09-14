@@ -1,4 +1,5 @@
 import handler from "vinext/server/fetch-handler";
+import {withRequestBodyCleanup} from "./lib/unused-request-body";
 import { StoreEngine, type SqlStorage, type InferenceReservation } from "./lib/store-engine";
 import { decodeAccountState, type MemoryCommand } from "./lib/account-state-schema";
 import {runOperationalMonitor} from "./lib/operational-monitor";
@@ -200,4 +201,5 @@ export class MiraStore {
     console.log(JSON.stringify({event:"mira-monitor",source:state.source,checkedAt:state.checkedAt,database:state.database,alerts:state.alerts.map(a=>a.id),delivery:state.delivery}));
   }
 }
-export default handler;
+const workerHandler = { ...handler, fetch: withRequestBodyCleanup(handler.fetch.bind(handler)) };
+export default workerHandler;

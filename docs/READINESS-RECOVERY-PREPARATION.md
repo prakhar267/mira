@@ -28,6 +28,16 @@ CI now requires three fixed independent cold starts of the built artifact. The *
 
 ## Verification and remaining gates
 
+### Reproduced rejected-body failure and bounded fix
+
+[PR CI 34819384528](https://github.com/prakhar267/mira/actions/runs/34819384528) captured the previously missing cause: `ProxyController` / `ProxyWorker` reported `Network connection lost` after a request was rejected before consuming its POST body. Two independent artifact cold starts passed and the third failed. The same failure was reproduced locally by successive 2-byte/8-KiB synthetic POSTs, without credentials or provider access.
+
+The no-bundle artifact does not receive Wrangler's development body-draining middleware. [Cloudflare's merged upstream fix explains why unread rejected POST bodies require cleanup](https://github.com/cloudflare/workers-sdk/pull/5106). The framework also transfers the incoming body to a replacement Request: an outer Worker wrapper alone was tested and **did not fix the reproduction**. Cleanup therefore runs in each of the four inference routes that owns the final Request, as well as the Worker boundary for pre-routing failures. It runs after the handler has authorized or refused the operation, without decoding, logging or retaining content. It stops at 100 ms, 32 chunks or the chunk crossing 64 KiB, and does not await a stalled cancellation. Denial responses and provider isolation are unchanged.
+
+The chat-route fix passed the reproduced 24-POST sequence followed by five public artifact checks. The expanded regression rotates chat, speech, transcription and memory requests with both body sizes; CI requires that sequence on each of three independent cold starts. The new head must pass those checks before promotion. Seven focused cleanup tests cover unchanged responses/errors, already-owned bodies, chunk/byte bounds, stalled bodies/cancellation and disconnected streams; the actual four route tests assert rejected bodies are released and no account, budget or provider access occurs.
+
+Final local verification of the expanded fix passed all **358 web tests**, **32 actual Worker tests**, zero-warning lint, route generation/TypeScript and a new Cloudflare build. Three fixed cold starts each passed all 24 rejected-body probes and all five public checks: **72 expected denials and 15/15 smoke checks**. No production request or inference call was used for that regression. Linux CI is still a separate required gate.
+
 The isolated preparation branch passed all 345 web tests and 32 actual Worker integration tests. After integrating four runtime-diagnostics regressions, the primary workspace passed **349/349 web tests across 44 files**, full zero-warning web lint and route generation/TypeScript checks. Fresh compiled-browser/CI results for this new head must be checked separately; the parent commit's 90 passing browser cases are not substituted for that verification.
 
 Remaining: resolve and verify the cold-start artifact failure; complete protection bootstrap/provenance, serving/drain fencing and source-loss admission/handoff; provision approved independent resources and key custody without spending; verify real email/alert receipt; physical voice/video, screen-reader and independent legal/security/provider review. Passing internal tests does not complete those gates.
