@@ -1,0 +1,170 @@
+{
+  "sourceSha256": "3b5f011aa01902d8a64788af7713fe317fee3f7a38c0b6300003816f3374e69b",
+  "path": "/assets/mira/avatar/mira-anime-call-v2.glb.gz",
+  "bytes": 1235862,
+  "sha256": "ca9f1f391ddf375ba5f538c94c7e6d4ff94a86cd91ef35d27a767f963fbca9a4",
+  "decodedBytes": 2920764,
+  "decodedSha256": "eac3a8b7c960897fbe9328988c2593e2e6f73667ddc5c57d91cacc3c630c39d5",
+  "portraitPath": "/assets/mira/avatar/mira-anime-preview-v2.webp",
+  "portraitBytes": 13868,
+  "portraitSha256": "f60bf046bbe1b74b1da9a5ac1a6e321fc8943d1e4004173dad9b2cc0c78d96c4",
+  "images": [
+    {
+      "index": 0,
+      "width": 1024,
+      "height": 1024,
+      "rgbaSha256": "d96751aef484d4cb02ec1634e91d88cf54e84dd1a8bf5da1a237e01ad9ba2e37",
+      "bytes": 18946,
+      "visibleRgbMae": 0.5836591720581055
+    },
+    {
+      "index": 1,
+      "width": 1024,
+      "height": 1024,
+      "rgbaSha256": "9a879b371bf6805a83d8ba5205441e7dd87b19f014410f4e06d88bcf4dbd5bf5",
+      "bytes": 37384,
+      "visibleRgbMae": 0.7560062408447266
+    },
+    {
+      "index": 2,
+      "width": 1024,
+      "height": 1024,
+      "rgbaSha256": "f4089be03341be207ceeee6b245df9078862bcc332beff983ca6d7ac0ba95939",
+      "bytes": 7244,
+      "visibleRgbMae": 0.15456295013427734
+    },
+    {
+      "index": 3,
+      "width": 512,
+      "height": 512,
+      "rgbaSha256": "5e399d8d00b0a95f62c4d702a52d278807b00e3f3fab6517dfaefb4ae62333fb",
+      "bytes": 15020,
+      "visibleRgbMae": 0.8053423563639323
+    },
+    {
+      "index": 4,
+      "width": 512,
+      "height": 1024,
+      "rgbaSha256": "c27dc5824f3bb6846d9a04ea4e9d567737015cccfd2fb303500098ef92307366",
+      "bytes": 4662,
+      "visibleRgbMae": 0.43547630310058594
+    },
+    {
+      "index": 5,
+      "width": 1024,
+      "height": 1024,
+      "rgbaSha256": "a383386f9e9964cafe9b92dd0c39e129b65206712bfa6746f1a2f963d5f637d3",
+      "bytes": 7138,
+      "visibleRgbMae": 0.5981464385986328
+    },
+    {
+      "index": 6,
+      "width": 512,
+      "height": 512,
+      "rgbaSha256": "507133082823364af0aa96b35961012103f673ff7c3801fa064a4405739d0b20",
+      "bytes": 7840,
+      "visibleRgbMae": 0.6690991719563802
+    },
+    {
+      "index": 7,
+      "width": 512,
+      "height": 512,
+      "rgbaSha256": "d0d036e9c8f4cd8b44e6d7275c9f1e85c3f6b23ab68f472450838d2d4bb2b38a",
+      "bytes": 2600,
+      "visibleRgbMae": 0.6177419026692709
+    },
+    {
+      "index": 8,
+      "width": 1024,
+      "height": 512,
+      "rgbaSha256": "9d5a5e147e43c21216339e9d271677c7c2896bb404196feb0ba49de54a42552e",
+      "bytes": 7744,
+      "visibleRgbMae": 0.7637259165445963
+    },
+    {
+      "index": 9,
+      "width": 1024,
+      "height": 1024,
+      "rgbaSha256": "9faadf7273f2c6033059c057041997cd64766d3780297cb6226d5beb42902db6",
+      "bytes": 9602,
+      "visibleRgbMae": 0.532621701558431
+    },
+    {
+      "index": 10,
+      "width": 256,
+      "height": 256,
+      "rgbaSha256": "c1e632a13cd2b88c6dbf43fad7a50e3bd886681ae8d191b6f108e2a782f6a573",
+      "bytes": 1732,
+      "visibleRgbMae": 0.3621164957682292
+    },
+    {
+      "index": 11,
+      "width": 1024,
+      "height": 512,
+      "rgbaSha256": "59ea55f794891748a32b369f6fec7b8c95aaa6ce359bee9f1cb4e23a632c1db1",
+      "bytes": 5378,
+      "visibleRgbMae": 0.6273117065429688
+    },
+    {
+      "index": 12,
+      "width": 1024,
+      "height": 256,
+      "rgbaSha256": "5180e5f57080f3fb9c539115adc0e31a68b85944060dbb275c6b337d329ef502",
+      "bytes": 3746,
+      "visibleRgbMae": 0.48374303181966144
+    },
+    {
+      "index": 13,
+      "width": 1024,
+      "height": 256,
+      "rgbaSha256": "b8ab85cb999d44ebbe261d0a846a3ddf16b575106da72a904d96c27cfd17f688",
+      "bytes": 542,
+      "visibleRgbMae": 0.6667378743489584
+    },
+    {
+      "index": 14,
+      "width": 1024,
+      "height": 512,
+      "rgbaSha256": "4bda3a28f4ffe603c0ec1258c0034d65a1a0d35ab7bd523a834608adabf03cc5",
+      "bytes": 994,
+      "visibleRgbMae": 0
+    },
+    {
+      "index": 15,
+      "width": 512,
+      "height": 1024,
+      "rgbaSha256": "ab3756207a2212cd620a3b1b63fd4c22a53f4f999084ef9845773e035dfffc8f",
+      "bytes": 4390,
+      "visibleRgbMae": 0.5386104583740234
+    },
+    {
+      "index": 16,
+      "width": 512,
+      "height": 1024,
+      "rgbaSha256": "534f4855b04cee38feacfb2b9e1c47bebc460bbbb749c4dbeb67f9ce8ec6698c",
+      "bytes": 9858,
+      "visibleRgbMae": 0.7689628601074219
+    },
+    {
+      "index": 17,
+      "width": 512,
+      "height": 1024,
+      "rgbaSha256": "c0e9ac23a72981c1f13f6410c83537f11624f57af4883508de2b1d320fdb2f1f",
+      "bytes": 3774,
+      "visibleRgbMae": 0.1181780497233073
+    },
+    {
+      "index": 18,
+      "width": 384,
+      "height": 384,
+      "rgbaSha256": "c99a731dab4043e608bc965349707e4707ee38d875f03952d6d8fc2fdce4b06c",
+      "bytes": 13868,
+      "visibleRgbMae": 0.9971810800057871
+    }
+  ],
+  "rawPath": "/assets/mira/avatar/mira-anime-call-v2.glb",
+  "textureMaxEdge": 1024,
+  "textureQuality": 90,
+  "pixelIdentical": false,
+  "geometryIdentical": true
+}

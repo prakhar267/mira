@@ -1,0 +1,48 @@
+{
+  "rawEvidenceSha256": "c0196d81d6863f4f768764327d268e690425fd62232520bc4353af29f67f3c2f",
+  "at": "2026-09-14T19:02:37.230Z",
+  "sourceArtifact": "Local compiled app; this is not proof of a sealed release or a deployment",
+  "conditions": "Headless Chromium with ANGLE Metal on this Apple M4 Mac; 393x851 mobile emulation, DPR1, no CPU throttle, loopback network. Actual GPU, synthetic audio and microphone. Not an iPhone or an acoustic test.",
+  "network": "After demo entry, CDP shaped loopback: 1.6 Mbps down, 0.8 Mbps up, 150ms latency; cold cache. Not a physical cellular connection.",
+  "providerRequests": 0,
+  "realMicrophoneRequests": 0,
+  "passed": true,
+  "load": {
+    "callToReadyMs": 10892.59999999404,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+  },
+  "samples": [
+    {
+      "label": "metal-synthetic-speaking",
+      "drawCalls": 1560,
+      "medianRAFIntervalMs": 16.69999999999891,
+      "maxRAFIntervalMs": 16.80000000000109
+    },
+    {
+      "label": "metal-synthetic-listening",
+      "drawCalls": 1040,
+      "medianRAFIntervalMs": 16.69999999999891,
+      "maxRAFIntervalMs": 16.799999999999272
+    }
+  ],
+  "cleanup": {
+    "requested": 1,
+    "stopped": 1,
+    "activeTracks": 0,
+    "cameraRequested": 0
+  },
+  "assets": [
+    {
+      "path": "/assets/mira/avatar/mira-anime-call-v2.glb.gz",
+      "durationMs": 10149.39999999851,
+      "bytes": 1235862,
+      "transferBytes": 1236162
+    }
+  ],
+  "syntheticRequests": {
+    "session": 1,
+    "chat": 0,
+    "speech": 1,
+    "unexpected": []
+  }
+}

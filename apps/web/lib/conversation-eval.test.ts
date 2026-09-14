@@ -8,7 +8,7 @@ const token="S".repeat(43),cookie=`__Host-mira_demo=${token}`;
 const cookieHeader=`${cookie}; Max-Age=3600; Path=/; HttpOnly; Secure; SameSite=Strict`;
 const version="11111111-1111-4111-8111-111111111111",commit="a".repeat(40);
 const env={COMPANARO_URL:"https://synthetic.example.test",MIRA_EVAL_ALLOW_PROVIDER_REQUESTS:"true",MIRA_EVAL_MAX_REQUESTS:"5",MIRA_EVAL_ADULT_DECLARED:"true",MIRA_EVAL_AI_PROCESSING_CONSENT:"true",MIRA_EVAL_POLICY_VERSION:"2026-09-13"};
-const dataset=[{id:"synthetic-continuity",turns:[
+const dataset:{id:string;turns:{text:string;language:string;anchors?:string[];anchorGroups?:string[][];noQuestion?:boolean}[]}[]=[{id:"synthetic-continuity",turns:[
   {text:"Synthetic cousin Arjun leaves Sunday.",language:"en",anchors:["Sunday"]},
   {text:"वो कब निकल रहा है?",language:"hi",anchors:["रविवार"]},
   {text:"ab Hinglish mein bolo, sawal mat poochna",language:"hinglish",noQuestion:true},
@@ -140,6 +140,14 @@ describe("consent-aware bounded conversation evaluator (synthetic only)",()=>{
   it("keeps semantic flags failing even when every endpoint and release check succeeds",async()=>{
     const x=harness({reply:()=>Response.json({reply:"I caught that wrong. What happened?"})}),report=await x.run();
     expect(report).toMatchObject({complete:true,success:false,passed:0,total:3,genericMisunderstandingRate:1});
+  });
+  it("requires every fact group, not merely one name from a multi-fact question",async()=>{
+    const turn={language:"en",anchorGroups:[["Arjun"],["Jaipur"],["Sunday"]]};
+    expect(evaluateTurn(turn,"Arjun is going to Jaipur.")).toContain("context-anchor-review");
+    expect(evaluateTurn(turn,"Arjun is going to Jaipur on Sunday.")).toEqual([]);
+    const x=harness();
+    await expect(x.run({},[{id:"bad-facts",turns:[{text:"Test",language:"en",anchorGroups:[[]]}]}])).rejects.toThrow("facts");
+    expect(x.http).not.toHaveBeenCalled();
   });
   it("validates all current checked-in scenarios, including the full long-context sequence",async()=>{
     const source=JSON.parse(await readFile(new URL("../evals/conversations.json",import.meta.url),"utf8"));

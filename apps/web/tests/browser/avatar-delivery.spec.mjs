@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
-import manifest from "../../lib/avatar-delivery-manifest.json" with { type: "json" };
+import manifest from "../../lib/avatar-call-manifest.json" with { type: "json" };
 
-test("native gzip and every lossless WebP avatar texture decode in this browser", async ({ page, context }) => {
+test("native gzip and every call-profile WebP avatar texture decode in this browser", async ({ page, context }) => {
   await context.route("**/*", route => new URL(route.request().url()).origin === "http://127.0.0.1:4397" ? route.continue() : route.abort());
   await page.goto("/");
   const result = await page.evaluate(async manifest => {

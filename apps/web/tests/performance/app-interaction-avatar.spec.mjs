@@ -7,6 +7,43 @@ const measuredAssets = () => performance.getEntriesByType("resource").filter(ent
   encodedBytes: entry.encodedBodySize, decodedBytes: entry.decodedBodySize, durationMs: entry.duration,
 }));
 
+test("closing during avatar download aborts it without a late mount or retry", async ({ browser }) => {
+  const { context, page, requests } = await coldMobilePage(browser, 1);
+  let release;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const errors = []; page.on("pageerror", error => errors.push(error.message));
+  try {
+    await syntheticCallMedia(page);
+    await page.addInitScript(() => {
+      const original = window.fetch;
+      window.__miraAvatarDownloads = [];
+      window.fetch = (input, init) => {
+        if (String(input).includes("/mira-anime-call-v2.glb")) {
+          const item = { aborted: init.signal.aborted };
+          window.__miraAvatarDownloads.push(item);
+          init.signal.addEventListener("abort", () => { item.aborted = true; }, { once: true });
+        }
+        return original(input, init);
+      };
+    });
+    await page.route("**/mira-anime-call-v2.glb.gz*", async route => { await blocked; await route.abort().catch(() => undefined); });
+    await enterDemo(page);
+    expect(await page.evaluate(() => window.__miraAvatarDownloads)).toEqual([]);
+    await page.getByRole("button", { name: "Chat", exact: true }).tap();
+    await page.getByRole("button", { name: "Start video call with Mira", exact: true }).tap();
+    await expect.poll(() => page.evaluate(() => window.__miraAvatarDownloads.length)).toBe(1);
+    await page.getByRole("button", { name: "End video call", exact: true }).tap();
+    await expect.poll(() => page.evaluate(() => window.__miraAvatarDownloads)).toEqual([{ aborted: true }]);
+    release();
+    await page.waitForTimeout(300);
+    await expect(page.locator(".live-avatar-3d")).toHaveCount(0);
+    expect(await page.evaluate(() => window.__miraAvatarDownloads.length)).toBe(1);
+    expect(await page.evaluate(() => window.__miraLabMedia.activeTracks)).toBe(0);
+    expect(requests.unexpected).toEqual([]);
+    expect(errors).toEqual([]);
+  } finally { release(); await context.close(); }
+});
+
 test("three cold mobile-emulated app sessions record real interaction timing", async ({ browser }, testInfo) => {
   const samples = [];
   try {
@@ -156,7 +193,7 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
       activeTracks: window.__miraLabMedia.activeTracks, cameraRequested: window.__miraLabMedia.cameraRequested,
     }, interactions: window.__miraInteractionLab.actions }));
     evidence.requests = requests;
-    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-delivery-v1.glb.gz"));
+    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-call-v2.glb.gz"));
     expect(model).toHaveLength(1);
     expect(model[0].decodedBytes).toBeGreaterThan(0);
     expect(evidence.load.callStartToReadyMs).toBeGreaterThan(0);

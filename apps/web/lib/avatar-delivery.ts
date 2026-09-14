@@ -1,4 +1,4 @@
-import manifest from "./avatar-delivery-manifest.json";
+import manifest from "./avatar-call-manifest.json";
 
 export { manifest as avatarDelivery };
 
@@ -25,11 +25,17 @@ async function verify(bytes: Uint8Array<ArrayBuffer>, expected: string) {
 /** Decompresses only our bounded, hash-verified static derivative. No remote
  * models, decoder bundle, image service or inference is involved. */
 export async function fetchAvatarDelivery(signal: AbortSignal) {
-  const response = await fetch(`${manifest.path}?v=${manifest.sha256.slice(0, 16)}`, { signal, credentials: "omit", redirect: "error" });
-  if (!response.ok || !response.body) throw new Error("Avatar download unavailable");
-  const compressed = await boundedBytes(response.body, manifest.bytes);
   signal.throwIfAborted();
-  await verify(compressed, manifest.sha256);
+  const gzip = typeof DecompressionStream === "function";
+  const path = gzip ? manifest.path : manifest.rawPath;
+  const hash = gzip ? manifest.sha256 : manifest.decodedSha256;
+  const response = await fetch(`${path}?v=${hash.slice(0, 16)}`, { signal, credentials: "omit", redirect: "error" });
+  if (!response.ok || !response.body) throw new Error("Avatar download unavailable");
+  const compressed = await boundedBytes(response.body, gzip ? manifest.bytes : manifest.decodedBytes);
+  signal.throwIfAborted();
+  await verify(compressed, hash);
+  signal.throwIfAborted();
+  if (!gzip) return compressed.buffer;
   const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
   const bytes = await boundedBytes(stream, manifest.decodedBytes);
   signal.throwIfAborted();
