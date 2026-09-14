@@ -102,7 +102,10 @@ export class StoreEngine {
     if(envelope.revision===0){
       const historic=JSON.parse(raw) as {memories?:{id:string;status:string}[]};
       const deleted=historic.memories?.filter(memory=>memory.status==="deleted")??[];
-      for(const memory of deleted)this.sql.exec("INSERT OR IGNORE INTO memory_suppressions(user_id,id,forgotten_at) VALUES(?,?,?)",userId,memory.id,Date.now());
+      for(const memory of deleted){
+        if(!this.sql.exec("SELECT id FROM memory_suppressions WHERE user_id=? AND id=?",userId,memory.id).toArray().length)this.recovery.append({kind:"memory",userId,id:memory.id});
+        this.sql.exec("INSERT OR IGNORE INTO memory_suppressions(user_id,id,forgotten_at) VALUES(?,?,?)",userId,memory.id,Date.now());
+      }
       if(deleted.length)envelope.state.companionReflections=[];
     }
     const suppressed=new Set(this.sql.exec("SELECT id FROM memory_suppressions WHERE user_id=?",userId).toArray().map(row=>String(row.id)));

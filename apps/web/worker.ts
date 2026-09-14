@@ -7,6 +7,8 @@ import { MailOutboxEngine, type MailJob } from "./lib/mail-outbox-engine";
 import { runMailOutbox } from "./lib/mail-outbox";
 import { BackupEngine } from "./lib/backup-engine";
 import { runBackupOperation, type BackupEnvironment } from "./lib/backup-operations";
+import { SourceSuppressionReplicator } from "./lib/suppression-replication";
+import { suppressionTransport, type SuppressionEnvironment } from "./lib/suppression-transport";
 export {MiraRecoveryDrill} from "./lib/recovery-drill";
 
 interface LegacyKV {
@@ -22,10 +24,12 @@ export class MiraStore {
   private engine: StoreEngine;
   private mail: MailOutboxEngine;
   private backup: BackupEngine;
-  constructor(private ctx: State, private env: LaunchEnvironment & BackupEnvironment & { LUMA_ACCOUNTS?: LegacyKV }) {
+  private replication: SourceSuppressionReplicator;
+  constructor(private ctx: State, private env: LaunchEnvironment & BackupEnvironment & SuppressionEnvironment & { LUMA_ACCOUNTS?: LegacyKV }) {
     this.engine = new StoreEngine(ctx.storage.sql);
     this.mail = new MailOutboxEngine(ctx.storage.sql);
     this.backup = new BackupEngine(ctx.storage.sql, this.engine);
+    this.replication = new SourceSuppressionReplicator(ctx.storage.sql,work=>ctx.storage.transactionSync(work),this.backup.source(),()=>suppressionTransport(this.env));
     void ctx.blockConcurrencyWhile(async () => {
       const alarm=await ctx.storage.getAlarm();
       // Reuse this store's existing alarm: account-wide free cron slots may be
@@ -34,6 +38,9 @@ export class MiraStore {
     });
   }
   private async importLegacy(key: string) {
+    // Protected generations cannot merge unjournaled legacy state. Activation
+    // needs a complete fenced baseline; it is not an environment toggle.
+    if (this.replication.isProtected()) return;
     if (!this.backup.legacyAllowed()) return;
     if (this.engine.row(key)) return;
     const value = await this.env.LUMA_ACCOUNTS?.get(key);
@@ -42,6 +49,7 @@ export class MiraStore {
     // transaction so a concurrent save/deletion always wins over stale KV.
     this.ctx.storage.transactionSync(()=>{
       this.backup.assertAvailable();
+      if(this.replication.isProtected())return;
       if (!this.backup.legacyAllowed()) return;
       if(this.engine.row(key))return;
       let ttl: number | undefined;
@@ -60,7 +68,13 @@ export class MiraStore {
     // This class is reachable only by the Worker binding, never a public route.
     const data = await request.json() as { action: string; key?: string; value?: string; ttl?: number; prefix?: string; cursor?: string; limit?: number; max?: number; seconds?: number; name?: string; failed?: boolean; duration?: number; hash?: string; salt?: string; account?: { id: string }; userId?: string; timestamp?: string; subscription?: Record<string, unknown>; emailKey?:string; keys?:string[];state?:unknown;revision?:number;sessionKey?:string;sessionValue?:string;command?:MemoryCommand;attemptId?:string };
       try {
-        if (data.action === "backup") return Response.json(await runBackupOperation(this.backup, work => this.ctx.storage.transactionSync(work), this.env, data as unknown as Record<string, unknown>));
+        if (data.action === "backup") {
+          // The existing retirement proof knows nothing about an independent
+          // authority/serving fence. Do not silently use it for protected data.
+          this.replication.assertLegacyRecoveryAllowed();
+          return Response.json(await runBackupOperation(this.backup, work => this.ctx.storage.transactionSync(work), this.env, data as unknown as Record<string, unknown>));
+        }
+        await this.replication.flush();
         this.ctx.storage.transactionSync(() => this.backup.assertAvailable());
         if (data.key && ["get", "claimEmail", "bootstrap", "resetPassword"].includes(data.action)) await this.importLegacy(data.key);
         if(data.userId&&["stateRead","stateSave","stateExport","memoryCommand"].includes(data.action))await this.importLegacy(`state:${data.userId}`);
@@ -74,8 +88,8 @@ export class MiraStore {
           this.backup.assertAvailable();
           switch(data.action) {
             case "get": return { value: this.engine.get(data.key!) };
-            case "put": this.engine.put(data.key!, data.value!, data.ttl); return { ok: true };
-            case "delete": this.engine.remove(data.key!);this.engine.put(`purge:${data.key!}`,JSON.stringify({key:data.key}));return { ok: true };
+            case "put": this.replication.assertRawMutationAllowed(data.key!);this.engine.put(data.key!, data.value!, data.ttl); return { ok: true };
+            case "delete": this.replication.assertRawMutationAllowed(data.key!);this.engine.remove(data.key!);this.engine.put(`purge:${data.key!}`,JSON.stringify({key:data.key}));return { ok: true };
             case "eraseAccount": {
               const account = JSON.parse(this.engine.get(`account:${data.userId!}`) ?? "null") as {email?:string}|null;
               if(account?.email)this.mail.purgeByEmail(account.email);
@@ -114,10 +128,12 @@ export class MiraStore {
           const next=Date.now()+1000,current=await this.ctx.storage.getAlarm();
           if(current===null||current>next)await this.ctx.storage.setAlarm(next);
         }
+        await this.replication.flush();
         return Response.json(result);
-      } catch(cause) { const code=cause instanceof Error&&(/^(?:BACKUP_|RESTORE_|CUTOVER_|SOURCE_ALREADY_RETIRED|RECOVERY_MAINTENANCE)/.test(cause.message)||["TRANSCRIPT_LIMIT","CONVERSATION_REMOVED","ACCOUNT_VERIFICATION_REQUIRED"].includes(cause.message))?cause.message:"STORAGE_UNAVAILABLE";return Response.json({ error:code==="ACCOUNT_VERIFICATION_REQUIRED"?"Verify your email after recovery before enabling AI processing.":"Storage operation unavailable",code }, { status:code==="ACCOUNT_VERIFICATION_REQUIRED"?403:code==="TRANSCRIPT_LIMIT"?413:code==="CONVERSATION_REMOVED"?409:503 }); }
+      } catch(cause) { const code=cause instanceof Error&&(/^(?:BACKUP_|RESTORE_|CUTOVER_|SUPPRESSION_|SOURCE_ALREADY_RETIRED|RECOVERY_MAINTENANCE)/.test(cause.message)||["TRANSCRIPT_LIMIT","CONVERSATION_REMOVED","ACCOUNT_VERIFICATION_REQUIRED"].includes(cause.message))?cause.message:"STORAGE_UNAVAILABLE";return Response.json({ error:code==="ACCOUNT_VERIFICATION_REQUIRED"?"Verify your email after recovery before enabling AI processing.":"Storage operation unavailable",code }, { status:code==="ACCOUNT_VERIFICATION_REQUIRED"?403:code==="TRANSCRIPT_LIMIT"?413:code==="CONVERSATION_REMOVED"?409:503 }); }
   }
   private async migrateBatch(){
+    if(this.replication.isProtected())return;
     for(const marker of this.engine.list("migration:","",1).slice(0,1)){
       const job=JSON.parse(this.engine.get(marker)!) as {prefix:string;cursor?:string};
       if(!this.env.LUMA_ACCOUNTS){this.availableTransaction(() => this.engine.remove(marker));continue;}
@@ -144,12 +160,14 @@ export class MiraStore {
   }
   async alarm() {
     await this.ctx.storage.setAlarm(Date.now()+15*60000);
+    try { await this.replication.flush(); } catch { return; }
     try { this.ctx.storage.transactionSync(() => this.backup.assertAvailable()); } catch { return; }
     if(Date.now()-Number(this.engine.get("ops:cleanup-at")??0)>=86400000) {
       this.engine.cleanup();this.engine.put("ops:cleanup-at",String(Date.now()));
     }
     await this.purgeLegacy();
     await this.migrateBatch().catch(()=>{/* Retry migration without delaying account operations. */});
+    try { await this.replication.flush(); } catch { return; }
     try { this.availableTransaction(() => undefined); } catch { return; }
     this.mail.cleanup();
     await runMailOutbox(this.env, {

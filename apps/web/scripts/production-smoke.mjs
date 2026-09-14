@@ -8,7 +8,7 @@ const results=[];
 let versionId=null;
 const check=(condition,message)=>{if(!condition)throw new Error(message);};
 const request=async(path,init={})=>fetch(`${baseUrl}${path}`,{...init,signal:AbortSignal.timeout(20_000)});
-const run=async(name,task)=>{try{const detail=await task();results.push({name,passed:true,detail});console.log(`PASS ${name} — ${detail}`);}catch(error){const detail=error instanceof Error?error.message:"Check failed";results.push({name,passed:false,detail});console.log(`FAIL ${name} — ${detail}`);}};
+const run=async(name,task)=>{try{const detail=await task();results.push({name,passed:true,detail});console.log(`PASS ${name} — ${detail}`);}catch(error){const cause=error instanceof Error?error.cause:null;const code=cause&&typeof cause==="object"&&"code" in cause&&typeof cause.code==="string"&&/^[A-Z0-9_]{1,80}$/.test(cause.code)?cause.code:null;const detail=`${error instanceof Error?error.message:"Check failed"}${code?` (${code})`:""}`;results.push({name,passed:false,detail});console.log(`FAIL ${name} — ${detail}`);}};
 
 await run("public site and security headers",async()=>{
   const response=await request("/");await response.arrayBuffer();

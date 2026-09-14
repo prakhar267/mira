@@ -13,6 +13,8 @@ const web=resolve(import.meta.dirname,"..");
 const base="http://127.0.0.1:4398";
 const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR,
   XDG_CONFIG_HOME:join(directory,"config"),XDG_CACHE_HOME:join(directory,"cache"),
+  // Wrangler may prefer an existing ~/.wrangler over XDG for its registry.
+  WRANGLER_REGISTRY_PATH:join(directory,"registry"),
   CLOUDFLARE_API_TOKEN:"mira-synthetic-only-no-cloud-access",
   CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV:"false",WRANGLER_SEND_METRICS:"false",CI:"true"};
 let output="";
@@ -37,7 +39,10 @@ try{
   if(denied.status!==503||deniedBody.code!=="INFERENCE_DISABLED")throw new Error("Local artifact did not refuse external inference");
   const smoke=spawn(process.execPath,[join(web,"scripts/production-smoke.mjs")],{cwd:resolve(web,"../.."),env:{...env,COMPANARO_URL:base,MIRA_EXPECTED_SHA:process.env.GITHUB_SHA??"unreleased",QA_DIRECTORY:process.env.QA_DIRECTORY??join(directory,"evidence")},stdio:"inherit"});
   const code=await new Promise((resolve,reject)=>{smoke.on("error",reject);smoke.on("exit",resolve);});
-  if(code!==0)throw new Error(`Local built-artifact smoke failed (${code})`);
+  // This server has isolated synthetic credentials and no real user requests.
+  // Retain its bounded diagnostics on failure: otherwise a workerd exit after
+  // readiness looks like unexplained page failures and hides the release cause.
+  if(code!==0)throw new Error(`Local built-artifact smoke failed (${code}); server exit=${server.exitCode}, signal=${server.signalCode}: ${output}`);
   console.log(`Built artifact executed locally; isolated state retained at ${directory}. No live deployment/provider calls.`);
 }finally{
   if(server.pid){try{if(process.platform!=="win32")process.kill(-server.pid,"SIGTERM");else server.kill("SIGTERM");}catch{/* Already exited. */}}

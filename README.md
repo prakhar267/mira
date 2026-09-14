@@ -79,6 +79,7 @@ The public deployment comes from `apps/web/`. Archived code and dated reports re
 - [September 13 implementation and verification ledger](docs/READINESS-IMPLEMENTATION.md)
 - [Remaining-work follow-through and current gates](docs/READINESS-FOLLOWTHROUGH.md)
 - [Encrypted backup operations and recovery limitations](docs/ENCRYPTED-BACKUP-OPERATIONS.md)
+- [Dormant independent suppression acknowledgement and remaining recovery work](docs/SUPPRESSION-AUTHORITY.md)
 - [Launch operations, providers and remaining gates](docs/LAUNCH-OPERATIONS.md)
 - [Mira brand guide](docs/brand.md)
 - [Security reporting](SECURITY.md)

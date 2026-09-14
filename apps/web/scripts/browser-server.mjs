@@ -13,6 +13,8 @@ const envFile=join(directory,"empty.env");await writeFile(envFile,"# No credenti
 const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR,
   ...(process.env.GITHUB_SHA?{GITHUB_SHA:process.env.GITHUB_SHA}:{}),
   XDG_CONFIG_HOME:join(directory,"config"),XDG_CACHE_HOME:join(directory,"cache"),
+  // Do not register this synthetic Worker alongside other local dev sessions.
+  WRANGLER_REGISTRY_PATH:join(directory,"registry"),
   // Explicit non-credential prevents Wrangler from using cached owner OAuth.
   CLOUDFLARE_API_TOKEN:"mira-synthetic-only-no-cloud-access",
   CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV:"false",WRANGLER_SEND_METRICS:"false",CI:"true"};
