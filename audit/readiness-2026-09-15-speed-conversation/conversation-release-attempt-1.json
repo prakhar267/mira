@@ -1,0 +1,78 @@
+{
+  "at": "2026-09-14T19:33:15.423Z",
+  "base": "https://luma-companion.prakhargupta267.workers.dev",
+  "kind": "Synthetic text inputs through the shared voice/video reply API. Language/anchors are review heuristics, not human microphone, semantic-quality or acoustic acceptance.",
+  "requestedTurns": 76,
+  "maxRequests": 76,
+  "budgetScope": "Client chat HTTP requests, charged before dispatch without retries/refunds. Upstream model attempts and credit use are unknown; an API request may perform normal plus repair attempts. No free-quota guarantee.",
+  "upstreamProviderAttempts": null,
+  "sessionMode": "account",
+  "total": 2,
+  "passed": 1,
+  "complete": false,
+  "stableDeployment": true,
+  "startingVersion": "f232eb78-614d-4ad6-87af-9e9ac91f308b",
+  "endingVersion": "f232eb78-614d-4ad6-87af-9e9ac91f308b",
+  "startingCommit": "c6d86d3486812105c30a4b977930e552fda376d6",
+  "endingCommit": "c6d86d3486812105c30a4b977930e552fda376d6",
+  "stopReason": "SERVICE_UNAVAILABLE",
+  "sessionRevoked": null,
+  "results": [
+    {
+      "scenario": "daily-smalltalk",
+      "turn": 1,
+      "expectedLanguage": "hi",
+      "delivery": "voice",
+      "inputSha256": "ddc8f2922dbe8550b1c6c3f36d5e3ccfe55594d1c396f03dd0903d3656b1cba3",
+      "replySha256": "3b9a5520135ff9cf04caa60bdac75fac3e74848069c54924a03a6ebe5bb11bc1",
+      "replyCharacters": 68,
+      "provider": "reported",
+      "status": 200,
+      "latencyMs": 371,
+      "flags": [],
+      "error": ""
+    },
+    {
+      "scenario": "daily-smalltalk",
+      "turn": 2,
+      "expectedLanguage": "hinglish",
+      "delivery": "video",
+      "inputSha256": "0d028a2b3081090fc59a69d5af888e7f9d34a8bcfc07a789a9f495e6f6402535",
+      "replySha256": null,
+      "replyCharacters": 0,
+      "provider": "unknown",
+      "status": 503,
+      "latencyMs": 8436,
+      "flags": [
+        "service-error",
+        "language"
+      ],
+      "error": "SERVICE_UNAVAILABLE"
+    }
+  ],
+  "p50Ms": 8436,
+  "p95Ms": 8436,
+  "p99Ms": 8436,
+  "genericMisunderstandingRate": 0,
+  "languages": {
+    "en": {
+      "turns": 0,
+      "passed": 0,
+      "p50Ms": null,
+      "p95Ms": null
+    },
+    "hi": {
+      "turns": 1,
+      "passed": 1,
+      "p50Ms": 371,
+      "p95Ms": 371
+    },
+    "hinglish": {
+      "turns": 1,
+      "passed": 0,
+      "p50Ms": 8436,
+      "p95Ms": 8436
+    }
+  },
+  "success": false
+}

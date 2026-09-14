@@ -72,3 +72,43 @@ Post-release testing must use the verified new SHA. This report does not
 certify the changed prompt or the full 76-turn dataset. It tests supplied
 current-conversation context, not saved-memory persistence, STT/TTS or a real
 microphone. Fluent-human and acoustic acceptance remain separate.
+
+## Live release findings and follow-up
+
+PR9 was merged as `c6d86d3486812105c30a4b977930e552fda376d6` and
+promoted from successful main CI34886066930, with every artifact hash checked
+before/after deployment. Live version `f232eb78-614d-4ad6-87af-9e9ac91f308b`
+passed 5/5 read-only production checks, including the 1,235,862-byte avatar.
+The avatar improvement is live; this does **not** certify conversation quality.
+
+Cloudflare showed about 1.75k/10k daily neurons before the subsequent bounded
+QA runs. Two ordinary synthetic accounts, with memory/transcript storage off,
+were deleted after use and their stale sessions rejected. No mail, payment,
+quota increase, credential change or fallback provider was activated.
+
+- First run stopped at turn2 with HTTP503 `SERVICE_UNAVAILABLE` after8,436ms;
+  the provider circuit recorded a failure. The old response does not expose
+  the cause, so this is consistent with the8s deadline, not proof of a global
+  Cloudflare outage. [Original report](../audit/readiness-2026-09-15-speed-conversation/conversation-release-attempt-1.json).
+- One bounded diagnostic follow-up, after checking the circuit, passed that
+  same turn but stopped at turn19 with `INVALID_REPLY`.18/19 attempts passed
+  the old heuristics; P50 2,832ms, P95 5,839ms. **Incomplete, not a passing76-turn
+  run.** [Original report](../audit/readiness-2026-09-15-speed-conversation/conversation-release-attempt-2.json).
+- Manual review found a Hindi opening followed by Roman-Hindi grammar, and a
+  requested translation of a good-luck message replaced by speculation about
+  the brother's feelings. Those passed the old language/anchor checks and must
+  not be counted as semantic successes.
+
+Follow-up source shares one language check between app and evaluator. It
+rejects disguised Roman-Hindi answers while retaining English names/technical
+terms and valid short inflected Hinglish. Native-script instructions reinforce
+Hindi generation and its single existing repair. Prompting preserves the
+purpose/addressee of a drafted message during translation or shortening; an
+additional intent-anchor group flags the observed drift.
+
+Content-free reason enums now distinguish style repairs/rejections and provider
+timeouts. No prompts, generated replies or exception messages enter those logs;
+the deadline, one-repair limit and capacity charges are unchanged. Production
+verification of this follow-up belongs in its PR release record. Free-provider
+latency/availability, fluent-human semantics and physical-call acceptance are
+still not guaranteed by these tests.

@@ -21,6 +21,10 @@ describe("edge companion prompting", () => {
     expect(input.messages.at(-1)?.content).not.toContain("Application reply setting");
     expect(buildFreeChatMessages({...input,messages:[{role:"user",content:"हिंदी में बात करो"}]}).at(-1)?.content).toContain("Hindi in Devanagari");
     expect(buildFreeChatMessages({...input,messages:[{role:"user",content:"ab hinglish mein bolo"}]}).at(-1)?.content).toContain("Hinglish in Roman letters");
+    const hindi=buildFreeChatMessages({...input,messages:[{role:"user",content:"इसे आसान उदाहरण से समझाओ"}]});
+    expect(hindi.at(-1)?.content).toContain("पूरा जवाब देवनागरी में लिखो");
+    expect(hindi[0]?.content).toContain("short ready-to-send message addressed to that person");
+    expect(hindi[0]?.content).toContain("preserve the draft's meaning, facts, addressee and purpose");
   });
   it("answers simple day check-ins without depending on provider availability",()=>{expect(buildDayCheckInReply("आज तुम्हारा दिन कैसा था?")).toContain("तुम्हारे साथ");expect(buildDayCheckInReply("How was your day?")).toContain("conversation");expect(buildDayCheckInReply("tumhara din kaisa tha")).toContain("tumhare saath");expect(buildDayCheckInReply("My day was rough")).toBeNull();});
   it("forbids the canned listener language seen in the failed call", () => {
@@ -54,7 +58,10 @@ describe("edge companion prompting", () => {
     expect(isInvalidCompanionReply("आज मैं अच्छी हूँ।", "आज तुम कैसी हो?" )).toBe(false);
     expect(isInvalidCompanionReply("Main aaj badhiya hoon.", "आज तुम कैसी हो?" )).toBe(true);
     expect(isInvalidCompanionReply("Good luck tomorrow! Just be yourself.", "Okay, what should I text her tonight?")).toBe(false);
-    expect(isInvalidCompanionReply("तो फिर बस उसके साथ समय bitta karne ki koshish karo, movie dekhne jao.", "लेकिन उसे सलाह पसंद नहीं है।")).toBe(false);
+    expect(isInvalidCompanionReply("तो फिर बस उसके साथ समय bitta karne ki koshish karo, movie dekhne jao.", "लेकिन उसे सलाह पसंद नहीं है।")).toBe(true);
+    expect(isInvalidCompanionReply("मुझे खेद है, तो फिर तुम Kabir ko bas itna kah sakte ho ki all the best.","नहीं, वो मेरा भाई है, दोस्त नहीं।")).toBe(true);
+    expect(isInvalidCompanionReply("React में state बदलता है, जबकि props बाहर से आते हैं।", "इसे आसान उदाहरण से समझाओ")).toBe(false);
+    expect(isInvalidCompanionReply("Bilkul!", "haan sahi kaha")).toBe(false);
     expect(isInvalidCompanionReply("main اس کے لئے کیا کر سکتا ہوں", "main uske liye kya kar sakta hoon")).toBe(true);
     expect(isInvalidCompanionReply("तो सलाह छोड़ दो। बस प्रिया को बता दो कि तुम उसके साथ हो, बिना लंबा भाषण दिए।", "लेकिन उसे सलाह पसंद नहीं है।")).toBe(false);
     expect(isInvalidCompanionReply("Haan, aaj mood kaafi accha hai.", "yaar tum kaisi ho?")).toBe(false);

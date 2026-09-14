@@ -4,6 +4,7 @@ import {setTimeout as delay} from "node:timers/promises";
 import {tmpdir} from "node:os";
 import {join,resolve} from "node:path";
 import {pathToFileURL} from "node:url";
+import {matchesReplyLanguage} from "../lib/reply-language.ts";
 
 // Explicit operator authorization only. This script never defaults to a live
 // target, manufactures consent, renews a limited session or retries inference.
@@ -47,10 +48,7 @@ function selectDataset(dataset,ids){
 /** Same review heuristics as the source dataset's original evaluator. A pass is
  * not a semantic-quality score; exact synthetic content stays in memory only. */
 export function evaluateTurn(turn,reply,status=200){
-  const hindi=/\p{Script=Devanagari}/u.test(reply);
-  const romanHindi=/\b(?:haan|hai|hoon|tum|aaj|kya|kar|karo|yaar|mujhe|nahi|accha|kaafi|bilkul|batao|toh|usko|uske|ek|main|aur|phir|pasand|chahiye|wahan|kal|saath|liye|rakh|rakho|hoga|hum|tujhe|kaam|chalo|tumhe|tumhari|bolo|mat|bas)\b/i.test(reply);
-  const englishHasHindi=(reply.match(/\b(?:aaj|abhi|hoon|haan|hai|hain|mujhe|tum|tumhe|tumhara|tumhari|kaafi|nahi|nahin|yaar|karti|rahi|aap|dono|bhi|rahega|rahegi|karoge|karogi|waapas|aaoge|thakaan|hoga|hogi|accha|kaise|kya|aur)\b/gi)?.length??0)>=2;
-  const languageOk=turn.language==="hi"?hindi:turn.language==="hinglish"?!hindi&&romanHindi:!hindi&&!englishHasHindi;
+  const languageOk=matchesReplyLanguage(reply,turn.language);
   const contains=anchor=>reply.toLowerCase().includes(anchor.toLowerCase());
   const anchorsOk=(!turn.anchors||turn.anchors.some(contains))&&(!turn.anchorGroups||turn.anchorGroups.every(group=>group.some(contains)));
   return [...(status!==200||!reply.trim()?["service-error"]:[]),...(!languageOk?["language"]:[]),...(generic.test(reply)?["generic-misunderstanding"]:[]),...(!anchorsOk?["context-anchor-review"]:[]),...(turn.noQuestion&&reply.includes("?")?["unwanted-question"]:[])];
@@ -59,7 +57,7 @@ export function evaluateTurn(turn,reply,status=200){
 class EvaluationFailure extends Error{
   constructor(code,status=0){super(code);this.code=code;this.status=status;}
 }
-const knownErrorCodes=new Set(["DEMO_SESSION_REQUIRED","DEMO_SESSION_EXPIRED","DEMO_SESSION_LIMIT","SESSION_EXPIRED","CONSENT_REQUIRED","POLICY_CONFIRMATION_REQUIRED","DAILY_CAPACITY_EXHAUSTED","INFERENCE_BUSY","PROVIDER_UNAVAILABLE","SERVICE_UNAVAILABLE","INFERENCE_DISABLED","RATE_LIMITED","INPUT_TOO_LARGE","INVALID_REQUEST","INVALID_REPLY","UNSAFE_STREAM","CONTEXT_CHANGED"]);
+const knownErrorCodes=new Set(["DEMO_SESSION_REQUIRED","DEMO_SESSION_EXPIRED","DEMO_SESSION_LIMIT","SESSION_EXPIRED","CONSENT_REQUIRED","POLICY_CONFIRMATION_REQUIRED","DAILY_CAPACITY_EXHAUSTED","INFERENCE_BUSY","PROVIDER_UNAVAILABLE","PROVIDER_TIMEOUT","SERVICE_UNAVAILABLE","INFERENCE_DISABLED","RATE_LIMITED","INPUT_TOO_LARGE","INVALID_REQUEST","INVALID_REPLY","UNSAFE_STREAM","CONTEXT_CHANGED"]);
 function failureCode(body,fallback){return knownErrorCodes.has(body?.code)?body.code:fallback;}
 async function boundedJson(fetchImpl,url,init){
   const abort=new AbortController();let reader,timer;

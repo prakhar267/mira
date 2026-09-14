@@ -1,4 +1,4 @@
-import { buildDayCheckInReply, buildIdentityReply, buildMemoryRecallReply, canUseSavedMemoryReply, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery } from "@/lib/companion-prompt";
+import { buildDayCheckInReply, buildIdentityReply, buildMemoryRecallReply, canUseSavedMemoryReply, companionReplyIssue, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery } from "@/lib/companion-prompt";
 import { assertEdgeSameOrigin, edgeError, edgeJson, edgeRateLimited, readEdgeJson, EdgeRequestError } from "@/lib/edge-security";
 import { buildFreeChatMessages } from "@/lib/free-chat";
 import { withProviderDeadline } from "@/lib/provider-resilience";
@@ -119,13 +119,15 @@ export async function POST(request: Request) {
     }
     let reply = sanitizeCompanionReplyForDelivery(raw, input.delivery);
     if (!emitted && !validReply(reply) && Date.now() - startedAt < 5_000) {
+      console.log(JSON.stringify({event:"reply_style_repair",requestId,reason:companionReplyIssue(reply,latestUserMessage,suppressQuestions,expectedLanguage),language:expectedLanguage}));
       // One bounded repair for a wrong-script/style draft, never a retry loop.
       // It uses the same approved provider and counts against the upstream cap.
       const language = expectedLanguage === "hi" ? "Hindi in Devanagari" : expectedLanguage === "hinglish" ? "Hindi mixed with English, using Roman letters ONLY" : "English ONLY";
+      const scriptRule=expectedLanguage==="hi"?"पूरा जवाब देवनागरी में लिखो। हिंदी के शब्द रोमन में मत लिखो। English technical terms and names may remain separate words.":"";
       raw = await runCloudflare([
         ...messages,
         {role:"assistant",content:reply},
-        {role:"user",content:`Rewrite your last reply in ${language}. Preserve its concrete meaning and the people from our conversation. Use feminine first-person grammar for Mira. ${suppressQuestions ? "No questions or requests for more information." : "One or two short sentences."} Only the rewritten reply, no explanation.`},
+        {role:"user",content:`Rewrite your last reply in ${language}. ${scriptRule} Preserve its concrete meaning and the people from our conversation. Use feminine first-person grammar for Mira. ${suppressQuestions ? "No questions or requests for more information." : "One or two short sentences."} Only the rewritten reply, no explanation.`},
       ]);
       await recheckContext(deliverySignal);
       reply = sanitizeCompanionReplyForDelivery(raw, input.delivery);
@@ -136,14 +138,19 @@ export async function POST(request: Request) {
       return { reply: safeOutputReplacement(unsafe, expectedLanguage), model: "safety" };
     }
     deliverySignal.throwIfAborted();
-    if (!validReply(reply)) throw new EdgeRequestError("The generated reply missed the conversation style.", 503, "INVALID_REPLY");
+    if (!validReply(reply)) {
+      console.log(JSON.stringify({event:"reply_style_rejected",requestId,reason:companionReplyIssue(reply,latestUserMessage,suppressQuestions,expectedLanguage),language:expectedLanguage}));
+      throw new EdgeRequestError("The generated reply missed the conversation style.", 503, "INVALID_REPLY");
+    }
     return { reply, model: MODEL };
     };
     if (incremental) return chatDeliveryStream({ requestId, startedAt, signal: request.signal, check: recheckContext, work: generate });
     const result = await generate();
     return respond(result, 200, { model: result.model, provider: "cloudflare", language: expectedLanguage, delivery: input.delivery ?? "text" });
   } catch (error) {
-    console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-chat" }));
+    const timedOut=error instanceof DOMException && error.name==="TimeoutError";
+    console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-chat", reason:timedOut?"deadline":"request-failed" }));
+    if(timedOut)return edgeError(requestId,"companion-chat",startedAt,new EdgeRequestError("The AI provider took too long to respond. Please retry this turn.",503,"PROVIDER_TIMEOUT"));
     if (error instanceof EdgeRequestError) return edgeError(requestId, "companion-chat", startedAt, error);
     return respond({ error: "Mira could not form a fresh reply just now." }, 503, { model: MODEL });
   } finally {
