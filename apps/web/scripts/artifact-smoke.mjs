@@ -13,6 +13,8 @@ const web=resolve(import.meta.dirname,"..");
 const base="http://127.0.0.1:4398";
 const env={PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR,
   XDG_CONFIG_HOME:join(directory,"config"),XDG_CACHE_HOME:join(directory,"cache"),
+  // Wrangler may prefer an existing ~/.wrangler over XDG for its registry.
+  WRANGLER_REGISTRY_PATH:join(directory,"registry"),
   CLOUDFLARE_API_TOKEN:"mira-synthetic-only-no-cloud-access",
   CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV:"false",WRANGLER_SEND_METRICS:"false",CI:"true"};
 let output="";
