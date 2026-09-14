@@ -2,7 +2,7 @@ import {mkdtemp,writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {resolve,join} from "node:path";
 import {spawn} from "node:child_process";
-import {retainRuntimeFailure} from "./runtime-diagnostics.mjs";
+import {retainRuntimeFailure,waitForRuntimeExit} from "./runtime-diagnostics.mjs";
 
 // Execute the already-built bytes, without rebundling or touching the sealed
 // production config. Persistence and env-file are unique/empty. --local alone
@@ -41,7 +41,7 @@ try{
   const denied=await fetch(`${base}/api/companion-chat`,{method:"POST",headers:{"content-type":"application/json",origin:base},body:"{}",signal:AbortSignal.timeout(5000)});
   const deniedBody=await denied.json();
   if(denied.status!==503||deniedBody.code!=="INFERENCE_DISABLED")throw new Error("Local artifact did not refuse external inference");
-  const smoke=spawn(process.execPath,[join(web,"scripts/production-smoke.mjs")],{cwd:resolve(web,"../.."),env:{...env,COMPANARO_URL:base,MIRA_EXPECTED_SHA:process.env.GITHUB_SHA??"unreleased",QA_DIRECTORY:evidence},stdio:"inherit"});
+  const smoke=spawn(process.execPath,[join(web,"scripts/production-smoke.mjs")],{cwd:resolve(web,"../.."),env:{...env,COMPANARO_URL:base,MIRA_EXPECTED_SHA:process.env.GITHUB_SHA??"unreleased",MIRA_SYNTHETIC_DIAGNOSTICS:"true",QA_DIRECTORY:evidence},stdio:"inherit"});
   const code=await new Promise((resolve,reject)=>{smoke.on("error",reject);smoke.on("exit",resolve);});
   // This server has isolated synthetic credentials and no real user requests.
   // Retain its bounded diagnostics on failure: otherwise a workerd exit after
@@ -53,10 +53,12 @@ try{
   // stack/cause. Keep that bounded log from THIS isolated process only. Console
   // level need not be debug; Wrangler writes debug records to disk by default.
   try{
+    await waitForRuntimeExit(server);
     const report=await retainRuntimeFailure({directory:evidence,logPath:debugLog,consoleTail:output,exitCode:server.exitCode,signal:server.signalCode});
     console.error(`Isolated runtime debug log (${report.debug.truncated?"tail":"complete"}):\n${report.debug.text||"unavailable"}`);
   }catch{console.error("Could not retain isolated runtime diagnostics; original failure follows.");}
   throw error;
 }finally{
   if(server.pid){try{if(process.platform!=="win32")process.kill(-server.pid,"SIGTERM");else server.kill("SIGTERM");}catch{/* Already exited. */}}
+  await waitForRuntimeExit(server);
 }

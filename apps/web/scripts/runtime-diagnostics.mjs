@@ -1,6 +1,20 @@
 import {open,mkdir,writeFile} from "node:fs/promises";
 import {join} from "node:path";
 
+// Fatal Wrangler proxy errors close the HTTP listener before its CLI has
+// finished flushing the debug queue. Do not snapshot that queue immediately
+// after ECONNREFUSED, nor kill its process group before its natural exit.
+export async function waitForRuntimeExit(child,timeoutMs=4000){
+  if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>5000)throw new Error("Invalid runtime exit deadline");
+  if(child.exitCode!==null||child.signalCode!==null)return true;
+  return new Promise(resolve=>{
+    const finish=exited=>{clearTimeout(timer);child.removeListener("close",closed);resolve(exited);};
+    const closed=()=>finish(true);
+    const timer=setTimeout(()=>finish(false),timeoutMs);
+    child.once("close",closed);
+  });
+}
+
 // Only for credential-isolated synthetic runtimes. Never copy a user's global
 // Wrangler logs: callers supply the exact log created in their own mkdtemp.
 export async function readLogTail(path,maxBytes=64*1024){
