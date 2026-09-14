@@ -47,6 +47,9 @@ test("account signup, login, conflict recovery, reauthenticated export and delet
     return route.fulfill({ status: 501, json: { error: `Unsupported fixture path ${path}` } });
   });
   await page.goto("/signup", { waitUntil: "domcontentloaded" });
+  // Changing step height and focusing/scanning consent controls must not leave
+  // the document animating underneath a pointer or keyboard interaction.
+  await expect(page.locator("html")).toHaveCSS("scroll-behavior", "auto");
   await page.getByRole("button", { name: "Begin setup", exact: true }).click();
   await page.getByLabel("First name", { exact: true }).fill("Synthetic Adult");
   await page.getByLabel("Email", { exact: true }).fill(email);
@@ -57,8 +60,11 @@ test("account signup, login, conflict recovery, reauthenticated export and delet
   await page.locator(".choice-grid button").first().click(); await next();
   await next(); await next(); await next();
   await page.locator(".choice-grid button").first().click(); await next();
-  await page.getByRole("checkbox", { name: /I agree to my messages/ }).check();
-  await page.getByRole("checkbox", { name: /I accept the/ }).check();
+  await expect(page.locator("html")).toHaveCSS("scroll-behavior", "auto");
+  const processingConsent = page.getByRole("checkbox", { name: /I agree to my messages/ });
+  const policyConsent = page.getByRole("checkbox", { name: /I accept the/ });
+  await processingConsent.check(); await policyConsent.check();
+  await expect(processingConsent).toBeChecked(); await expect(policyConsent).toBeChecked();
   await page.getByRole("button", { name: "Meet your companion", exact: true }).click();
   await expect(page.locator(".first-meeting")).toBeVisible();
   expect(signed).toBe(true); // Ensure signup went through this fixture, not local bindings.
