@@ -10,6 +10,8 @@ This work addresses the measured avatar bottleneck. It does **not** certify phys
 - Rendering is capped at 30 updates/second during speech, 20 when idle, and 12 for non-speaking reduced-motion mode. These are **maximum scheduling rates**, not promised FPS. Facial interpolation is elapsed-time-based; a stopped utterance cannot keep a stale open-mouth target.
 - The backing framebuffer is limited to approximately 600,000 pixels before bounded adaptive downscaling. Sustained slow callbacks can reduce its scale to 0.75; isolated spikes/background stalls do not. Resolution never oscillates upward/downward during one call.
 - Hidden tabs stop requesting animation frames and reset timing when resumed. A lost WebGL context or failed load displays the existing portrait fallback. Hang-up removes listeners, cancels animation and disposes skeleton resources as well as geometry/materials/textures.
+- Eight consecutive rendering callbacks slower than 180 ms trigger a clearly labelled portrait mode for the rest of that call. This prevents sustained GPU stalls from monopolizing call controls. A new call retries animation. One isolated OS/shader stall does not trigger it. Background transitions clear the observation window. Timings above 250 ms are **not** discarded as outliers indefinitely.
+- Persistent performance/context-loss fallbacks show a sharp, framed full-face portrait, not the zoomed and blurred loading placeholder. The call controls and explicit non-animated status remain available; no lip-sync claim is made in portrait mode.
 - Reduced-motion changes are observed during the call. Decorative head, neck, eye and breathing offsets are suppressed while speech expressions remain available.
 
 ## Verification scope
@@ -22,7 +24,11 @@ pnpm --filter @companion/web assets:check
 pnpm --filter @companion/web exec playwright test --config playwright.performance.config.mjs tests/performance/app-interaction-avatar.spec.mjs
 ```
 
-CI now runs this real-avatar suite in addition to the existing three-browser acceptance suite and retains the JSON measurements in its test artifact. The checks assert rendering/lifecycle behavior; they do not silently turn a slow measurement into a speed pass. Local timings use SwiftShader software WebGL, 4× CPU throttle, 393×851/DPR 1 and unshaped loopback networking. Do not compare them with physical GPU FPS, field INP, or production provider latency. Earlier baseline measurements remain in `audit/readiness-2026-09-14-handoff/performance-lab.json`.
+CI now runs this real-avatar suite in addition to the existing three-browser acceptance suite and retains the JSON measurements in its test artifact. The checks assert rendering/lifecycle behavior; they do not silently turn a slow measurement into a speed pass. App/high-load timings use SwiftShader software WebGL, 4× CPU throttle, 393×851/DPR 1 and unshaped loopback networking. Lifecycle checks use the same software renderer without added CPU throttle. A scheduling-fault test verifies actual drawing before injected stalls, explicit performance fallback, stopped drawing and usable hang-up. High-load reports identify animated versus portrait mode; callback cadence in portrait mode is **not** animated-avatar FPS. Do not compare these with physical GPU FPS, field INP, or production provider latency. Earlier baseline measurements remain in `audit/readiness-2026-09-14-handoff/performance-lab.json`.
+
+The first PR #6 run passed three scenarios but failed a new assertion that the unthrottled software GPU must remain animated for four seconds. It legitimately entered performance portrait mode instead. That hardware-capability assumption was removed, not the production safeguard: the fault test now injects stalls immediately after actual drawing, and the separate high-load scenario still records observed cadence and rendering mode. Sustained animation on a capable physical GPU remains an external acceptance item.
+
+The first optimization's PR CI passed functionality but measured approximately 383 ms software-renderer callback intervals and slow controls. A heavily contended Mac run also timed out. These results motivated the explicit sustained-stall fallback; they were not erased or labelled smooth. See [PR #5 evidence](https://github.com/prakhar267/mira/pull/5#issuecomment-5663161715).
 
 ## Still external
 

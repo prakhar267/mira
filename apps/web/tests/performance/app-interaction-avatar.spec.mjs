@@ -53,7 +53,7 @@ test("three cold mobile-emulated app sessions record real interaction timing", a
 });
 
 test("avatar pauses when hidden, resumes once, and falls back after actual WebGL context loss", async ({ browser }) => {
-  const { context, page, requests } = await coldMobilePage(browser);
+  const { context, page, requests } = await coldMobilePage(browser, 1);
   try {
     await syntheticCallMedia(page);
     await observeAvatar(page);
@@ -119,6 +119,15 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
     await page.evaluate(() => window.__miraLabMedia.activeAudio.finish());
     await expect(dialog.getByRole("button", { name: "Listening automatically", exact: true })).toBeVisible();
     evidence.samples.push(await sampleAvatarCadence(page, "synthetic-listening"));
+    evidence.renderingMode = await page.locator(".live-avatar-3d--limited").count() ? "performance-portrait" : "animated";
+    if (evidence.renderingMode === "performance-portrait") {
+      await expect(page.getByRole("status").filter({ hasText: "Animation paused" })).toBeVisible();
+      const paused = await page.evaluate(() => window.__miraAvatarLab.drawCalls);
+      await page.waitForTimeout(350);
+      expect(await page.evaluate(() => window.__miraAvatarLab.drawCalls)).toBe(paused);
+    } else {
+      expect(evidence.samples.every(sample => sample.drawCalls > 0)).toBe(true);
+    }
     await recordInteraction(page, "hide-call-captions", () => dialog.getByRole("button", { name: "Hide captions", exact: true }).tap(),
       () => expect(page.locator(".video-call__captions")).toHaveCount(0));
     await page.screenshot({ path: testInfo.outputPath("avatar-mobile-ready.png") });
@@ -142,7 +151,8 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
     expect(evidence.load.callStartToReadyMs).toBeGreaterThan(0);
     expect(evidence.load.webglVersion).toContain("WebGL");
     expect(evidence.final.avatar.contextLost).toBe(0);
-    expect(evidence.samples.every(sample => sample.drawCalls > 0 && sample.rAFCallbacks > 1 && sample.medianRAFIntervalMs > 0)).toBe(true);
+    expect(evidence.samples.every(sample => sample.rAFCallbacks > 1 && sample.medianRAFIntervalMs > 0)).toBe(true);
+    expect(evidence.load.drawCalls).toBeGreaterThan(0);
     expect(requests).toMatchObject({ session: 1, chat: 0, speech: 1, unexpected: [] });
     // A long observation can cross the normal 10s silence restart. Verify
     // complete cleanup, not an incorrect exactly-one permission assumption.
@@ -153,4 +163,47 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
     await testInfo.attach("avatar-lab-measurements", { body: JSON.stringify(evidence, null, 2), contentType: "application/json" });
     await context.close();
   }
+});
+
+test("actual avatar drawing followed by severe rendering stalls uses an explicit stable fallback", async ({ browser }, testInfo) => {
+  const { context, page, requests } = await coldMobilePage(browser, 1);
+  try {
+    await syntheticCallMedia(page);
+    await observeAvatar(page);
+    await enterDemo(page);
+    await page.getByRole("button", { name: "Chat", exact: true }).tap();
+    await page.getByRole("button", { name: "Start video call with Mira", exact: true }).tap();
+    await expect(page.locator(".live-avatar-3d--ready")).toBeVisible({ timeout: 90_000 });
+    const beforeFault = await page.evaluate(() => ({ ...window.__miraAvatarLab }));
+    expect(beforeFault.drawCalls).toBeGreaterThan(0);
+    await testInfo.attach("avatar-before-scheduling-fault", { body: JSON.stringify(beforeFault), contentType: "application/json" });
+    // Delay actual rAF callbacks while retaining the actual renderer. This
+    // deterministic scheduling fault verifies fallback, not hardware speed.
+    // Apply immediately after actual drawing: removing CPU throttling does
+    // not make a software GPU capable of sustained animation. A four-second
+    // "must remain ready" assertion incorrectly rejected legitimate fallback.
+    await page.evaluate(() => {
+      const original = window.requestAnimationFrame.bind(window);
+      window.requestAnimationFrame = callback => original(() => setTimeout(() => callback(performance.now()), 220));
+    });
+    await expect(page.locator(".live-avatar-3d--limited")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("status").filter({ hasText: "Animation paused" })).toBeVisible();
+    await expect(page.locator(".live-avatar-3d__canvas")).toHaveAttribute("aria-hidden", "true");
+    const portrait = page.getByRole("img", { name: "Mira, anime companion portrait", exact: true });
+    await expect(portrait).toBeVisible();
+    const portraitStyle = await portrait.evaluate(element => ({ fit: getComputedStyle(element).objectFit,
+      filter: getComputedStyle(element).filter, width: element.getBoundingClientRect().width,
+      height: element.getBoundingClientRect().height, viewport: innerWidth }));
+    expect(portraitStyle.fit).toBe("contain");
+    expect(portraitStyle.filter).not.toContain("blur");
+    expect(portraitStyle.width).toBeLessThan(portraitStyle.viewport);
+    expect(Math.abs(portraitStyle.width - portraitStyle.height)).toBeLessThan(2);
+    await page.screenshot({ path: testInfo.outputPath("performance-portrait-mobile.png") });
+    const paused = await page.evaluate(() => window.__miraAvatarLab.drawCalls);
+    await page.waitForTimeout(450);
+    expect(await page.evaluate(() => window.__miraAvatarLab.drawCalls)).toBe(paused);
+    await page.getByRole("button", { name: "End video call", exact: true }).tap();
+    await expect(page.getByRole("dialog", { name: "Video call with Mira", exact: true })).toHaveCount(0);
+    expect(requests).toMatchObject({ chat: 0, speech: 1, unexpected: [] });
+  } finally { await context.close(); }
 });
