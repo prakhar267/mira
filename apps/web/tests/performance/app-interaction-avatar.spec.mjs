@@ -57,19 +57,30 @@ test("avatar pauses when hidden, resumes once, and falls back after actual WebGL
   try {
     await syntheticCallMedia(page);
     await observeAvatar(page);
+    // Pause on the first committed ready state, inside the page. Waiting for
+    // several driver round trips can let a slow software GPU enter legitimate
+    // portrait mode before the visibility test even begins (which must not
+    // resume animation). Keep lifecycle testing independent of that race.
+    await page.addInitScript(() => {
+      const observer = new MutationObserver(() => {
+        if (!document.querySelector(".live-avatar-3d--ready")) return;
+        observer.disconnect();
+        Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+        document.dispatchEvent(new Event("visibilitychange"));
+        window.__miraVisibilityPausedAt = window.__miraAvatarLab.drawCalls;
+      });
+      observer.observe(document, { subtree: true, childList: true, attributes: true });
+    });
     await enterDemo(page);
     await page.getByRole("button", { name: "Chat", exact: true }).tap();
     await page.getByRole("button", { name: "Start video call with Mira", exact: true }).tap();
     await expect(page.locator(".live-avatar-3d--ready")).toBeVisible({ timeout: 90_000 });
     const canvas = page.locator(".live-avatar-3d__canvas");
     expect(await canvas.evaluate(element => element.width * element.height)).toBeLessThanOrEqual(601_600);
-    // Exercise the visibility listener deterministically without taking over
-    // the user's foreground browser or claiming a physical backgrounding test.
-    await page.evaluate(() => {
-      Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
+    // This is a deterministic visibility event, not physical backgrounding.
+    expect(await page.evaluate(() => document.hidden)).toBe(true);
     const paused = await page.evaluate(() => window.__miraAvatarLab.drawCalls);
+    expect(paused).toBe(await page.evaluate(() => window.__miraVisibilityPausedAt));
     await page.waitForTimeout(350);
     expect(await page.evaluate(() => window.__miraAvatarLab.drawCalls)).toBe(paused);
     await page.evaluate(() => {
