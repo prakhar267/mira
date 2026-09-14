@@ -1,0 +1,65 @@
+# Mira current readiness and acceptance status
+
+Updated 14 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
+
+## Verified live release
+
+- Application source: `f2d00cb4694d20f93b81c2c35e754dc8b7eeec60`, merged through [PR #3](https://github.com/prakhar267/mira/pull/3).
+- [Main CI 34825950777](https://github.com/prakhar267/mira/actions/runs/34825950777): workspace lint/typecheck/build, **395 web tests**, **35 actual Worker tests**, **90 compiled browser tests**, asset/dependency checks, three independent artifact cold starts, and sealed upload/download integrity all passed.
+- The exact main artifact's 324 listed files were verified before and after owner-authorized `--no-bundle` deployment; no local rebuild or relabeled PR artifact was promoted.
+- Live Cloudflare version: `97987f08-96a5-4a01-91b3-6639b5ed166d`. `/api/health` reports the exact commit and reachable SQLite storage. Read-only post-deployment smoke passed **5/5**, with no provider requests or account mutations.
+- [Post-release availability check 34826987758](https://github.com/prakhar267/mira/actions/runs/34826987758) passed from GitHub. It was manually dispatched; a prior scheduled run also executed. Neither result establishes a reliable 15-minute cadence or external alert receipt.
+- Three cold live mobile-emulation loads at 393×851, 4× CPU slowdown, 1.6 Mbps and 150 ms latency measured LCP **2.040 / 1.500 / 1.508 seconds**, median **1.508 seconds**, and CLS **0.006128** each. No overflow or HTTP/navigation errors. A screenshot was visually reviewed. These are Chromium lab samples, not physical-device or field percentile measurements.
+- The live signup page has instant root scrolling; landing-page scrolling remains smooth. Browser tests verify both explicit consent choices without forced clicks or preselection.
+
+[Full promotion and live-check evidence](https://github.com/prakhar267/mira/pull/3#issuecomment-5661724599). Later evaluator, test and documentation changes do not themselves alter this deployed application or its SHA. A normal Git push does not deploy.
+
+## Post-release verification tooling
+
+A fresh audit found the old conversation evaluator posted directly to the now-protected API without a session, so it would measure authentication failures rather than model quality. The updated evaluator requires explicit target, current consent, authorization and a finite client-chat request cap before network access. It uses a current limited demo session or an explicitly supplied dedicated QA account session, preserves per-scenario context and never renews a session or retries to escape a limit. It records hashes/heuristic flags rather than raw messages, replies or credentials. **46/46 focused synthetic tests** passed, including drift checks against actual session creation/policy, a real loopback HTTP cookie/context/revocation exchange, malformed options, expiry, budget exhaustion, service failure and bounded stalled response bodies. No live inference was used. [Opt-in instructions and limitations](DEPLOYMENT.md#explicitly-authorized-conversation-evaluation).
+
+Two additional call-controller tests verify the timing arithmetic in both call modes: 650 ms endpointing + 250 ms transcription + 400 ms generation + 350 ms speech preparation = 1,650 ms round trip. Late playback after hang-up adds no new metric. The full focused controller suite passed **24/24**; this tests instrumentation, not acoustic accuracy.
+
+The new optional performance suite passed **2/2 scenarios**, validating measurement collection and cleanup rather than certifying speed. [Retained content-free lab evidence](../audit/readiness-2026-09-14-handoff/performance-lab.json) records:
+
+- Three fresh mobile-emulated demo sessions: maximum observed Event Timing interaction durations **120 / 96 / 112 ms**, no horizontal overflow and no VRM prefetch before opening a call. All JavaScript requested during the scripted app interactions decoded to **949,946 bytes** per sample; that broader app scope is not the landing page's 320,746-byte script-initiator metric.
+- Real VRM asset: **10,776,032 bytes**, with readiness observed **1,807.5 ms** after the call-opening command began. The measured transfer was unshaped loopback, not a phone network; the large model still needs real-network acceptance.
+- **Slow avatar baseline:** with SwiftShader software WebGL and 4× CPU slowdown, median animation-frame callback intervals were **116.7 / 116.6 ms** during synthetic speaking/listening. In-call Event Timing reached **456 ms** for captions, **568 ms** for the activity menu, and **264 ms** for hang-up. These observations do not establish smooth avatar performance. They are instrumented draw submissions/frame-timing proxies, not GPU completion, presented FPS, field INP or perceptual lip-sync.
+- The actual avatar rendered without WebGL context loss and stopped submitting draws after hang-up. Both requested synthetic microphone tracks were released. No physical microphone, camera or real speech/provider request was used. An initial test wrongly expected one microphone request despite the existing silence restart; the final assertion verifies every requested track is stopped instead of disabling automatic listening.
+
+Run the optional lab checks with:
+
+```sh
+pnpm --filter @companion/web exec playwright test --config playwright.performance.config.mjs tests/performance/app-interaction-avatar.spec.mjs
+```
+
+The three-browser release suite and these optional Chromium measurements have different scopes. The latter are not silently included in the 90-browser release count. Fresh integrated workspace lint/typecheck/test/build, **443/443 active web tests across 50 files**, and **35/35 actual Worker tests** passed after these additions; the active web tasks ran fresh while unrelated workspace tasks reused prior cache. The ordinary typecheck regenerated Next route types, resolving a standalone `tsc` check's stale generated-type mismatch without editing generated files. The source-only tooling does not change the deployed voice/model, avatar, application configuration or payment state.
+
+## Requirement-by-requirement disposition
+
+| Requirement from the remaining goal | Evidence and current status | Still required |
+| --- | --- | --- |
+| Genuine incremental text chat with cancellation | Implemented and runtime/browser verified: real route/HTTP client sees checked sentence prefixes before synthetic upstream completion; terminal `done` alone commits success; cancellation, malformed streams and changed consent/memory fence delivery. See [inference boundary](INFERENCE-BOUNDARY.md#incremental-text-delivery). | Real-provider first-use latency and open-ended answer quality are not established by these synthetic checks. Calls deliberately keep complete replies for speech. |
+| Independent encrypted backup and deletion-safe source-loss recovery | V2 code is deployed but dormant. Three separate SQLite files and an encrypted filesystem vault demonstrate successful recovery after physically removing the synthetic source, current deletion/consent replay, protected target admission and subsequent independently acknowledged deletions. Wrong target/archive, stale authority, partial failure and v1 bypass cases fail closed. See [v2 protocol/evidence](PROTECTED-RECOVERY-V2.md). | Independently surviving production authority/archive placement, approved retention/key custody, explicit enrollment/capture, real email recovery, and an operational source-loss/cutover drill. Same-store daily snapshots are not independent backups. |
+| English/Hindi/Hinglish conversation verification | Curated prompt/language/safety regressions and synthetic multi-turn scenarios exist. Failed answers remain typed errors, not saved companion messages. The repaired evaluator/session contract has 46 focused tests; its fixture coverage is separate from acceptance of a hosted model. | An explicitly authorized finite provider-test budget, reviewed synthetic scenarios and fluent consenting adult reviewers. Anchor/script heuristics cannot certify meaning, accents, empathy or conversational quality. |
+| Voice/video reliability | Real adapters/controller plus synthetic browser media cover cancellation, permissions, retry, automatic listening and late callbacks. The virtual soak runs 90 turns per mode over more than 30 minutes of simulated time. Endpointing and stage timing are instrumented. | Physical Android/iPhone/desktop microphones and speakers, accents/noise, echo, talk-over, real Priya playback, audible latency, camera behavior and long-call/lip-sync acceptance. [Device protocol](REAL-DEVICE-CALL-QA.md) is unsigned. |
+| Accessibility and performance | Automated browser accessibility covers public/auth/main views, dialogs, labels, keyboard/focus, 320px reflow, doubled computed text and call permission states. Live landing checks, new app Event Timing and real-avatar draw/cleanup observations have separately recorded scope; the software-GPU avatar baseline is slow. | Human screen-reader/assistive-technology review, real-GPU/phone-network avatar acceptance, physical mobile performance and field data. Automated Axe incomplete/manual findings remain manual, not silently counted as passes. |
+| Email, alerts and operations | Durable mail outbox, bounded retries, one-use token lifecycle and content-minimized alert state are tested with fixtures. Live application/database checks and GitHub monitor execution pass. | Verified sender credentials and authorized test mailbox, approved alert destination and accepted on-call ownership, actual receipt/reset/reverification/incident-recovery evidence. Presence of a configuration field does not prove delivery. |
+| Review, GitHub and release | Repository is public; PR #3 is merged; main CI and exact-artifact Cloudflare release passed. The deployed source and version are above. | Independent security/legal/provider-data approval and owner operational decisions. GitHub-hosted automated promotion still lacks scoped credentials; owner-CLI promotion is verified. Payments remain excluded. |
+
+The original phase-by-phase access, state, memory, safety, authentication and storage work is catalogued in the [initial implementation ledger](READINESS-IMPLEMENTATION.md). That ledger's old counts and deployment/billing blockers are historical, not current status. Subsequent [streaming/accessibility work](READINESS-FOLLOWTHROUGH.md), [call lifecycle work](READINESS-CONTINUATION.md), [v2 recovery](PROTECTED-RECOVERY-V2.md) and [release-runtime fixes](READINESS-RECOVERY-PREPARATION.md) provide the narrower regression evidence behind this handoff.
+
+## Fresh external-configuration audit
+
+At the September 14 recheck, Worker secret-name listing contained only `INWORLD_API_KEY` and `MIRA_ADMIN_KEY`; secret values were not read. The reviewed production configuration preserves existing bindings and keeps `BILLING_ENABLED=false`. It does not enable protected recovery or configure a sender/alert destination. Repository secret-name listing was empty. Live health reported `inference: configured-not-probed`, not available credit or model quality.
+
+No approved independent archive/authority, recovery key custody, sender identity, test mailbox, alert endpoint or signed physical/independent-review result was found in the current handoff. Missing authorization/configuration is not resolved by silently choosing a new data processor, signing up for a paid service, exporting user data to a Mac, or sending messages to real people.
+
+To close the external gates, the owner must provide:
+
+1. An approved independently retained archive/authority location and retention policy, key custodian and recovery objectives. Existing free resources are possible; no particular account/location or billing change is assumed. Follow the [explicit maintenance/enrollment procedure](PROTECTED-RECOVERY-V2.md#dormant-deployment-and-owner-controlled-activation).
+2. A verified sender and securely configured email credential, an authorized test mailbox, an approved incident endpoint and accepted support/on-call owner. Do not paste credentials into GitHub or chat.
+3. A known available provider allowance with a finite authorized request budget, consenting fluent adult testers, named physical devices and authorization for any recordings. Synthetic fixtures remain the default.
+4. Named independent security/legal/provider-data reviewers and human accessibility acceptance. Internal engineering tests cannot supply independent approval.
+
+**Limited free beta:** deployed hardening with demonstrated automated boundaries and live reachability, but the external acceptance/availability risks above remain. **Paid general availability:** deliberately out of scope and not ready. No guaranteed uptime, perfect understanding, universal safety, verified age or offsite recovery promise is made.

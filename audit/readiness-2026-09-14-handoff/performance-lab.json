@@ -1,0 +1,543 @@
+{
+  "applicationBaseCommit": "f2d00cb4694d20f93b81c2c35e754dc8b7eeec60",
+  "sourceScope": "Application unchanged; new uncommitted performance fixtures. Local compiled build, not a sealed production release.",
+  "conditions": "Local compiled Worker, fresh Chromium context, 393x851, DPR 1, mobile/touch emulation, cold HTTP cache, 4x CPU throttle, unshaped loopback network; not physical hardware, production transport, field INP, or provider latency.",
+  "providerRequests": 0,
+  "realAccountMutations": 0,
+  "realMicrophoneOrCameraAccess": false,
+  "app": {
+    "status": "passed",
+    "measuredAt": "2026-09-14T09:26:41.162Z",
+    "limitations": "Fixed scripted actions with synthetic replies. Event Timing durations are quantized and entries below 16ms are absent. No INP percentile, physical-device acceptance, live latency or before/after improvement claim.",
+    "samples": [
+      {
+        "sample": 1,
+        "overflow": false,
+        "scriptDecodedBytes": 949946,
+        "vrmRequests": 0,
+        "requests": {
+          "session": 1,
+          "chat": 1,
+          "speech": 0,
+          "unexpected": []
+        },
+        "actions": [
+          {
+            "label": "open-chat",
+            "confirmationWallMs": 175.5,
+            "observedInteractions": [
+              {
+                "interactionId": 932,
+                "durationMs": 120
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "type-message",
+            "confirmationWallMs": 924.8999999985099,
+            "observedInteractions": [
+              {
+                "interactionId": 939,
+                "durationMs": 32
+              },
+              {
+                "interactionId": 946,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 953,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 960,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 974,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 981,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 988,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 995,
+                "durationMs": 24
+              },
+              {
+                "interactionId": 1016,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 1030,
+                "durationMs": 24
+              },
+              {
+                "interactionId": 1051,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 1072,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 1114,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 1142,
+                "durationMs": 16
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "send-synthetic-message",
+            "confirmationWallMs": 145,
+            "observedInteractions": [
+              {
+                "interactionId": 1149,
+                "durationMs": 88
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-profile",
+            "confirmationWallMs": 135.69999999925494,
+            "observedInteractions": [
+              {
+                "interactionId": 1156,
+                "durationMs": 80
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-memories",
+            "confirmationWallMs": 77.20000000111759,
+            "observedInteractions": [
+              {
+                "interactionId": 1163,
+                "durationMs": 32
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-memory-dialog",
+            "confirmationWallMs": 58.20000000111759,
+            "observedInteractions": [
+              {
+                "interactionId": 1170,
+                "durationMs": 40
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "close-memory-dialog",
+            "confirmationWallMs": 23.90000000037253,
+            "observedInteractions": [
+              {
+                "interactionId": 1177,
+                "durationMs": 16
+              }
+            ],
+            "missingEventInterpretation": null
+          }
+        ]
+      },
+      {
+        "sample": 2,
+        "overflow": false,
+        "scriptDecodedBytes": 949946,
+        "vrmRequests": 0,
+        "requests": {
+          "session": 1,
+          "chat": 1,
+          "speech": 0,
+          "unexpected": []
+        },
+        "actions": [
+          {
+            "label": "open-chat",
+            "confirmationWallMs": 156.10000000149012,
+            "observedInteractions": [
+              {
+                "interactionId": 3955,
+                "durationMs": 96
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "type-message",
+            "confirmationWallMs": 925.5,
+            "observedInteractions": [
+              {
+                "interactionId": 3962,
+                "durationMs": 40
+              },
+              {
+                "interactionId": 3969,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 3976,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 3983,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 3990,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 3997,
+                "durationMs": 24
+              },
+              {
+                "interactionId": 4004,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 4011,
+                "durationMs": 24
+              },
+              {
+                "interactionId": 4039,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 4067,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 4095,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 4123,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 4151,
+                "durationMs": 16
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "send-synthetic-message",
+            "confirmationWallMs": 124.40000000037253,
+            "observedInteractions": [
+              {
+                "interactionId": 4172,
+                "durationMs": 64
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-profile",
+            "confirmationWallMs": 128.7000000011176,
+            "observedInteractions": [
+              {
+                "interactionId": 4179,
+                "durationMs": 72
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-memories",
+            "confirmationWallMs": 78.09999999962747,
+            "observedInteractions": [
+              {
+                "interactionId": 4186,
+                "durationMs": 40
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-memory-dialog",
+            "confirmationWallMs": 60.90000000037253,
+            "observedInteractions": [
+              {
+                "interactionId": 4193,
+                "durationMs": 40
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "close-memory-dialog",
+            "confirmationWallMs": 18.09999999962747,
+            "observedInteractions": [
+              {
+                "interactionId": 4200,
+                "durationMs": 16
+              }
+            ],
+            "missingEventInterpretation": null
+          }
+        ]
+      },
+      {
+        "sample": 3,
+        "overflow": false,
+        "scriptDecodedBytes": 949946,
+        "vrmRequests": 0,
+        "requests": {
+          "session": 1,
+          "chat": 1,
+          "speech": 0,
+          "unexpected": []
+        },
+        "actions": [
+          {
+            "label": "open-chat",
+            "confirmationWallMs": 179,
+            "observedInteractions": [
+              {
+                "interactionId": 9568,
+                "durationMs": 112
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "type-message",
+            "confirmationWallMs": 929.6999999992549,
+            "observedInteractions": [
+              {
+                "interactionId": 9575,
+                "durationMs": 32
+              },
+              {
+                "interactionId": 9582,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9589,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9596,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9603,
+                "durationMs": 24
+              },
+              {
+                "interactionId": 9610,
+                "durationMs": 24
+              },
+              {
+                "interactionId": 9624,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9631,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9645,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9673,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9701,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9736,
+                "durationMs": 16
+              },
+              {
+                "interactionId": 9750,
+                "durationMs": 24
+              },
+              {
+                "interactionId": 9771,
+                "durationMs": 16
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "send-synthetic-message",
+            "confirmationWallMs": 125.89999999850988,
+            "observedInteractions": [
+              {
+                "interactionId": 9785,
+                "durationMs": 64
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-profile",
+            "confirmationWallMs": 112.59999999962747,
+            "observedInteractions": [
+              {
+                "interactionId": 9792,
+                "durationMs": 72
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-memories",
+            "confirmationWallMs": 77.90000000037253,
+            "observedInteractions": [
+              {
+                "interactionId": 9799,
+                "durationMs": 40
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "open-memory-dialog",
+            "confirmationWallMs": 75.59999999962747,
+            "observedInteractions": [
+              {
+                "interactionId": 9806,
+                "durationMs": 40
+              }
+            ],
+            "missingEventInterpretation": null
+          },
+          {
+            "label": "close-memory-dialog",
+            "confirmationWallMs": 27.299999998882413,
+            "observedInteractions": [
+              {
+                "interactionId": 9813,
+                "durationMs": 16
+              }
+            ],
+            "missingEventInterpretation": null
+          }
+        ]
+      }
+    ]
+  },
+  "avatar": {
+    "status": "passed",
+    "measuredAt": "2026-09-14T09:26:41.212Z",
+    "limitations": "One local instrumented cold load. Fake playback and silent synthetic microphone; no acoustic, echo, camera, real-device, presented-FPS or perceptual lip-sync certification.",
+    "load": {
+      "callStartToReadyMs": 1807.5,
+      "callStartToFirstDrawMs": 1409.9000000003725,
+      "drawCalls": 360,
+      "contextLost": 0,
+      "firstDrawAt": 2578,
+      "readyAt": 2975.5999999996275,
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+      "webglVersion": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    },
+    "model": [
+      {
+        "path": "/assets/mira/avatar/mira-anime-live-v2.vrm",
+        "initiatorType": "fetch",
+        "transferBytes": 10776332,
+        "encodedBytes": 10776032,
+        "decodedBytes": 10776032,
+        "durationMs": 297
+      }
+    ],
+    "samples": [
+      {
+        "label": "synthetic-speaking",
+        "elapsedMs": 4038.9000000003725,
+        "drawCalls": 680,
+        "rAFCallbacks": 34,
+        "medianRAFIntervalMs": 116.70000000000073,
+        "maxRAFIntervalMs": 150,
+        "intervalsOver50ms": 33,
+        "interpretation": "Instrumented WebGL draw submissions and rAF frame-timing proxy, not actual presented avatar FPS or perceptual lip-sync."
+      },
+      {
+        "label": "synthetic-listening",
+        "elapsedMs": 4040.9000000003725,
+        "drawCalls": 740,
+        "rAFCallbacks": 37,
+        "medianRAFIntervalMs": 116.59999999999854,
+        "maxRAFIntervalMs": 183.20000000000073,
+        "intervalsOver50ms": 36,
+        "interpretation": "Instrumented WebGL draw submissions and rAF frame-timing proxy, not actual presented avatar FPS or perceptual lip-sync."
+      }
+    ],
+    "contextLost": 0,
+    "media": {
+      "requested": 2,
+      "stopped": 2,
+      "playbackStarted": 1,
+      "activeTracks": 0,
+      "cameraRequested": 0
+    },
+    "requests": {
+      "session": 1,
+      "chat": 0,
+      "speech": 1,
+      "unexpected": []
+    },
+    "actions": [
+      {
+        "label": "open-video-call",
+        "observedInteractions": [
+          {
+            "interactionId": 3607,
+            "durationMs": 40
+          }
+        ],
+        "missingEventInterpretation": null
+      },
+      {
+        "label": "hide-call-captions",
+        "observedInteractions": [
+          {
+            "interactionId": 3614,
+            "durationMs": 456
+          }
+        ],
+        "missingEventInterpretation": null
+      },
+      {
+        "label": "open-call-activity",
+        "observedInteractions": [
+          {
+            "interactionId": 3621,
+            "durationMs": 568
+          }
+        ],
+        "missingEventInterpretation": null
+      },
+      {
+        "label": "end-video-call",
+        "observedInteractions": [
+          {
+            "interactionId": 3628,
+            "durationMs": 264
+          }
+        ],
+        "missingEventInterpretation": null
+      }
+    ]
+  }
+}

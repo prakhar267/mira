@@ -1,6 +1,6 @@
 # Mira: active architecture and configuration
 
-Source implementation updated 13 September 2026. This guide describes this checkout, **not proof that it has been deployed**. See [implementation evidence](READINESS-IMPLEMENTATION.md), [inference contract](INFERENCE-BOUNDARY.md), and [storage/recovery](STORAGE-RECOVERY.md).
+Updated 14 September 2026. This guide describes the active implementation. The [current acceptance status](READINESS-STATUS.md) distinguishes the verified deployed commit from later test/documentation changes. See [inference contract](INFERENCE-BOUNDARY.md), [storage/recovery](STORAGE-RECOVERY.md), and [protected recovery v2](PROTECTED-RECOVERY-V2.md).
 
 ## Serving path and trust boundaries
 
@@ -26,7 +26,7 @@ Source implementation updated 13 September 2026. This guide describes this check
 | Voice choice / mood sliders | Fixed Priya; unsupported controls removed/disabled | Same | Not relevant to active voice |
 | Payments | Disabled | Disabled | Excluded from this work |
 
-`GET /api/capabilities` is the authoritative configured-capability contract. Configured does not mean quota is available. Neither canned artwork nor text animations are described as model generation or network streaming. The browser currently reveals a completed reply; genuine incremental client transport is deferred, not a measured time-to-first-token improvement.
+`GET /api/capabilities` is the authoritative configured-capability contract. Configured does not mean quota is available. Text chat negotiates genuine incremental NDJSON delivery, releasing checked complete-sentence prefixes while the upstream response is still in progress. A valid terminal `done` is required before saving the assistant reply; cancellation/error removes the transient draft. One-sentence replies may still wait until completion. Voice/video use complete JSON replies and Priya playback, not raw token streaming. See [streaming boundaries and runtime evidence](INFERENCE-BOUNDARY.md#incremental-text-delivery); this is not a measured production time-to-first-token claim.
 
 ## Isolated developer setup
 
@@ -69,6 +69,7 @@ The active web unit, Worker and browser suites fail if no tests are found. The o
 | `MIRA_ADMIN_KEY` | Operator bearer secret; never in query parameters/localStorage |
 | `MIRA_ALERT_WEBHOOK`, `MIRA_SUPPORT_OWNER` | Approved HTTPS delivery destination / owner metadata, not delivered-alert or staffed-support proof |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Optional recovery/verification sender; requires verified sender, HTTPS origin and authorized mailbox test |
+| Protected-recovery v2 configuration | Independent suppression authority, separately retained encrypted archive, role-separated credentials and explicit enrollment; see [activation settings](PROTECTED-RECOVERY-V2.md#dormant-deployment-and-owner-controlled-activation). Not active merely because the code or a same-store snapshot exists |
 | `BILLING_ENABLED=false` | Remains disabled; no payment implementation/activation work in this run |
 | `DODO_PAYMENTS_ENVIRONMENT=test_mode` | Existing dormant integration. Merchant/product/pricing/webhook secrets remain excluded; do not configure to satisfy readiness |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Scoped release secrets only, absent from compiled client code |
@@ -83,4 +84,4 @@ Passwords retain compatible PBKDF2 hashing with algorithm/work-factor metadata. 
 
 ## Release and remaining gates
 
-See [deployment](DEPLOYMENT.md) for immutable artifact hashes, commit/version correlation and explicit promotion. This implementation is local/synthetic only; production migration, human audio, external sender/alerts, real provider performance, security/legal review and on-call ownership remain explicit gates. No uptime, universal safety, strong age verification, perfect recall or paid-GA claim is made.
+See [deployment](DEPLOYMENT.md) for immutable artifact hashes, commit/version correlation and explicit promotion. Application deployment and post-release reachability are verified separately from human audio, independent backup activation, external sender/alerts, real provider performance, security/legal review and on-call ownership. [Current evidence and remaining inputs](READINESS-STATUS.md) record those distinctions. No uptime, universal safety, strong age verification, perfect recall or paid-GA claim is made.
