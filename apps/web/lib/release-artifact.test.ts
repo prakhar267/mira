@@ -33,6 +33,28 @@ describe("sealed production artifact promotion", () => {
     expect(manifest).toMatchObject({ schemaVersion: 1, sha, dirty: false }); expect(manifest.files).toHaveLength(6);
     const verified = run("verify"); expect(verified.status, verified.stderr).toBe(0);
   });
+  it("seals hidden asset rules and Vite manifests, rejecting an upload that omits them", async () => {
+    const hidden = [
+      ["client/.assetsignore", "wrangler.json\n.dev.vars\n.vite\n"],
+      ["client/.vite/manifest.json", JSON.stringify({ "synthetic-client": { file: "chunk-0.js" } })],
+      ["server/.vite/manifest.json", JSON.stringify({ "synthetic-server": { file: "index.js" } })],
+    ] as const;
+    await mkdir(join(artifact, "client/.vite")); await mkdir(join(artifact, "server/.vite"));
+    for (const [path, contents] of hidden) await writeFile(join(artifact, path), contents);
+    const created = run("create"); expect(created.status, created.stderr).toBe(0);
+    const manifest = JSON.parse(await readFile(join(artifact, "mira-release-manifest.json"), "utf8"));
+    for (const [path] of hidden) expect(manifest.files.map((file: { path: string }) => file.path)).toContain(path);
+    expect(run("verify").status).toBe(0);
+    // Upload-artifact excludes hidden files by default. Each omitted entry must
+    // fail verification; never compensate by dropping it from the sealed set.
+    for (const [path, contents] of hidden) {
+      await rm(join(artifact, path));
+      const incomplete = run("verify"); expect(incomplete.status).not.toBe(0);
+      expect(incomplete.stderr).toContain("Release artifact changed after testing");
+      await writeFile(join(artifact, path), contents);
+      const restored = run("verify"); expect(restored.status, restored.stderr).toBe(0);
+    }
+  });
   it("rejects changed bytes, injected files and wrong commit identity", async () => {
     expect(run("create").status).toBe(0);
     expect(run("verify", "f".repeat(40)).status).not.toBe(0);

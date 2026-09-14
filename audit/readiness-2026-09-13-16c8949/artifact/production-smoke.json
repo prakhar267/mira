@@ -1,0 +1,42 @@
+{
+  "at": "2026-09-13T13:51:39.580Z",
+  "baseUrl": "http://127.0.0.1:4398",
+  "versionId": "583006ac-c00e-48ab-94d5-24b66bf020fa",
+  "expectedCommit": "16c89499f522b7fd08206acdf65dc2491c810d5f",
+  "providerRequests": 0,
+  "accountMutations": 0,
+  "unverified": [
+    "provider response quality",
+    "physical microphone/playback",
+    "email and alert delivery"
+  ],
+  "passed": 5,
+  "total": 5,
+  "results": [
+    {
+      "name": "public site and security headers",
+      "passed": true,
+      "detail": "application reachable; CSP/HSTS/frame protection present"
+    },
+    {
+      "name": "public free-beta pages",
+      "passed": true,
+      "detail": "demo, account entry, recovery and disclosures reachable"
+    },
+    {
+      "name": "account-page boundary",
+      "passed": true,
+      "detail": "redirects unauthenticated page to login; API boundaries covered in Worker suite"
+    },
+    {
+      "name": "operational health and exact release correlation",
+      "passed": true,
+      "detail": "Worker version 583006ac-c00e-48ab-94d5-24b66bf020fa; commit 16c89499f522b7fd08206acdf65dc2491c810d5f; inference not probed"
+    },
+    {
+      "name": "avatar asset availability",
+      "passed": true,
+      "detail": "asset reachable; no claim about frame rate or lip sync"
+    }
+  ]
+}

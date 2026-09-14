@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: companion-ci-${{ github.workflow }}-${{ github.ref }}
@@ -71,8 +72,19 @@ jobs:
         with:
           name: mira-worker-${{ github.sha }}
           path: apps/web/dist
+          # The sealed manifest includes .vite manifests and .assetsignore.
+          # The sealer rejects credential files before this upload is reached.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
+
+      - name: Verify uploaded artifact round-trip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifact_directory="$(mktemp -d)"
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "mira-worker-$GITHUB_SHA" --dir "$artifact_directory"
+          node apps/web/scripts/release-artifact.mjs verify "$artifact_directory" "$GITHUB_SHA"
 
       - name: Retain synthetic test and audit evidence
         if: always()
