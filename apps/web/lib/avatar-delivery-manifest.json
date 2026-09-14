@@ -1,0 +1,146 @@
+{
+  "sourceSha256": "3b5f011aa01902d8a64788af7713fe317fee3f7a38c0b6300003816f3374e69b",
+  "path": "/assets/mira/avatar/mira-anime-delivery-v1.glb.gz",
+  "bytes": 3265180,
+  "sha256": "cd33eb1a69390c571e8410c553c2f5c41b111142e9643a8c514ec82457d15960",
+  "decodedBytes": 4946016,
+  "decodedSha256": "3defff1a0f5e5f3d453ab8f944a1e6ef0e021ccceecf15a15ef16bc4337053b4",
+  "portraitPath": "/assets/mira/avatar/mira-anime-portrait-v1.webp",
+  "portraitBytes": 542802,
+  "portraitSha256": "e6b32a6793d2c81c217e744025bf8040c1271792b01da53b76b1523da459f6cf",
+  "images": [
+    {
+      "index": 0,
+      "width": 2048,
+      "height": 2048,
+      "rgbaSha256": "1bd506de5407a9b1d3937e19e89fe8d2744a1360b679319e8a344a81e8e21be9",
+      "bytes": 262732
+    },
+    {
+      "index": 1,
+      "width": 2048,
+      "height": 2048,
+      "rgbaSha256": "f8538479fec77afc263a33394b0845d8a93c0953751a16b913f43aebe3ef42ad",
+      "bytes": 1367108
+    },
+    {
+      "index": 2,
+      "width": 1024,
+      "height": 1024,
+      "rgbaSha256": "afc69719eb6242d176142685e93c1059bc173663b4d6cf28076349c312eec4d0",
+      "bytes": 49468
+    },
+    {
+      "index": 3,
+      "width": 512,
+      "height": 512,
+      "rgbaSha256": "f810ad5b16bce2fc525b67637e74ff96c341fce328a785b42b32b648703903f2",
+      "bytes": 51422
+    },
+    {
+      "index": 4,
+      "width": 1024,
+      "height": 2048,
+      "rgbaSha256": "41222c5a40e4dd9a94abd1be07f6e02987ba3b05f4480cd2052067e2e0d6d3e6",
+      "bytes": 64408
+    },
+    {
+      "index": 5,
+      "width": 1024,
+      "height": 1024,
+      "rgbaSha256": "697c47bf6f9700b1807ff5837899453310496beed8b1fbebeb048a1c541febda",
+      "bytes": 49138
+    },
+    {
+      "index": 6,
+      "width": 512,
+      "height": 512,
+      "rgbaSha256": "28f79b432c32b69afcc3ce9457e96927267869b16c427020cbfe39881596dcf5",
+      "bytes": 43892
+    },
+    {
+      "index": 7,
+      "width": 512,
+      "height": 512,
+      "rgbaSha256": "e579e3d22b575e8ef0f765cfc3b7633d4da7519aba0839beb6862a0e8bff2aa9",
+      "bytes": 16456
+    },
+    {
+      "index": 8,
+      "width": 1024,
+      "height": 512,
+      "rgbaSha256": "e2d8534d387294437c52b385f3128a4cfc1d5909a78760b76a3d95d57918402c",
+      "bytes": 38200
+    },
+    {
+      "index": 9,
+      "width": 1024,
+      "height": 1024,
+      "rgbaSha256": "30f2e2d702700970bf1594eb941f5bb5815425e48c0608b86a8e83475ce77be0",
+      "bytes": 38744
+    },
+    {
+      "index": 10,
+      "width": 256,
+      "height": 256,
+      "rgbaSha256": "05c2df1ef60225e62d3994ae2ee5d8532890349456c0b8b5417370302499bef0",
+      "bytes": 6294
+    },
+    {
+      "index": 11,
+      "width": 1024,
+      "height": 512,
+      "rgbaSha256": "0c89498e86893ccfcb86cd641e846d79f56107a336e4c4a577a28b43b6856ebe",
+      "bytes": 48308
+    },
+    {
+      "index": 12,
+      "width": 1024,
+      "height": 256,
+      "rgbaSha256": "53db370d5daf74ac6a90462dc43905ba015a3f94e559a7a3dd5f9cbd445d5198",
+      "bytes": 9088
+    },
+    {
+      "index": 13,
+      "width": 1024,
+      "height": 256,
+      "rgbaSha256": "e456a7b5ff8af293d077f4057721c0f864ec3ef85163091b8d248a0f5334852c",
+      "bytes": 54
+    },
+    {
+      "index": 14,
+      "width": 1024,
+      "height": 512,
+      "rgbaSha256": "4bda3a28f4ffe603c0ec1258c0034d65a1a0d35ab7bd523a834608adabf03cc5",
+      "bytes": 66
+    },
+    {
+      "index": 15,
+      "width": 512,
+      "height": 1024,
+      "rgbaSha256": "b80e46d4ae011ab5516bd232ff8d2852157216be0c91f911c7c7dd20fe8f9f45",
+      "bytes": 65986
+    },
+    {
+      "index": 16,
+      "width": 512,
+      "height": 1024,
+      "rgbaSha256": "2b765af28c8633ac48e429c48d9bacc6a4f6e536581cab3a8af621c09d071f30",
+      "bytes": 43276
+    },
+    {
+      "index": 17,
+      "width": 512,
+      "height": 1024,
+      "rgbaSha256": "486818df10597bdd851453822cd39bf51181ad17cce991da83c821b8bf57af74",
+      "bytes": 19202
+    },
+    {
+      "index": 18,
+      "width": 2048,
+      "height": 2048,
+      "rgbaSha256": "9addd18438a45a8d2aefa48eced6cb7c9e4adee24f2f9cc7cf3d764ff5a3191b",
+      "bytes": 542802
+    }
+  ]
+}

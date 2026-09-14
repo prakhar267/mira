@@ -2,6 +2,17 @@
 
 Updated 14 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
 
+## Latest follow-up
+
+See [the live-provider and smaller-delivery follow-up](READINESS-LIVE-FOLLOWUP.md):
+12 actual-provider multilingual turns passed the bounded evaluator's heuristics;
+physical/acoustic and fluent-human acceptance remain outstanding. The new
+avatar derivative transfers 3.26 MB instead of 9.00 MB, without changing decoded
+pixels or the rig. Its release evidence must be checked separately from source.
+Cloudflare sign-in is verified; R2 requires a usage-billed subscription and was
+not activated. The prepared deployment token still needs action-time access
+confirmation. The historical sections below describe earlier checkpoints.
+
 ## Avatar optimization follow-up
 
 The [avatar performance follow-up](AVATAR-PERFORMANCE.md) reduces the model losslessly from 10.78 MB to 9.00 MB, bounds rendering work, improves reduced-motion handling, and adds hidden-tab/context-loss cleanup checks to CI. It preserves Priya and the character's original rig/textures. This is implementation/test evidence, not physical-device acceptance. A merge alone does not deploy; use `/api/health` and the corresponding promotion record to identify the live source.

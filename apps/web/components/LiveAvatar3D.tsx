@@ -5,6 +5,7 @@ import { type VRM, MToonMaterial, VRMLoaderPlugin, VRMUtils } from "@pixiv/three
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { AvatarResolutionBudget, avatarFrameInterval, avatarPixelRatio, avatarSmoothing } from "../lib/avatar-render-policy";
+import { avatarDelivery, fetchAvatarDelivery } from "../lib/avatar-delivery";
 
 export type AvatarMouthPose = 0 | 1 | 2 | 3;
 export type AvatarEmotion = "natural" | "happy" | "playful" | "tender" | "intimate" | "sad" | "angry";
@@ -151,8 +152,14 @@ export function LiveAvatar3D({
 
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
+    const download = new AbortController();
+    // Old browsers keep the source VRM path. A failed compressed download does
+    // not silently trigger another 9MB transfer; the portrait remains usable.
+    const loading = typeof DecompressionStream === "function"
+      ? fetchAvatarDelivery(download.signal).then(bytes => loader.parseAsync(bytes, "/assets/mira/avatar/"))
+      : loader.loadAsync(avatarAsset);
 
-    loader.loadAsync(avatarAsset).then((gltf) => {
+    loading.then((gltf) => {
       const loadedVrm = gltf.userData.vrm as VRM | undefined;
       if (!active) {
         disposeObject(gltf.scene);
@@ -210,6 +217,7 @@ export function LiveAvatar3D({
       loadedVrm.expressionManager?.update();
       modelLoaded = true;
     }).catch((cause) => {
+      if (!active) return;
       console.warn("Anime VRM avatar failed to load", cause);
       renderFailed = true;
       window.cancelAnimationFrame(frame);
@@ -327,6 +335,7 @@ export function LiveAvatar3D({
       active = false;
       window.cancelAnimationFrame(frame);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      download.abort();
       canvas.removeEventListener("webglcontextlost", onContextLost);
       resizeObserver.disconnect();
       canvas.removeEventListener("pointermove", onPointerMove);
@@ -338,7 +347,7 @@ export function LiveAvatar3D({
 
   return (
     <div className={`live-avatar-3d live-avatar-3d--${loadState}`}>
-      <img className="live-avatar-3d__fallback" src="/assets/mira/avatar/mira-anime-live-v2.png" alt={loadState === "ready" ? "" : `${companionName}, anime companion portrait`} aria-hidden={loadState === "ready"} draggable={false} />
+      <img className="live-avatar-3d__fallback" src={avatarDelivery.portraitPath} alt={loadState === "ready" ? "" : `${companionName}, anime companion portrait`} aria-hidden={loadState === "ready"} draggable={false} />
       <canvas ref={canvasRef} className="live-avatar-3d__canvas" role="img" aria-hidden={loadState !== "ready"} aria-label={`${companionName}, an expressive open-licensed anime 3D companion`} />
       {loadState === "loading" ? <span className="live-avatar-3d__loading">Bringing {companionName} into the call…</span> : null}
       {loadState === "fallback" ? <span className="live-avatar-3d__loading" role="status">3D is unavailable on this device · using anime portrait mode</span> : null}
