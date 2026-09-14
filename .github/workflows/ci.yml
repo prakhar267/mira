@@ -55,6 +55,11 @@ jobs:
       - name: Build Cloudflare target and run isolated browser acceptance
         run: pnpm --filter @companion/web test:browser
 
+      - name: Verify real avatar rendering, visibility cleanup and context-loss fallback
+        # Actual bundled VRM/WebGL; synthetic media and blocked provider egress.
+        # Timings are retained lab observations, not physical-device sign-off.
+        run: pnpm --filter @companion/web exec playwright test --config playwright.performance.config.mjs tests/performance/app-interaction-avatar.spec.mjs
+
       - name: Check patched image parsers and dependency advisories
         run: node apps/web/scripts/dependency-smoke.mjs
 
