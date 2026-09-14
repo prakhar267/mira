@@ -3,6 +3,8 @@ import { accountMessageSchema, decodeAccountState } from "./account-state-schema
 import type { SqlStorage, StoreEngine } from "./store-engine";
 import { RecoveryJournal, recoveryEventSchema as event, type RecoveryEvent } from "./recovery-journal";
 import { BACKUP_CHUNK_BYTES, BACKUP_MAX_BYTES, BACKUP_MAX_CHUNKS, type SealedBackup } from "./backup-crypto";
+import { authorityPreparationSchema, authorityRestoreBindingSchema, authorityVerifiedPageSchema, authorityWriteFenceSchema, AUTHORITY_PREPARATION_MAX_EVENTS, type AuthorityPreparation, type AuthorityVerifiedPage } from "./authority-quarantine-protocol";
+import { checkpointSchema, writerSchema, type Checkpoint, type Writer } from "./suppression-protocol";
 
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,120}$/);
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -22,7 +24,8 @@ export const archiveManifestSchema = z.object({ version: z.literal(1), kind: z.e
 export type ArchiveManifest = z.infer<typeof archiveManifestSchema>;
 export interface ArchiveChunk { version: 1; kind: "snapshot" | "ledger"; archiveId: string; source: string; index: number; table: Table; rows: Record<string, unknown>[] }
 type Job = { archiveId: string; source: string; watermark: number; createdAt: number; kind: "snapshot" | "ledger"; nonce: string; table: number; offset: number; next: number; totalBytes: number; totalRows: number };
-type Control = { mode: "active" } | { mode: "export"; nonce: string; archiveId: string; expires: number } | { mode: "restore"; target: string; challenge: string; snapshot: ArchiveManifest; next: number; ledger?: ArchiveManifest; ledgerNext: number; ledgerSequence: number; validatedAccounts: number } | { mode: "retired"; target: string; challenge: string; backupId: string; watermark: number };
+type RestoreControl = { mode: "restore"; target: string; challenge: string; snapshot: ArchiveManifest; next: number; ledger?: ArchiveManifest; ledgerNext: number; ledgerSequence: number; validatedAccounts: number; authority?: AuthorityPreparation };
+type Control = { mode: "active" } | { mode: "export"; nonce: string; archiveId: string; expires: number } | RestoreControl | { mode: "retired"; target: string; challenge: string; backupId: string; watermark: number };
 const recordFilter = "(key LIKE 'account:%' OR key LIKE 'email:%' OR key LIKE 'state:%' OR key LIKE 'account-policy:%')";
 function fail(code: string): never { throw new Error(code); }
 function randomCredential(length: number) { return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(length)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
@@ -42,7 +45,7 @@ export class BackupEngine {
   private set(key: string, value: unknown) { this.sql.exec("INSERT INTO recovery_control VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", key, JSON.stringify(value)); }
   private control(): Control { return this.get<Control>("control") ?? { mode: "active" }; }
   source() { return this.get<string>("identity")!; }
-  status() { const state = this.control(); return { mode: state.mode, source: this.source(), watermark: this.journal.watermark(), ...(state.mode === "restore" ? { challenge: state.challenge, target: state.target, archiveId: state.snapshot.archiveId, next: state.next, ledgerNext: state.ledgerNext, ledgerArchiveId: state.ledger?.archiveId } : {}), ...(state.mode === "export" ? { expiresAt: new Date(state.expires).toISOString() } : {}), restored: this.get("restored"), legacyImportAllowed: !this.get("legacy-disabled") }; }
+  status() { const state = this.control(); return { mode: state.mode, source: this.source(), watermark: this.journal.watermark(), ...(state.mode === "restore" ? { challenge: state.challenge, target: state.target, archiveId: state.snapshot.archiveId, next: state.next, ledgerNext: state.ledgerNext, ledgerArchiveId: state.ledger?.archiveId, ...(state.authority ? { preparation: state.authority.kind, prepared: state.authority.prepared, coverageVerified: false, servingAllowed: false } : {}) } : {}), ...(state.mode === "export" ? { expiresAt: new Date(state.expires).toISOString() } : {}), restored: this.get("restored"), legacyImportAllowed: !this.get("legacy-disabled") }; }
   assertAvailable() { const state = this.control(); if (state.mode === "export" && state.expires <= Date.now()) this.set("control", { mode: "active" }); else if (state.mode !== "active") fail("RECOVERY_MAINTENANCE"); }
   legacyAllowed() { return !this.get("legacy-disabled"); }
   begin(kind: "snapshot" | "ledger") {
@@ -109,10 +112,11 @@ export class BackupEngine {
     this.set("legacy-disabled", true); this.set("control", state); return this.status();
   }
   private restore() { const state = this.control(); if (state.mode !== "restore") fail("RESTORE_NOT_QUARANTINED"); return state; }
-  setLedger(raw: unknown) { const state = this.restore(), ledger = this.validateManifest(raw); if (state.ledger?.archiveId === ledger.archiveId && JSON.stringify(state.ledger) === JSON.stringify(ledger)) return { accepted: true, resumed: true }; if (ledger.kind !== "ledger" || ledger.source !== state.snapshot.source || ledger.watermark < state.snapshot.watermark || state.ledgerNext) fail("RESTORE_LEDGER_INVALID"); state.ledger = ledger; this.set("control", state); return { accepted: true }; }
+  setLedger(raw: unknown) { const state = this.restore(); if (state.authority !== undefined) fail("RESTORE_AUTHORITY_QUARANTINED"); const ledger = this.validateManifest(raw); if (state.ledger?.archiveId === ledger.archiveId && JSON.stringify(state.ledger) === JSON.stringify(ledger)) return { accepted: true, resumed: true }; if (ledger.kind !== "ledger" || ledger.source !== state.snapshot.source || ledger.watermark < state.snapshot.watermark || state.ledgerNext) fail("RESTORE_LEDGER_INVALID"); state.ledger = ledger; this.set("control", state); return { accepted: true }; }
   importChunk(value: unknown, digest: string) {
     const state = this.restore();
     const chunk = z.object({ version: z.literal(1), kind: z.enum(["snapshot", "ledger"]), archiveId: id, source: id, index: integer, table: z.enum(Object.keys(rows) as [Table, ...Table[]]), rows: z.array(z.record(z.string(), z.unknown())).max(128) }).strict().parse(value);
+    if (state.authority !== undefined && (chunk.kind !== "snapshot" || !state.authority.fence)) fail("RESTORE_AUTHORITY_QUARANTINED");
     const manifest = chunk.kind === "snapshot" ? state.snapshot : state.ledger;
     if (!manifest || chunk.archiveId !== manifest.archiveId || chunk.source !== manifest.source || digest !== manifest.chunks[chunk.index]?.digest || chunk.table !== manifest.chunks[chunk.index]?.table || chunk.rows.length !== manifest.chunks[chunk.index]?.rows) fail("RESTORE_CHUNK_MISMATCH");
     const next = chunk.kind === "snapshot" ? state.next : state.ledgerNext;
@@ -172,11 +176,92 @@ export class BackupEngine {
       this.sql.exec("INSERT OR REPLACE INTO privacy_suppressions VALUES(?,?,?,?,?)", change.userId, Math.max(change.revision, envelope.revision + 1), change.ai ? 0 : 1, change.history ? 0 : 1, change.memory ? 0 : 1);
     }
   }
+  /** Internal preparation only. The caller verifies/decrypts the manifest and
+   * computes its digest/genesis before entering this synchronous transaction.
+   * No operator route dispatches to this method. It cannot open a target. */
+  beginAuthorityQuarantine(raw: unknown, target: string, rawWriter: Writer, manifestDigest: string, genesis: Checkpoint) {
+    const manifest = this.validateManifest(raw), writer = writerSchema.parse(rawWriter), start = checkpointSchema.parse(genesis);
+    if (manifest.kind !== "snapshot" || writer.source !== manifest.source || start.sequence !== 0) fail("RESTORE_AUTHORITY_BINDING_INVALID");
+    const existing = this.control();
+    if (existing.mode === "restore") {
+      const saved = this.authorityPreparationState();
+      const candidate = authorityRestoreBindingSchema.parse({ ...writer, target, archiveId: manifest.archiveId, manifestDigest, challenge: saved.binding.challenge });
+      if (JSON.stringify(candidate) !== JSON.stringify(saved.binding) || JSON.stringify(manifest) !== JSON.stringify(existing.snapshot)) fail("RESTORE_AUTHORITY_BINDING_CHANGED");
+      return saved;
+    }
+    // Empty means all archived owner/content tables, not just the account index.
+    if (snapshotTables.some(table => this.sql.exec(`SELECT 1 AS present FROM ${table} LIMIT 1`).toArray().length)) fail("RESTORE_TARGET_NOT_EMPTY");
+    this.beginRestore(manifest, target);
+    const state = this.restore();
+    const binding = authorityRestoreBindingSchema.parse({ ...writer, target, archiveId: manifest.archiveId, manifestDigest, challenge: state.challenge });
+    state.authority = { version: 1, kind: "authority-quarantine", binding, cursor: start, fence: null, prepared: false };
+    this.sql.exec("CREATE TABLE IF NOT EXISTS authority_restore_pages (start_sequence INTEGER PRIMARY KEY, end_sequence INTEGER NOT NULL, before_digest TEXT NOT NULL, after_digest TEXT NOT NULL, digest TEXT NOT NULL)");
+    this.set("control", state);
+    return this.authorityPreparationState();
+  }
+  authorityPreparationState() {
+    const state = this.restore();
+    if (state.authority === undefined) fail("RESTORE_AUTHORITY_NOT_STARTED");
+    const authority = authorityPreparationSchema.parse(state.authority);
+    if (authority.binding.target !== state.target || authority.binding.challenge !== state.challenge || authority.binding.archiveId !== state.snapshot.archiveId || authority.binding.source !== state.snapshot.source) fail("RESTORE_AUTHORITY_BINDING_CHANGED");
+    return { ...authority, snapshotNext: state.next, snapshotChunks: state.snapshot.chunks.length, snapshotWatermark: state.snapshot.watermark, validatedAccounts: state.validatedAccounts, coverageVerified: false as const, servingAllowed: false as const };
+  }
+  pinAuthorityWriteFence(raw: unknown) {
+    const state = this.restore(), current = this.authorityPreparationState(), fence = authorityWriteFenceSchema.parse(raw);
+    const { target, challenge, authorityId, source, writerId, epoch } = current.binding;
+    if (fence.target !== target || fence.challenge !== challenge || fence.authorityId !== authorityId || fence.source !== source || fence.writerId !== writerId || fence.epoch !== epoch || fence.sequence < state.snapshot.watermark || fence.sequence > AUTHORITY_PREPARATION_MAX_EVENTS) fail("RESTORE_AUTHORITY_FENCE_INVALID");
+    if (current.fence && JSON.stringify(current.fence) !== JSON.stringify(fence)) fail("RESTORE_AUTHORITY_FENCE_CHANGED");
+    if (fence.sequence === current.cursor.sequence && fence.digest !== current.cursor.digest) fail("RESTORE_AUTHORITY_FENCE_INVALID");
+    state.authority!.fence = fence; this.set("control", state);
+    return this.authorityPreparationState();
+  }
+  /** Only an already hash-verified page is accepted here. The internal async
+   * orchestrator reconstructs SHA-256 outside this transaction. Exact page
+   * receipts prevent retry from replaying restrictions after account validation. */
+  importAuthorityPage(raw: AuthorityVerifiedPage) {
+    const page = authorityVerifiedPageSchema.parse(raw), state = this.restore(), current = this.authorityPreparationState();
+    if (JSON.stringify(page.binding) !== JSON.stringify(current.binding)) fail("RESTORE_AUTHORITY_BINDING_CHANGED");
+    if (!current.fence || state.next !== state.snapshot.chunks.length) fail("RESTORE_INCOMPLETE");
+    if (page.after.sequence !== page.before.sequence + page.entries.length || page.entries.some((entry, index) => entry.sequence !== page.before.sequence + index + 1) || page.after.sequence > current.fence.sequence) fail("RESTORE_AUTHORITY_PAGE_INVALID");
+    if (page.before.sequence < current.cursor.sequence) {
+      const old = this.sql.exec("SELECT end_sequence,before_digest,after_digest,digest FROM authority_restore_pages WHERE start_sequence=?", page.before.sequence).toArray()[0];
+      if (old && old.end_sequence === page.after.sequence && old.before_digest === page.before.digest && old.after_digest === page.after.digest && old.digest === page.digest) return { imported: true, duplicate: true, checkpoint: current.cursor };
+      fail("RESTORE_AUTHORITY_PAGE_CONFLICT");
+    }
+    if (current.prepared || page.before.sequence !== current.cursor.sequence || page.before.digest !== current.cursor.digest) fail("RESTORE_AUTHORITY_PAGE_ORDER");
+    if (page.after.sequence === current.fence.sequence && page.after.digest !== current.fence.digest) fail("RESTORE_AUTHORITY_HEAD_MISMATCH");
+    for (const entry of page.entries) {
+      if (entry.sequence > state.snapshot.watermark) this.replay(entry.event);
+      this.sql.exec("INSERT INTO recovery_events(seq,value) VALUES(?,?)", entry.sequence, JSON.stringify(entry.event));
+    }
+    this.sql.exec("INSERT INTO authority_restore_pages(start_sequence,end_sequence,before_digest,after_digest,digest) VALUES(?,?,?,?,?)", page.before.sequence, page.after.sequence, page.before.digest, page.after.digest, page.digest);
+    state.authority!.cursor = page.after; this.set("control", state);
+    return { imported: true, duplicate: false, checkpoint: page.after };
+  }
+  validateAuthorityPreparation() {
+    const state = this.restore(), current = this.authorityPreparationState();
+    if (!current.fence || state.next !== state.snapshot.chunks.length || current.cursor.sequence !== current.fence.sequence || current.cursor.digest !== current.fence.digest) fail("RESTORE_INCOMPLETE");
+    if (!current.prepared) {
+      const result = this.validateRestoredAccounts(state);
+      if (result.complete) { state.authority!.prepared = true; this.set("control", state); }
+    }
+    // Intentionally no `restored` receipt and no active mode. Neither valid
+    // ciphertext nor this write fence establishes coverage or serving safety.
+    return this.authorityPreparationState();
+  }
   finalize(proofRaw: unknown) {
     const state = this.restore();
+    if (state.authority !== undefined) fail("RESTORE_AUTHORITY_QUARANTINED");
     const proof = z.object({ version: z.literal(1), source: id, target: id, challenge: id, backupId: id, watermark: integer, issuedAt: integer, sourceRetired: z.literal(true) }).strict().parse(proofRaw);
     if (!state.ledger || proof.source !== state.snapshot.source || proof.target !== state.target || proof.challenge !== state.challenge || proof.backupId !== state.snapshot.archiveId || proof.watermark !== state.ledger.watermark || proof.issuedAt > Date.now() + 30_000 || proof.issuedAt < Date.now() - 30 * 60_000) fail("RESTORE_CURRENT_CUTOVER_PROOF_REQUIRED");
     if (state.next !== state.snapshot.chunks.length || state.ledgerNext !== state.ledger.chunks.length || state.ledgerSequence !== state.ledger.watermark) fail("RESTORE_INCOMPLETE");
+    const result = this.validateRestoredAccounts(state);
+    if (!result.complete) return result;
+    this.set("restored", { archiveId: state.snapshot.archiveId, source: state.snapshot.source, watermark: proof.watermark, completedAt: Date.now(), passwordsResetRequired: true, emailReverificationRequired: true });
+    this.set("control", { mode: "active" });
+    return { complete: true, validatedAccounts: state.validatedAccounts, passwordsResetRequired: true, emailReverificationRequired: true, note: "Target is validated; routing cutover and offsite availability require separate operator verification." };
+  }
+  private validateRestoredAccounts(state: RestoreControl) {
     const accounts = this.sql.exec("SELECT key,value FROM records WHERE key LIKE 'account:%' AND deleted=0 ORDER BY key LIMIT 11 OFFSET ?", state.validatedAccounts).toArray();
     for (const row of accounts.slice(0, 10)) {
       const account = JSON.parse(String(row.value)) as Record<string, unknown>, userId = String(account.id);
@@ -198,9 +283,7 @@ export class BackupEngine {
     const orphan = this.sql.exec("SELECT t.id FROM transcripts t LEFT JOIN records a ON a.key='account:'||t.user_id AND a.deleted=0 LEFT JOIN account_conversations c ON c.user_id=t.user_id AND c.id=json_extract(t.value,'$.conversationId') AND c.deleted=0 WHERE a.key IS NULL OR c.id IS NULL LIMIT 1").toArray();
     const orphanProfile = this.sql.exec("SELECT p.key FROM records p LEFT JOIN records a ON a.key='account:'||substr(p.key,instr(p.key,':')+1) AND a.deleted=0 WHERE (p.key LIKE 'state:%' OR p.key LIKE 'account-policy:%') AND p.deleted=0 AND a.key IS NULL LIMIT 1").toArray();
     if (orphan.length || orphanProfile.length || Number(this.sql.exec("SELECT count(*) AS count FROM records WHERE key LIKE 'account:%' AND deleted=0").toArray()[0]?.count) > 5000) fail("RESTORE_OWNER_INVARIANT");
-    this.set("restored", { archiveId: state.snapshot.archiveId, source: state.snapshot.source, watermark: proof.watermark, completedAt: Date.now(), passwordsResetRequired: true, emailReverificationRequired: true });
-    this.set("control", { mode: "active" });
-    return { complete: true, validatedAccounts: state.validatedAccounts, passwordsResetRequired: true, emailReverificationRequired: true, note: "Target is validated; routing cutover and offsite availability require separate operator verification." };
+    return { complete: true, validatedAccounts: state.validatedAccounts };
   }
 }
 

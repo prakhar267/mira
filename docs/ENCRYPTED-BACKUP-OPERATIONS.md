@@ -64,6 +64,8 @@ If a command fails after retirement, keep both source and target isolated. Re-ru
 
 ## What this does not solve yet
 
+An additional [internal authority-backed preparation path](AUTHORITY-QUARANTINE.md) can now replay a retained authority journal after actual source-file loss, but only into permanent quarantine. It has no route or activation path, always reports unverified archive protection coverage and forbidden serving, and cannot use legacy finalization to open the target. This is not completed recovery admission or operational offsite protection.
+
 If the source is lost **before** obtaining current retirement/cutover proof, and no independent trusted latest-ledger authority survives, the implementation refuses to open a historical restore. This is deliberate deletion safety, not completed source-loss disaster recovery. A real independent destination with trustworthy newest-watermark evidence, owner-approved RPO/RTO, retention review and source-loss/offsite drill remain activation gates. The mounted-vault adapter is implementable without buying or provisioning a new service, but an unconfigured offsite destination cannot be represented as operational.
 
 Account backups contain personal data and password verifiers inside encryption. Encryption is not erasure of older physical backup bytes. Access and archive/key-retirement policy need independent legal/security review. Source retirement and target validation do not erase data already processed by chat, speech or email providers. Billing reconciliation, support history and operational monitoring must be restored separately; payments remain disabled.
