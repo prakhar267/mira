@@ -1,4 +1,5 @@
 import { cloudStore } from "@/lib/cloud-store";
+import { demoSchemaVersion } from "@/lib/demo-storage";
 export async function GET() {
   const requestId = crypto.randomUUID();
   try {
@@ -8,7 +9,8 @@ export async function GET() {
     return Response.json({
       status: healthy ? "ok" : "degraded",
       versionId:env.CF_VERSION_METADATA?.id??"local",
-      demoSchemaVersion:2,
+      commitSha:process.env.MIRA_RELEASE_SHA??"unreleased",
+      demoSchemaVersion,
       checkedAt: new Date().toISOString(),
       services: { application: "ok", inference: env.AI ? "configured-not-probed" : "missing", accountStorage: "sqlite-reachable" },
       dataProtection: { accountExport: true, rollingBackups: true, backupRetentionDays: 30 },

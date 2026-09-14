@@ -1,15 +1,12 @@
 "use client";
 import Link from "next/link";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   applyContradictions,
   assessSafety,
-  buildCompanionContext,
   extractMemoryCandidates,
-  planCompanionTurn,
-  type CompanionTurn,
 } from "@companion/ai";
 import type {
   ActivityDefinition,
@@ -33,8 +30,6 @@ import { MomentsView, type MomentsTab } from "./MomentsView";
 import { Onboarding, type OnboardingDraft } from "./Onboarding";
 import { PlanModal } from "./PlanModal";
 import { ProfileView } from "./ProfileView";
-import { VideoCallModal } from "./VideoCallModal";
-import { VoiceCallModal } from "./VoiceCallModal";
 import {
   initialState,
   storageKey,
@@ -58,10 +53,16 @@ import {
   currentMemoryRecords,
   relevantMemoryContents,
 } from "@/lib/memory-relevance";
-import { playCompanionSpeech } from "@/lib/speech";
+import { playCompanionSpeech, stopCompanionSpeech } from "@/lib/speech";
 import { freshDemo, restoreDemo, serializeDemo } from "@/lib/demo-storage";
 import { trackEvent } from "@/lib/analytics";
 import { AdultDemoGate } from "./AdultDemoGate";
+import { AccountSync, type SyncStatus } from "@/lib/account-sync";
+import { ConversationTurns, appendUniqueMessages, assertTurnActive, resolveConversationTurn, type TurnContext } from "@/lib/conversation-turn";
+import { CapabilityRefresh, createDemoSession, fetchCapabilities, revokeDemoSession, type CapabilityContract, type RuntimeMode } from "@/lib/runtime-capabilities";
+import { assessCompanionSafety } from "@/lib/companion-safety";
+const VoiceCallModal = lazy(() => import("./VoiceCallModal").then(module => ({ default: module.VoiceCallModal })));
+const VideoCallModal = lazy(() => import("./VideoCallModal").then(module => ({ default: module.VideoCallModal })));
 
 const pause = (milliseconds: number) =>
   new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -84,7 +85,7 @@ function rememberConversationMessage(
   sourceMessageId: string,
   now: Date,
 ) {
-  if (!current.memoryEnabled || assessSafety(content).level !== "safe")
+  if (!current.memoryEnabled || assessSafety(content).level !== "safe" || assessCompanionSafety([{ role: "user", content }]))
     return current.memories;
   let memories = current.memories;
   for (const candidate of extractMemoryCandidates(content)) {
@@ -131,14 +132,18 @@ export function CompanionApp({
   const accountMode = productionAccount && !forceDemo;
   const liveMode = companionApi.enabled && !forceDemo && !accountMode;
   const cloudBacked = accountMode || liveMode;
+  const runtime: RuntimeMode = accountMode ? "cloudflare-account" : liveMode ? "optional-fastify" : "browser-demo";
   const [state, setState] = useState<DemoState>(initialState);
   const [hydrated, setHydrated] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  // In-progress text is never part of DemoState, autosave, export or memories.
+  const [streamDraft, setStreamDraft] = useState<{ turnId: string; conversationId: string; text: string } | null>(null);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
   const [videoCallOpen, setVideoCallOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
   const [processingNoticeOpen, setProcessingNoticeOpen] = useState(false);
+  const [policyConfirmed, setPolicyConfirmed] = useState(false);
   const [actionError, setActionError] = useState("");
   const [hydrationError, setHydrationError] = useState("");
   const [legacyDemo, setLegacyDemo] = useState(false);
@@ -147,6 +152,36 @@ export function CompanionApp({
   const companionSyncTimer = useRef<number | null>(null);
   const accountSyncTimer = useRef<number | null>(null);
   const accountReady = useRef(false);
+  const accountSync = useRef<AccountSync<DemoState> | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("saved");
+  const [capabilities, setCapabilities] = useState<CapabilityContract | null>(null);
+  const [failedMessage, setFailedMessage] = useState<ChatMessage | null>(null);
+  const [olderMessages, setOlderMessages] = useState<ChatMessage[]>([]);
+  const [olderCursor, setOlderCursor] = useState<string | undefined>(undefined);
+  const [olderComplete, setOlderComplete] = useState(false);
+  const [olderBusy, setOlderBusy] = useState(false);
+  const turns = useRef(new ConversationTurns());
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+  const [reauthAction, setReauthAction] = useState<"export" | "delete" | null>(null);
+  const [reauthPassword, setReauthPassword] = useState("");
+  const [reauthError, setReauthError] = useState("");
+  const [reauthBusy, setReauthBusy] = useState(false);
+
+  useEffect(() => {
+    if (liveMode) return;
+    const checks = new CapabilityRefresh(setCapabilities);
+    const refresh = () => { void checks.refresh(); };
+    refresh();
+    window.addEventListener("mira-capabilities-changed", refresh);
+    window.addEventListener("focus", refresh);
+    return () => { checks.stop(); window.removeEventListener("mira-capabilities-changed", refresh); window.removeEventListener("focus", refresh); };
+  }, [liveMode, state.aiProcessingConsent]);
+
+  useEffect(() => {
+    if (!state.aiProcessingConsent) { turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); setVoiceCallOpen(false); setVideoCallOpen(false); setCameraOpen(false); }
+  }, [state.aiProcessingConsent]);
+  useEffect(() => () => { turns.current.cancel(); accountSync.current?.stop(); stopCompanionSpeech(); }, []);
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -184,10 +219,14 @@ export function CompanionApp({
       return;
     }
     if (accountMode) {
+      const controller = new AbortController();
       void accountClient
-        .load()
-        .then(({ state: savedState }) => {
+        .load(controller.signal)
+        .then(({ state: savedState, revision, policy }) => {
+          if (controller.signal.aborted) return;
           accountReady.current = true;
+          accountSync.current = new AccountSync(revision, accountClient.save, setSyncStatus);
+          if (policy?.termsVersion !== "2026-09-13") setProcessingNoticeOpen(true);
           setState({
             ...initialState,
             ...savedState,
@@ -203,6 +242,7 @@ export function CompanionApp({
           });
         })
         .catch((cause) => {
+          if (controller.signal.aborted) return;
           if (
             cause instanceof Error &&
             /sign in|session expired/i.test(cause.message)
@@ -215,8 +255,8 @@ export function CompanionApp({
                 : "Your account could not be loaded just now.",
             );
         })
-        .finally(() => setHydrated(true));
-      return;
+        .finally(() => { if (!controller.signal.aborted) setHydrated(true); });
+      return () => controller.abort();
     }
     if (liveMode && companionApi.hasSession()) {
       void (async () => {
@@ -413,20 +453,13 @@ export function CompanionApp({
     if (accountMode) {
       document.documentElement.dataset.theme = state.theme;
       if (!accountReady.current || !state.onboardingComplete) return;
+      setSyncStatus(current => ["conflict", "offline", "failed"].includes(current) ? current : "saving");
       if (accountSyncTimer.current !== null)
         window.clearTimeout(accountSyncTimer.current);
       accountSyncTimer.current = window.setTimeout(() => {
-        void accountClient
-          .save(state)
-          .catch((cause) =>
-            setActionError(
-              cause instanceof Error
-                ? cause.message
-                : "Your latest changes could not be synced.",
-            ),
-          );
+        accountSync.current?.enqueue(state);
       }, 700);
-      return;
+      return () => { if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current); };
     }
     if (liveMode) {
       try {
@@ -486,10 +519,12 @@ export function CompanionApp({
     () => state.memories.filter((memory) => memory.status === "active"),
     [state.memories],
   );
-  const navigate = (view: AppView) =>
+  const navigate = (view: AppView) => {
+    if (view !== state.currentView) { turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); }
     setState((current) => ({ ...current, currentView: view }));
+  };
   const processingAllowed = () => {
-    if (state.aiProcessingConsent) return true;
+    if (state.aiProcessingConsent && (liveMode || capabilities?.capabilities.chat)) return true;
     setProcessingNoticeOpen(true);
     return false;
   };
@@ -525,6 +560,14 @@ export function CompanionApp({
   };
 
   const changeProfile = (next: DemoState) => {
+    if (next.memoryEnabled !== state.memoryEnabled) {
+      turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); setVoiceCallOpen(false); setVideoCallOpen(false);
+      if (!cloudBacked && state.aiProcessingConsent) runAction(createDemoSession(next.memoryEnabled), "Memory consent could not be updated. Please retry.");
+    }
+    if (!next.aiProcessingConsent) {
+      turns.current.cancel(); stopCompanionSpeech();
+      if (!cloudBacked) void revokeDemoSession();
+    }
     const notificationsChanged =
       JSON.stringify(next.notifications) !==
       JSON.stringify(state.notifications);
@@ -570,6 +613,7 @@ export function CompanionApp({
   };
 
   const completeOnboarding = async (draft: OnboardingDraft) => {
+    if (!draft.adultConfirmed || !draft.policyAccepted || !draft.aiProcessingConsent) throw new Error("Confirm the adult declaration, policies and AI-processing consent to continue.");
     let liveAccount: Awaited<ReturnType<typeof companionApi.signup>> | null =
       null;
     let liveConversationId: string | null = null;
@@ -654,6 +698,8 @@ export function CompanionApp({
           draft.relationshipMode === "romantic" && draft.sensuality > 0,
       },
       memoryEnabled: draft.memoryEnabled,
+      aiProcessingConsent: draft.aiProcessingConsent,
+      conversationStorageEnabled: draft.conversationStorageEnabled,
       memories: [],
       moments: [],
       photos: [],
@@ -688,8 +734,10 @@ export function CompanionApp({
         password: draft.password,
         name: draft.name.trim(),
         state: nextState,
+        policy: { termsVersion: "2026-09-13", adultConfirmed: true, aiProcessingConsent: draft.aiProcessingConsent },
       });
       accountReady.current = true;
+      accountSync.current = new AccountSync(created.revision, accountClient.save, setSyncStatus);
       setState(created.state);
     } else {
       setState(nextState);
@@ -697,57 +745,14 @@ export function CompanionApp({
     router.replace(forceDemo ? "/demo" : "/app");
   };
 
-  const createCompanionTurn = (
-    content: string,
-    messages: ChatMessage[],
-    now: Date,
-    delivery: "text" | "voice" | "video" = "text",
-  ): CompanionTurn => {
-    const conversationMessages = messagesForConversation(
-      messages,
-      state.activeConversationId,
-    );
-    const currentMemories = state.memoryEnabled
-      ? currentMemoryRecords(activeMemories)
-      : [];
-    const relevantContents = relevantMemoryContents(currentMemories, messages);
-    const relevantMemories = relevantContents.flatMap((memoryContent) => {
-      const memory = currentMemories.find(
-        (candidate) => candidate.content === memoryContent,
-      );
-      return memory ? [memory] : [];
-    });
-    const context = buildCompanionContext({
-      user: state.user,
-      companion: state.companion,
-      relationship: {
-        mode: state.companion.relationshipMode,
-        startedAt: state.companion.createdAt,
-        interactionCount: conversationMessages.length,
-        sharedExperiences: state.moments.map((moment) => moment.title),
-      },
-      memories: relevantMemories,
-      messages: conversationMessages,
-      timezone: state.user.timezone,
-      now,
-      delivery,
-      companionBackstory: state.companionBackstory,
-      responsePreferences: state.responsePreferences,
-    });
-    return planCompanionTurn(content, context);
-  };
 
   const generateDemoReply = async (
     messages: ChatMessage[],
     delivery: "text" | "voice" | "video",
-    fallback: CompanionTurn,
+    signal: AbortSignal,
+    onDelta?: (delta: string) => void,
   ) => {
     const replyStartedAt = performance.now();
-    const immediateCallIntent =
-      delivery !== "text" &&
-      ["greeting", "self"].includes(fallback.intent);
-    if (immediateCallIntent || fallback.adaptations.includes("safety-support"))
-      return fallback.text;
     try {
       const currentMemories = state.memoryEnabled
         ? currentMemoryRecords(activeMemories)
@@ -779,27 +784,27 @@ export function CompanionApp({
         memories: recalledMemories,
         responsePreferences: state.responsePreferences,
         delivery,
-      });
+      }, signal, onDelta);
       trackEvent("reply_received", Math.round(performance.now() - replyStartedAt));
       return reply;
-    } catch {
+    } catch (error) {
       trackEvent("reply_failed", Math.round(performance.now() - replyStartedAt));
-      // A provider outage must not masquerade as misunderstanding the speaker.
-      const latest = messages.filter(message => message.role === "user").at(-1)?.content ?? "";
-      if (/\p{Script=Devanagari}/u.test(latest)) return "अभी reply service से connection नहीं बन पा रहा। थोड़ी देर में फिर कोशिश कर सकते हैं।";
-      if (/\b(?:aaj|yaar|yar|hai|kya|mein|mujhe|tum|nahi|meri|uske)\b/i.test(latest)) return "Abhi reply service se connection nahi ban raha. Thodi der mein phir try kar sakte hain.";
-      return "I can’t reach the reply service right now. Please try again in a moment.";
+      // Errors are not companion messages. The caller retains the failed turn.
+      throw error;
     }
   };
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, retryMessage?: ChatMessage) => {
     if (!processingAllowed()) return;
-    if (streaming) return;
+    if (voiceCallOpen || videoCallOpen) throw new Error("Finish the call before sending a chat message.");
+    const context = turns.current.begin(retryMessage?.id);
+    if (!context) return;
     trackEvent("chat_send");
     setStreaming(true);
+    setStreamDraft(null);
     const now = new Date();
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+    const userMessage: ChatMessage = retryMessage ?? {
+      id: context.turnId,
       conversationId: state.activeConversationId,
       role: "user",
       content,
@@ -808,7 +813,7 @@ export function CompanionApp({
     };
     setState((current) => ({
       ...current,
-      messages: [...current.messages, userMessage],
+      messages: appendUniqueMessages(current.messages.map(message => message.id === userMessage.id ? { ...message, status: "sent" } : message), [userMessage]),
     }));
 
     if (liveMode) {
@@ -838,6 +843,7 @@ export function CompanionApp({
             responsePreferences: state.responsePreferences,
           },
           (delta) => {
+            if (context.signal.aborted) return;
             setState((current) => ({
               ...current,
               messages: current.messages.map((message) =>
@@ -846,8 +852,9 @@ export function CompanionApp({
                   : message,
               ),
             }));
-          },
+          }, context.signal,
         );
+        assertTurnActive(context);
         const memories = state.memoryEnabled
           ? await optional(companionApi.memories(), state.memories)
           : state.memories;
@@ -865,6 +872,7 @@ export function CompanionApp({
           ),
         }));
       } catch (cause) {
+        if (context.signal.aborted) return;
         setState((current) => ({
           ...current,
           messages: current.messages.map((message) =>
@@ -881,80 +889,47 @@ export function CompanionApp({
           ),
         }));
       } finally {
+        turns.current.finish(context);
         setStreaming(false);
       }
       return;
     }
 
     const conversation = [
-      ...messagesForConversation(state.messages, state.activeConversationId),
+      ...messagesForConversation(state.messages, state.activeConversationId).filter(message => message.id !== userMessage.id),
       userMessage,
     ];
-    const turn = createCompanionTurn(content, conversation, now);
-    const reply = await generateDemoReply(conversation, "text", turn);
-    const beats = reply
-      .split(/\n\n+/)
-      .map((beat) => beat.trim())
-      .filter(Boolean);
-
-    for (let beatIndex = 0; beatIndex < beats.length; beatIndex += 1) {
-      const assistantId = crypto.randomUUID();
-      const beat = beats[beatIndex]!;
-      setState((current) => ({
-        ...current,
-        messages: [
-          ...current.messages,
-          {
-            id: assistantId,
-            conversationId: current.activeConversationId,
-            role: "assistant",
-            content: "",
-            createdAt: new Date(now.getTime() + beatIndex + 1).toISOString(),
-            status: "sending",
-            explanation: turn.explanation,
-          },
-        ],
-      }));
-      for (const token of beat.split(/(\s+)/).filter(Boolean)) {
-        await pause(6);
-        setState((current) => ({
-          ...current,
-          messages: current.messages.map((message) =>
-            message.id === assistantId
-              ? { ...message, content: `${message.content}${token}` }
-              : message,
-          ),
-        }));
+    try {
+      await resolveConversationTurn(context, signal => generateDemoReply(conversation, "text", signal, delta => {
+        if (context.signal.aborted) return;
+        setStreamDraft(current => context.signal.aborted ? current : { turnId: context.turnId, conversationId: userMessage.conversationId, text: `${current?.turnId === context.turnId ? current.text : ""}${delta}` });
+      }), reply => {
+        setState(current => {
+          if (context.signal.aborted || !current.aiProcessingConsent || current.activeConversationId !== userMessage.conversationId) return current;
+          return { ...current,
+            memories: accountMode ? current.memories : rememberConversationMessage(current, content, userMessage.id, now),
+            messages: appendUniqueMessages(current.messages, [{ id: `${userMessage.id}:reply`, conversationId: userMessage.conversationId, role: "assistant", content: reply, createdAt: new Date().toISOString(), status: "sent" }]),
+          };
+        });
+      });
+      setFailedMessage(null);
+    } catch (error) {
+      if (!context.signal.aborted) {
+        setFailedMessage(userMessage);
+        setActionError(error instanceof Error ? error.message : "Your message could not be answered. Retry the same message.");
+        setState(current => ({ ...current, messages: current.messages.map(message => message.id === userMessage.id ? { ...message, status: "failed" } : message) }));
       }
-      setState((current) => ({
-        ...current,
-        messages: current.messages.map((message) =>
-          message.id === assistantId ? { ...message, status: "sent" } : message,
-        ),
-      }));
-      if (beatIndex < beats.length - 1) await pause(320);
+    } finally {
+      setStreamDraft(current => current?.turnId === context.turnId ? null : current);
+      turns.current.finish(context);
+      if (!context.signal.aborted) setStreaming(false);
     }
-
-    setState((current) => {
-      return {
-        ...current,
-        memories: rememberConversationMessage(
-          current,
-          content,
-          userMessage.id,
-          now,
-        ),
-        relationship: {
-          ...current.relationship,
-          progress: Math.min(100, current.relationship.progress + 1),
-        },
-        messages: current.messages,
-      };
-    });
-    setStreaming(false);
   };
 
   const newConversation = async () => {
+    turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); setFailedMessage(null);
+    setOlderMessages([]); setOlderCursor(undefined); setOlderComplete(false);
+    if (accountMode) { await accountConversation({ action: "create" }); return; }
     const conversationId = liveMode
       ? (await companionApi.createConversation(state.companion.id)).id
       : crypto.randomUUID();
@@ -976,6 +951,9 @@ export function CompanionApp({
   };
 
   const deleteConversation = async () => {
+    turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); setFailedMessage(null);
+    setOlderMessages([]); setOlderCursor(undefined); setOlderComplete(false);
+    if (accountMode) { await accountConversation({ action: "delete", id: state.activeConversationId }); return; }
     const deletedId = state.activeConversationId;
     if (liveMode) await companionApi.deleteConversation(deletedId);
     const conversationId = liveMode
@@ -1000,75 +978,13 @@ export function CompanionApp({
     }));
   };
 
-  const addMockExchange = (
-    userMessage: ChatMessage,
-    assistantMessage: ChatMessage,
-  ) =>
-    setState((current) => ({
-      ...current,
-      messages: [...current.messages, userMessage, assistantMessage],
-    }));
-
   const sendVoiceNote = async (transcript: string) => {
     if (!processingAllowed()) return;
     if (!featureEntitlements.has(state.subscription.planId, "voiceNotes")) {
       setPlansOpen(true);
       return;
     }
-    if (liveMode) {
-      await sendMessage(transcript);
-      return;
-    }
-    const now = new Date();
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      conversationId: state.activeConversationId,
-      role: "user",
-      content: transcript,
-      createdAt: now.toISOString(),
-      status: "sent",
-      attachments: [
-        {
-          id: crypto.randomUUID(),
-          type: "audio",
-          url: "browser://voice-transcript",
-          name: "Voice note",
-          transcript,
-          durationMs: Math.max(1_000, transcript.split(/\s+/).length * 420),
-        },
-      ],
-    };
-    const turn = createCompanionTurn(
-      transcript,
-      [
-        ...messagesForConversation(state.messages, state.activeConversationId),
-        userMessage,
-      ],
-      now,
-      "voice",
-    );
-    const reply = turn.text;
-    await pause(250);
-    const assistantMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      conversationId: state.activeConversationId,
-      role: "assistant",
-      content: reply,
-      createdAt: new Date().toISOString(),
-      status: "sent",
-      explanation: turn.explanation,
-      attachments: [
-        {
-          id: crypto.randomUUID(),
-          type: "audio",
-          url: "browser://speech-synthesis",
-          name: `${state.companion.name} voice reply`,
-          transcript: reply,
-          durationMs: Math.max(1_500, reply.split(/\s+/).length * 360),
-        },
-      ],
-    };
-    addMockExchange(userMessage, assistantMessage);
+    await sendMessage(transcript);
   };
 
   const sendVoiceRecording = async (
@@ -1080,20 +996,29 @@ export function CompanionApp({
       setPlansOpen(true);
       return;
     }
-    const transcription = liveMode
-      ? await companionApi.transcribe(audioBase64, contentType)
-      : await companionApi.edgeTranscribe(audioBase64, contentType);
-    if (!transcription.text.trim())
-      throw new Error("I couldn’t hear words in that voice note.");
-    await sendMessage(transcription.text);
+    const context = turns.current.begin();
+    if (!context) throw new Error("Wait for the current message before sending a voice note.");
+    setStreaming(true);
+    let transcript = "";
+    try {
+      const transcription = liveMode
+        ? await companionApi.transcribe(audioBase64, contentType)
+        : await companionApi.edgeTranscribe(audioBase64, contentType, context.signal);
+      assertTurnActive(context);
+      transcript = transcription.text.trim();
+      if (!transcript) throw new Error("I couldn’t hear words in that voice note.");
+    } finally { turns.current.finish(context); if (!context.signal.aborted) setStreaming(false); }
+    if (!context.signal.aborted) await sendMessage(transcript);
   };
 
   const speakWithProvider = async (content: string) => {
-    playCompanionSpeech(content);
+    if (!processingAllowed()) return;
+    playCompanionSpeech(content, { onError: setActionError });
   };
 
   const uploadImage = async (file: File) => {
     if (!processingAllowed()) return;
+    if (!liveMode) throw new Error("Private image upload and image understanding are unavailable in this beta. Describe the image in a message instead.");
     if (!file.type.match(/^image\/(jpeg|png|webp)$/))
       throw new Error("Choose a JPEG, PNG, or WebP image.");
     if (file.size > 8_000_000)
@@ -1162,56 +1087,11 @@ export function CompanionApp({
       }));
       return;
     }
-    const now = new Date().toISOString();
-    const attachmentId = crypto.randomUUID();
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      conversationId: state.activeConversationId,
-      role: "user",
-      content: "Look at this.",
-      createdAt: now,
-      status: "sent",
-      attachments: [
-        { id: attachmentId, type: "image", url: dataUrl, name: file.name },
-      ],
-    };
-    const assistantMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      conversationId: state.activeConversationId,
-      role: "assistant",
-      content:
-        "Okay, I’m looking. I won’t guess who anyone is or infer sensitive details—what do you want me to notice?",
-      createdAt: new Date(Date.now() + 1).toISOString(),
-      status: "sent",
-    };
-    setState((current) => ({
-      ...current,
-      mediaLibrary: [
-        ...current.mediaLibrary,
-        {
-          id: attachmentId,
-          type: "image",
-          name: file.name,
-          url: dataUrl,
-          createdAt: now,
-        },
-      ],
-      photos: [
-        {
-          id: attachmentId,
-          imageUrl: dataUrl,
-          caption: file.name,
-          createdAt: now,
-          kind: "shared",
-        },
-        ...current.photos,
-      ],
-      messages: [...current.messages, userMessage, assistantMessage],
-    }));
   };
 
   const generateImage = async (prompt: string) => {
     if (!processingAllowed()) return;
+    if (!liveMode) throw new Error("Image generation is not available in this beta. Existing companion images are preselected artwork, not newly generated photos.");
     if (
       !featureEntitlements.has(state.subscription.planId, "imageGeneration")
     ) {
@@ -1272,55 +1152,11 @@ export function CompanionApp({
       }));
       return;
     }
-    const now = new Date().toISOString();
-    const attachmentId = crypto.randomUUID();
-    const imageUrl = prompt.toLowerCase().includes("rooftop")
-      ? "/assets/mira/rooftop-evening.png"
-      : "/assets/mira/rainy-cafe.png";
-    const assistantMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      conversationId: state.activeConversationId,
-      role: "assistant",
-      content: `I took this for you—“${prompt}.”`,
-      createdAt: now,
-      status: "sent",
-      attachments: [
-        {
-          id: attachmentId,
-          type: "generated-image",
-          url: imageUrl,
-          name: prompt,
-        },
-      ],
-    };
-    setState((current) => ({
-      ...current,
-      mediaLibrary: [
-        {
-          id: attachmentId,
-          type: "generated-image",
-          name: prompt,
-          url: imageUrl,
-          createdAt: now,
-        },
-        ...current.mediaLibrary,
-      ],
-      photos: [
-        {
-          id: attachmentId,
-          imageUrl,
-          caption: prompt,
-          createdAt: now,
-          kind: "selfie",
-        },
-        ...current.photos,
-      ],
-      messages: [...current.messages, assistantMessage],
-    }));
   };
 
   const addSelfie = () => {
     if (!processingAllowed()) return;
+    if (!liveMode) { setActionError("AI selfies are unavailable in this beta. The gallery contains preselected artwork, not photos taken or generated for you."); return; }
     if (!featureEntitlements.has(state.subscription.planId, "aiSelfies")) {
       setPlansOpen(true);
       return;
@@ -1334,32 +1170,6 @@ export function CompanionApp({
       );
       return;
     }
-    const now = new Date().toISOString();
-    const id = crypto.randomUUID();
-    setState((current) => ({
-      ...current,
-      photos: [
-        {
-          id,
-          imageUrl: "/assets/mira/rainy-cafe.png",
-          caption: "Rainy coffee break—just for you",
-          createdAt: now,
-          kind: "selfie",
-        },
-        ...current.photos,
-      ],
-      mediaLibrary: [
-        {
-          id,
-          type: "generated-image",
-          name: `${current.companion.name} coffee selfie`,
-          url: "/assets/mira/rainy-cafe.png",
-          createdAt: now,
-        },
-        ...current.mediaLibrary,
-      ],
-    }));
-    setMomentsTab("photos");
   };
 
   const recordFeedback = (
@@ -1416,6 +1226,7 @@ export function CompanionApp({
   };
 
   const regenerateResponse = async (messageId: string) => {
+    if (!processingAllowed()) return;
     const source = previousUserMessage(
       state.messages,
       messageId,
@@ -1437,7 +1248,6 @@ export function CompanionApp({
       }));
       return;
     }
-    const now = new Date();
     const activeMessages = messagesForConversation(
       state.messages,
       state.activeConversationId,
@@ -1445,30 +1255,20 @@ export function CompanionApp({
     const sourceIndex = activeMessages.findIndex(
       (message) => message.id === source.id,
     );
-    const turn = createCompanionTurn(
-      source.content,
-      activeMessages.slice(0, sourceIndex + 1),
-      now,
-    );
-    setState((current) => ({
-      ...current,
-      messages: current.messages.map((message) => {
-        if (message.id !== messageId) return message;
-        const next = {
-          ...message,
-          content: turn.text.replace(/\n\n+/g, " "),
-          explanation: turn.explanation,
-          status: "sent" as const,
-        };
-        delete next.feedback;
-        return next;
-      }),
-    }));
+    const context = turns.current.begin();
+    if (!context) throw new Error("Wait for the current reply before regenerating.");
+    setStreaming(true);
+    try {
+      await resolveConversationTurn(context, signal => generateDemoReply(activeMessages.slice(0, sourceIndex + 1), "text", signal), reply => {
+        setState(current => context.signal.aborted ? current : { ...current, messages: current.messages.map(message => message.id === messageId ? { ...message, content: reply, status: "sent" } : message) });
+      });
+    } finally { turns.current.finish(context); if (!context.signal.aborted) setStreaming(false); }
   };
 
   const purchaseItem = async (
     item: StoreItemRecord,
   ): Promise<string | null> => {
+    if (accountMode) return "Wardrobe purchases and reward balances are unavailable in this beta. Your current avatar and background remain available.";
     if (!canAccessItem(state.subscription.planId, item)) {
       setPlansOpen(true);
       return `${item.tierRequired[0]?.toUpperCase()}${item.tierRequired.slice(1)} is required for this item.`;
@@ -1530,6 +1330,7 @@ export function CompanionApp({
   };
 
   const equipItem = async (item: StoreItemRecord) => {
+    if (accountMode) throw new Error("Wardrobe item changes are unavailable in this beta. Avatar appearance stays fixed.");
     const liveOwnedItems = liveMode
       ? await companionApi.equipItem(item.id)
       : null;
@@ -1598,6 +1399,7 @@ export function CompanionApp({
   const reflectOnJournal = async (
     entry: DemoState["journalEntries"][number],
   ) => {
+    if (!liveMode) throw new Error("AI journal reflections are unavailable in this beta. You can save a journal entry or share selected text in chat yourself.");
     const reflection = liveMode
       ? (await companionApi.reflectJournal(entry.id)).reflection
       : `I notice ${entry.mood} energy in “${entry.title}.” What part would you like me to sit with?`;
@@ -1664,24 +1466,46 @@ export function CompanionApp({
           },
           ...current.futureEvents,
         ],
-        nudges:
-          current.notifications.frequency === "off"
-            ? current.nudges
-            : [
-                {
-                  id: crypto.randomUUID(),
-                  userId: current.user.id,
-                  eventId,
-                  content: `You mentioned ${event.description}. Want a calm check-in before it?`,
-                  scheduledFor: scheduled.toISOString(),
-                  status: "planned",
-                },
-                ...current.nudges,
-              ],
+        nudges: current.nudges,
       };
     });
   };
+  const accountConversation = async (command: Parameters<typeof accountClient.conversation>[0]) => {
+    const sync = accountSync.current;
+    if (!sync) throw new Error("The account is still loading.");
+    if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current);
+    sync.enqueue(stateRef.current); await sync.flush();
+    const result = await accountClient.conversation(command, sync.revision);
+    sync.revision = result.revision;
+    setState(current => ({ ...current, activeConversationId: result.state.activeConversationId, messages: result.state.messages }));
+  };
+
+  const loadOlderMessages = async () => {
+    if (olderBusy || olderComplete || !accountMode) return;
+    const conversationId = state.activeConversationId;
+    const oldest = [...olderMessages, ...state.messages].filter(message => message.conversationId === conversationId).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))[0];
+    setOlderBusy(true);
+    try {
+      const page = await accountClient.messages(olderCursor ?? (oldest ? JSON.stringify([oldest.createdAt, oldest.id]) : undefined), conversationId);
+      if (stateRef.current.activeConversationId !== conversationId) return;
+      setOlderMessages(current => appendUniqueMessages(page.messages, current));
+      setOlderCursor(page.cursor); setOlderComplete(!page.cursor);
+    } finally { setOlderBusy(false); }
+  };
+
+  const accountMemory = async (command: Parameters<typeof accountClient.memory>[0]) => {
+    const sync = accountSync.current;
+    if (!sync) throw new Error("The account is still loading.");
+    if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current);
+    sync.enqueue(stateRef.current);
+    await sync.flush();
+    const result = await accountClient.memory(command, sync.revision);
+    sync.revision = result.revision;
+    setState(current => ({ ...current, memories: result.state.memories }));
+  };
+
   const updateMemory = async (updated: MemoryRecord) => {
+    if (accountMode) { await accountMemory({ action: "edit", id: updated.id, content: updated.content, pinned: updated.pinned }); return; }
     const saved = liveMode
       ? await companionApi.updateMemory(updated.id, {
           content: updated.content,
@@ -1697,21 +1521,16 @@ export function CompanionApp({
     }));
   };
   const deleteMemory = async (memoryId: string) => {
+    turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); setVoiceCallOpen(false); setVideoCallOpen(false);
+    if (accountMode) { await accountMemory({ action: "forget", id: memoryId }); return; }
     if (liveMode) await companionApi.deleteMemory(memoryId);
     setState((current) => ({
       ...current,
-      memories: current.memories.map((memory) =>
-        memory.id === memoryId
-          ? {
-              ...memory,
-              status: "deleted",
-              updatedAt: new Date().toISOString(),
-            }
-          : memory,
-      ),
+      memories: current.memories.filter(memory => memory.id !== memoryId),
     }));
   };
   const addMemory = async (content: string, type: MemoryType) => {
+    if (accountMode) { await accountMemory({ action: "create", content, type }); return; }
     const now = new Date().toISOString();
     const memory = liveMode
       ? await companionApi.createMemory(state.companion.id, type, content)
@@ -1751,13 +1570,13 @@ export function CompanionApp({
         ...current,
         currentView: "chat",
         completedActivityIds: [...current.completedActivityIds, activity.id],
-        wallet: liveWallet ?? {
+        wallet: liveWallet ?? (accountMode ? current.wallet : {
           ...current.wallet,
           xp,
           level: Math.max(current.wallet.level, Math.floor(xp / 100) + 1),
           coins,
-        },
-        walletTransactions: liveMode
+        }),
+        walletTransactions: liveMode || accountMode
           ? current.walletTransactions
           : [
               ...current.walletTransactions,
@@ -1790,7 +1609,7 @@ export function CompanionApp({
             id: crypto.randomUUID(),
             conversationId: current.activeConversationId,
             role: "assistant",
-            content: `Let’s do “${activity.title}.” ${activity.description} I’ll go first.`,
+            content: `Activity card: “${activity.title}.” ${activity.description} Share a message when you’re ready to explore it.`,
             createdAt: completedAt,
             status: "sent",
           },
@@ -1859,6 +1678,8 @@ export function CompanionApp({
 
   const openVoiceCall = () => {
     if (!processingAllowed()) return;
+    if (turns.current.busy) { setActionError("Wait for the current reply before starting a call."); return; }
+    if (!liveMode && !capabilities?.capabilities.voiceCall) { setActionError("Voice calls are unavailable for this session. Review processing consent or try again later."); return; }
     if (!featureEntitlements.has(state.subscription.planId, "voiceCalls"))
       setPlansOpen(true);
     else {
@@ -1868,6 +1689,8 @@ export function CompanionApp({
   };
   const openVideoCall = () => {
     if (!processingAllowed()) return;
+    if (turns.current.busy) { setActionError("Wait for the current reply before starting a call."); return; }
+    if (!liveMode && !capabilities?.capabilities.videoCall) { setActionError("Avatar calls are unavailable for this session. Review processing consent or try again later."); return; }
     if (!featureEntitlements.has(state.subscription.planId, "videoCalls"))
       setPlansOpen(true);
     else {
@@ -1891,7 +1714,9 @@ export function CompanionApp({
     return "Camera-frame understanding is not available in this beta. You can describe what you want to show me, and we can talk about it.";
   };
 
-  const replyDuringCall = (content: string, delivery: "voice" | "video") => {
+  const replyDuringCall = (content: string, delivery: "voice" | "video", context: TurnContext) => {
+    assertTurnActive(context);
+    if (!stateRef.current.aiProcessingConsent) return Promise.reject(new Error("AI processing is paused."));
     if (liveMode) {
       let reply = "";
       return companionApi
@@ -1899,20 +1724,20 @@ export function CompanionApp({
           {
             conversationId: state.activeConversationId,
             companionId: state.companion.id,
-            clientMessageId: crypto.randomUUID(),
+            clientMessageId: context.turnId,
             content,
             memoryEnabled: state.memoryEnabled,
             responsePreferences: state.responsePreferences,
           },
           (delta) => {
-            reply += delta;
-          },
+            if (!context.signal.aborted) reply += delta;
+          }, context.signal,
         )
         .then(() => reply);
     }
     const now = new Date();
     const userTurn: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: context.turnId,
       conversationId: state.activeConversationId,
       role: "user",
       content,
@@ -1920,34 +1745,36 @@ export function CompanionApp({
       status: "sent",
     };
     const conversation = [
-      ...messagesForConversation(state.messages, state.activeConversationId),
+      ...messagesForConversation(state.messages, state.activeConversationId).filter(message => message.id !== context.turnId),
       userTurn,
     ];
-    const turn = createCompanionTurn(content, conversation, now, delivery);
-    return generateDemoReply(conversation, delivery, turn).then((reply) => {
+    // Retain the user turn across a provider failure. A retry uses this same ID.
+    setState(current => context.signal.aborted ? current : { ...current, messages: appendUniqueMessages(current.messages, [userTurn]) });
+    return resolveConversationTurn(context, signal => generateDemoReply(conversation, delivery, signal), (reply) => {
       const assistantTurn: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: `${context.turnId}:reply`,
         conversationId: state.activeConversationId,
         role: "assistant",
         content: reply,
         createdAt: new Date(now.getTime() + 1).toISOString(),
         status: "sent",
       };
-      setState((current) => ({
+      setState((current) => context.signal.aborted || !current.aiProcessingConsent || current.activeConversationId !== userTurn.conversationId ? current : ({
         ...current,
-        memories: rememberConversationMessage(
+        memories: accountMode ? current.memories : rememberConversationMessage(
           current,
           content,
           userTurn.id,
           now,
         ),
-        messages: [...current.messages, userTurn, assistantTurn],
+        messages: appendUniqueMessages(current.messages, [userTurn, assistantTurn]),
       }));
-      return reply;
     });
   };
 
-  const exportData = async () => {
+  const exportData = async (reauthenticated = false) => {
+    if (accountMode && !reauthenticated) { setReauthAction("export"); return; }
+    if (accountMode) { if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current); accountSync.current?.enqueue(stateRef.current); await accountSync.current?.flush(); }
     const payload = accountMode
       ? await accountClient.exportData()
       : liveMode
@@ -1970,7 +1797,9 @@ export function CompanionApp({
     URL.revokeObjectURL(url);
   };
 
-  const deleteDemo = async () => {
+  const deleteDemo = async (reauthenticated = false) => {
+    if (accountMode && !reauthenticated) { setReauthAction("delete"); return; }
+    turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); setVoiceCallOpen(false); setVideoCallOpen(false);
     if (accountMode) {
       await accountClient.deleteAccount();
       router.replace("/");
@@ -1989,6 +1818,11 @@ export function CompanionApp({
   };
 
   const logout = async () => {
+    turns.current.cancel(); stopCompanionSpeech();
+    if (accountMode) {
+      if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current);
+      accountSync.current?.enqueue(stateRef.current); await accountSync.current?.flush(); accountSync.current?.stop();
+    }
     if (accountMode) await accountClient.logout();
     else await companionApi.logout();
     router.replace("/login");
@@ -2054,8 +1888,11 @@ export function CompanionApp({
       case "chat":
         return (
           <ChatView
-            state={state}
+            state={olderMessages.length ? { ...state, messages: appendUniqueMessages(olderMessages, state.messages) } : state}
+            {...(accountMode && !olderComplete ? { onLoadOlder: loadOlderMessages } : {})}
+            loadingOlder={olderBusy}
             streaming={streaming}
+            streamingText={streaming && state.aiProcessingConsent && streamDraft?.conversationId === state.activeConversationId ? streamDraft.text : ""}
             processingEnabled={state.aiProcessingConsent}
             liveMode={cloudBacked}
             onSend={sendMessage}
@@ -2145,12 +1982,15 @@ export function CompanionApp({
             memories={state.memories}
             enabled={state.memoryEnabled}
             companionName={state.companion.name}
-            onToggle={() =>
+            onToggle={() => {
+              turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); setVoiceCallOpen(false); setVideoCallOpen(false);
+              if (!cloudBacked && state.aiProcessingConsent) runAction(createDemoSession(!state.memoryEnabled), "Memory consent could not be updated. Please retry.");
               setState((current) => ({
                 ...current,
                 memoryEnabled: !current.memoryEnabled,
-              }))
-            }
+              }));
+            }}
+            automatic={!accountMode}
             onUpdate={(memory) =>
               runAction(
                 updateMemory(memory),
@@ -2174,6 +2014,7 @@ export function CompanionApp({
       case "activities":
         return (
           <ActivitiesView
+            reflectionEnabled={Boolean(capabilities?.capabilities.journalReflection)}
             activities={state.activities}
             completedIds={state.completedActivityIds}
             wallet={state.wallet}
@@ -2219,6 +2060,7 @@ export function CompanionApp({
           <ProfileView
             state={state}
             liveMode={cloudBacked}
+            accountMode={accountMode}
             onChange={changeProfile}
             onExport={() =>
               runAction(exportData(), "Your data export could not be created.")
@@ -2251,6 +2093,13 @@ export function CompanionApp({
         relationshipLevel={state.relationship.level}
         immersive={state.currentView === "home"}
       >
+        {accountMode ? <aside className="account-sync-status" role="status" aria-live="polite">
+          {syncStatus === "saved" ? "Saved to your account" : syncStatus === "saving" ? "Saving…" : syncStatus === "conflict" ? "Another tab changed this account. Your unsaved changes are kept only in this page; they have not overwritten the newer version." : syncStatus === "offline" ? "Offline. Unsaved changes stay in this page until reconnecting; do not close it." : "Changes could not be saved. Your unsaved work is still in this page."}
+          {syncStatus === "failed" || syncStatus === "offline" ? <button type="button" className="button button--ghost" onClick={() => runAction(accountSync.current?.retry() ?? Promise.resolve(), "Account sync failed.")}>Retry save</button> : null}
+          {syncStatus === "conflict" ? <button type="button" className="button button--ghost" onClick={() => { if (window.confirm("Discard this page’s unsaved changes and load the newer account version?")) window.location.reload(); }}>Discard unsaved changes and reload</button> : null}
+        </aside> : null}
+        {failedMessage && !streaming ? <aside className="account-sync-status" role="status">Your last message was not answered. <button type="button" className="button button--ghost" onClick={() => { setActionError(""); void sendMessage(failedMessage.content, failedMessage); }}>Retry last message</button></aside> : null}
+        <span className="visually-hidden">Runtime: {runtime}</span>
         {legacyDemo ? (
           <aside className="demo-migration-notice" role="status">
             Your saved conversation is from an earlier Mira version. Old replies
@@ -2287,6 +2136,10 @@ export function CompanionApp({
           </footer>
         ) : null}
       </AppShell>
+      {reauthAction ? <Modal title="Confirm it’s you" description="Enter your account password to export or delete private account data." onClose={() => { setReauthAction(null); setReauthPassword(""); setReauthError(""); }}><form onSubmit={event => {
+        event.preventDefault(); setReauthBusy(true); setReauthError("");
+        void accountClient.reauthenticate(reauthPassword).then(async () => { setReauthPassword(""); if (reauthAction === "export") await exportData(true); else await deleteDemo(true); setReauthAction(null); }).catch(cause => setReauthError(cause instanceof Error ? cause.message : "Could not confirm your password.")).finally(() => setReauthBusy(false));
+      }}><label className="field">Password<input autoFocus type="password" autoComplete="current-password" required value={reauthPassword} onChange={event => setReauthPassword(event.target.value)} /></label>{reauthError ? <p role="alert" className="form-error">{reauthError}</p> : null}<button className="button button--primary" disabled={reauthBusy}>{reauthBusy ? "Confirming…" : "Confirm and continue"}</button></form></Modal> : null}
       {resetDemoOpen ? (
         <Modal
           title="Reset this browser demo?"
@@ -2315,11 +2168,11 @@ export function CompanionApp({
           </div>
         </Modal>
       ) : null}
-      {voiceCallOpen ? (
+      <Suspense fallback={<div role="status" className="account-sync-status">Opening call…</div>}>{voiceCallOpen ? (
         <VoiceCallModal
           companionName={state.companion.name}
           userName={state.user.name}
-          onUserTurn={(content) => replyDuringCall(content, "voice")}
+          onUserTurn={(content, context) => replyDuringCall(content, "voice", context)}
           onClose={(seconds) => finishCall("voice", seconds)}
         />
       ) : null}
@@ -2328,11 +2181,12 @@ export function CompanionApp({
           companionName={state.companion.name}
           userName={state.user.name}
           initialEnvironment={state.activeEnvironment}
-          onUserTurn={(content) => replyDuringCall(content, "video")}
+          onUserTurn={(content, context) => replyDuringCall(content, "video", context)}
+          frameUnderstanding={Boolean(capabilities?.capabilities.imageUnderstanding)}
           onAnalyzeFrame={analyzeSharedCallFrame}
           onClose={(seconds) => finishCall("video", seconds)}
         />
-      ) : null}
+      ) : null}</Suspense>
       {cameraOpen ? (
         <CameraConversationModal
           companionName={state.companion.name}
@@ -2369,10 +2223,11 @@ export function CompanionApp({
       ) : null}
       {processingNoticeOpen ? (
         <Modal
-          title="AI processing is paused"
-          description="Turn processing consent back on before starting chat, voice, video, camera, or image features."
+          title="Review AI processing and access"
+          description="Mira is an AI companion for adults 18+. Messages and voice input are sent to the disclosed providers. Agree to the current policy before enabling AI features."
           onClose={() => setProcessingNoticeOpen(false)}
         >
+          <label className="toggle-line"><span>I declare that I am 18 or older, accept the <Link href="/terms" target="_blank">Terms</Link> and <Link href="/privacy" target="_blank">Privacy Policy</Link>, and consent to AI processing.</span><input type="checkbox" checked={policyConfirmed} onChange={event => setPolicyConfirmed(event.target.checked)} /></label>
           <div className="modal-actions">
             <button
               type="button"
@@ -2384,12 +2239,23 @@ export function CompanionApp({
             <button
               type="button"
               className="button button--primary"
+              disabled={!policyConfirmed}
               onClick={() => {
-                setState((current) => ({
-                  ...current,
-                  aiProcessingConsent: true,
-                }));
-                setProcessingNoticeOpen(false);
+                runAction((async () => {
+                  if (!cloudBacked) await createDemoSession(state.memoryEnabled);
+                  if (accountMode) {
+                    const sync = accountSync.current;
+                    if (!sync) throw new Error("Account is still loading.");
+                    if (accountSyncTimer.current !== null) window.clearTimeout(accountSyncTimer.current);
+                    await sync.flush();
+                    const result = await accountClient.acceptPolicy({ termsVersion: "2026-09-13", adultConfirmed: true, aiProcessingConsent: true, memoryEnabled: state.memoryEnabled, conversationStorageEnabled: state.conversationStorageEnabled }, sync.revision);
+                    sync.revision = result.revision;
+                    setState(result.state);
+                  } else setState((current) => ({ ...current, aiProcessingConsent: true }));
+                  if (!liveMode) setCapabilities(await fetchCapabilities());
+                  setProcessingNoticeOpen(false);
+                  setPolicyConfirmed(false);
+                })(), "Processing could not be enabled. Please retry.");
               }}
             >
               Enable AI features
@@ -2414,5 +2280,5 @@ export function CompanionApp({
       ) : null}
     </>
   );
-  return forceDemo ? <AdultDemoGate>{appContent}</AdultDemoGate> : appContent;
+  return forceDemo ? <AdultDemoGate onAccess={setCapabilities} onConsent={memoryEnabled => setState(current => ({ ...current, aiProcessingConsent: true, memoryEnabled }))}>{appContent}</AdultDemoGate> : appContent;
 }

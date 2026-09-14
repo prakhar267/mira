@@ -1,0 +1,10 @@
+{
+  "evidence": "source-lost-before-retirement-admission-denied",
+  "sourceFileRemoved": true,
+  "snapshotAndLedgerIntegrityVerified": true,
+  "archivedWatermark": 1,
+  "acknowledgedWatermarkBeforeSourceLoss": 2,
+  "targetMode": "restore",
+  "independentLatestAuthorityConfigured": false,
+  "sourceLossRecoveryImplemented": false
+}

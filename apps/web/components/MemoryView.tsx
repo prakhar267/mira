@@ -16,10 +16,11 @@ const categories: Array<{ label: string; value: "all" | MemoryType }> = [
   { label: "Shared", value: "shared" },
 ];
 
-export function MemoryView({ memories, enabled, companionName, onToggle, onUpdate, onDelete, onAdd }: {
+export function MemoryView({ memories, enabled, companionName, automatic = false, onToggle, onUpdate, onDelete, onAdd }: {
   memories: MemoryRecord[];
   enabled: boolean;
   companionName: string;
+  automatic?: boolean;
   onToggle: () => void;
   onUpdate: (memory: MemoryRecord) => void;
   onDelete: (memoryId: string) => void;
@@ -36,7 +37,7 @@ export function MemoryView({ memories, enabled, companionName, onToggle, onUpdat
   return (
     <section className="workspace memory-view" aria-labelledby="memory-title">
       <header className="workspace-header workspace-header--text">
-        <div><span className="eyebrow">Continuity you control</span><h1 id="memory-title">Memory</h1><p>{enabled ? `${visible.length} active ${visible.length === 1 ? "memory" : "memories"}. Personal details and meaningful conversation moments are remembered automatically and stay inspectable.` : "Memory is paused. Conversation can continue without new memories."}</p></div>
+        <div><span className="eyebrow">Continuity you control</span><h1 id="memory-title">Memory</h1><p>{enabled ? `${visible.length} active ${visible.length === 1 ? "memory" : "memories"}. ${automatic ? "Details may be saved from this browser demo’s conversations." : "Add details explicitly to use them in future conversations."} Inspect, correct or forget them here.` : "Memory is paused. Existing memories are not used in replies and remain available to inspect or delete."}</p><p>Forgetting a memory erases its saved wording, not the source conversation. Delete that transcript separately if needed.</p></div>
         <div className="header-actions"><button type="button" className="button button--ghost" onClick={onToggle}>{enabled ? "Pause memory" : "Resume memory"}</button><button type="button" className="button button--primary" onClick={() => setAdding(true)} disabled={!enabled}><Plus aria-hidden="true" /> Add memory</button></div>
       </header>
 
@@ -49,22 +50,22 @@ export function MemoryView({ memories, enabled, companionName, onToggle, onUpdat
       {enabled && visible.length === 0 ? <div className="empty-state"><Search aria-hidden="true" /><h2>No matching memories</h2><p>Try another phrase or add something you explicitly want {companionName} to remember.</p></div> : null}
 
       <div className="memory-list">
-        {enabled ? visible.map((memory) => (
+        {visible.map((memory) => (
           <article key={memory.id} className="memory-row">
             <div className={`memory-type memory-type--${memory.type}`}><Sparkles aria-hidden="true" /></div>
-            <div className="memory-row__content"><span>{memory.type.replace("episodic", "important event")}</span><p>{memory.content}</p><small>Source: conversation · {Math.round(memory.confidence * 100)}% confidence{memory.lastRetrievedAt ? ` · recalled ${memory.retrievalCount} ${memory.retrievalCount === 1 ? "time" : "times"}` : " · not recalled yet"}</small></div>
+            <div className="memory-row__content"><span>{memory.type.replace("episodic", "important event")}</span><p>{memory.content}</p><small>{memory.sourceMessageIds.length ? `Source: conversation · ${Math.round(memory.confidence * 100)}% estimated confidence` : "Saved explicitly"}{memory.lastRetrievedAt ? ` · recalled ${memory.retrievalCount} ${memory.retrievalCount === 1 ? "time" : "times"}` : " · not recalled yet"}</small></div>
             <div className="memory-row__actions">
               <button type="button" className={memory.pinned ? "icon-button icon-button--active" : "icon-button"} aria-label={memory.pinned ? "Unpin memory" : "Pin memory"} onClick={() => onUpdate({ ...memory, pinned: !memory.pinned, updatedAt: new Date().toISOString() })}><Bookmark aria-hidden="true" /></button>
               <button type="button" className="icon-button" aria-label="Edit memory" onClick={() => { setEditing(memory); setDraft(memory.content); }}><Edit3 aria-hidden="true" /></button>
               <button type="button" className="icon-button icon-button--danger" aria-label="Delete memory" onClick={() => onDelete(memory.id)}><Trash2 aria-hidden="true" /></button>
             </div>
           </article>
-        )) : null}
+        ))}
       </div>
 
-      {editing ? <Modal title="Correct this memory" description="Corrections replace the active wording and keep the memory under your control." onClose={() => setEditing(null)}><label className="field">Memory<textarea rows={4} value={draft} onChange={(event) => setDraft(event.target.value)} /></label><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setEditing(null)}>Cancel</button><button type="button" className="button button--primary" disabled={!draft.trim()} onClick={() => { onUpdate({ ...editing, content: draft.trim(), normalizedContent: draft.trim().toLowerCase(), updatedAt: new Date().toISOString() }); setEditing(null); }}><Check aria-hidden="true" /> Save correction</button></div></Modal> : null}
+      {editing ? <Modal title="Correct this memory" description="Corrections replace the active wording and keep the memory under your control." onClose={() => setEditing(null)}><label className="field">Memory<textarea rows={4} maxLength={2_000} value={draft} onChange={(event) => setDraft(event.target.value)} /></label><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setEditing(null)}>Cancel</button><button type="button" className="button button--primary" disabled={!draft.trim()} onClick={() => { onUpdate({ ...editing, content: draft.trim(), normalizedContent: draft.trim().toLowerCase(), updatedAt: new Date().toISOString() }); setEditing(null); }}><Check aria-hidden="true" /> Save correction</button></div></Modal> : null}
 
-      {adding ? <Modal title="Add a memory" description="Only add something you want used for future continuity." onClose={() => setAdding(false)}><label className="field">Category<select value={type} onChange={(event) => setType(event.target.value as MemoryType)}>{categories.filter((category) => category.value !== "all").map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label><label className="field">What should {companionName} remember?<textarea rows={4} value={draft} onChange={(event) => setDraft(event.target.value)} /></label><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setAdding(false)}>Cancel</button><button type="button" className="button button--primary" disabled={!draft.trim()} onClick={() => { onAdd(draft.trim(), type); setDraft(""); setAdding(false); }}><Plus aria-hidden="true" /> Add memory</button></div></Modal> : null}
+      {adding ? <Modal title="Add a memory" description="Only add something you want used for future continuity." onClose={() => setAdding(false)}><label className="field">Category<select value={type} onChange={(event) => setType(event.target.value as MemoryType)}>{categories.filter((category) => category.value !== "all").map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label><label className="field">What should {companionName} remember?<textarea rows={4} maxLength={2_000} value={draft} onChange={(event) => setDraft(event.target.value)} /></label><div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setAdding(false)}>Cancel</button><button type="button" className="button button--primary" disabled={!draft.trim()} onClick={() => { onAdd(draft.trim(), type); setDraft(""); setAdding(false); }}><Plus aria-hidden="true" /> Add memory</button></div></Modal> : null}
     </section>
   );
 }

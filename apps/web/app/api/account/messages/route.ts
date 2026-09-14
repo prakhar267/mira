@@ -1,0 +1,5 @@
+import {AccountError,accountErrorResponse,requireAccount} from "@/lib/account-server";
+import {storeAction} from "@/lib/cloud-store";
+export async function GET(request:Request){
+  try{const {account}=await requireAccount(request);const params=new URL(request.url).searchParams;const cursor=params.get("cursor")??undefined;const conversationId=params.get("conversationId")??undefined;const limit=Number(params.get("limit")??50);if(!Number.isInteger(limit)||limit<1||limit>200||cursor&&cursor.length>300||conversationId&&!/^[a-zA-Z0-9_-]{1,120}$/.test(conversationId))throw new AccountError("Invalid conversation page.");if(cursor){const decoded=JSON.parse(cursor);if(!Array.isArray(decoded)||decoded.length!==2||decoded.some(value=>typeof value!=="string"))throw new AccountError("Invalid conversation cursor.");}return Response.json(await storeAction({action:"transcriptPage",userId:account.id,cursor,limit,conversationId}),{headers:{"cache-control":"no-store"}});}catch(cause){return accountErrorResponse(cause);}
+}

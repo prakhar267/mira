@@ -1,6 +1,6 @@
 import { initialState, type DemoState } from "./state";
 
-export const demoSchemaVersion = 2;
+export const demoSchemaVersion = 3;
 export function freshDemo(): DemoState {
   const state = structuredClone(initialState);
   return {
@@ -27,6 +27,7 @@ export function freshDemo(): DemoState {
     currentView: "home",
     activeConversationId: crypto.randomUUID(),
     messages: [],
+    memoryEnabled: false,
     memories: [],
     calls: [],
     journalEntries: [],
@@ -90,14 +91,17 @@ export function restoreDemo(raw: string | null): {
         "Saved demo needs a reset. Your saved data has not been overwritten.",
       );
   }
+  // Historical tombstones must not retain forgotten content in ordinary exports.
+  state.memories = state.memories.filter(memory => memory.status !== "deleted");
   return { state, migrated: envelope.schemaVersion !== demoSchemaVersion };
 }
 export function serializeDemo(state: DemoState) {
   return JSON.stringify({
     schemaVersion: demoSchemaVersion,
     savedAt: new Date().toISOString(),
-    state: state.conversationStorageEnabled
-      ? state
-      : { ...state, messages: [] },
+    state: { ...state,
+      memories: state.memories.filter(memory => memory.status !== "deleted"),
+      ...(!state.conversationStorageEnabled ? { messages: [], calls: [], feedbackSignals: [], companionReflections: [] } : {}),
+    },
   });
 }

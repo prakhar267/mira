@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-13",
+  "scope": "Local synthetic acceptance, not production/provider or physical-device certification",
+  "baselineSha": "5487e4e1655292ef4dc6b9da67f189cf3511b437",
+  "branch": "codex/mira-production-readiness",
+  "runtime": { "node": "24.18.0", "pnpm": "11.19.0" },
+  "checks": {
+    "pnpm lint": { "result": "passed", "tasks": 12, "cachedTasks": 11, "activeWebFresh": true },
+    "pnpm typecheck": { "result": "passed", "tasks": 12, "cachedTasks": 11, "activeWebFresh": true },
+    "pnpm test": { "result": "passed", "tasks": 13, "cachedTasks": 12, "webTestsFresh": 260, "webFiles": 36, "optionalWorkspaceTestsFromPriorForcedRun": 96 },
+    "test:worker": { "result": "passed", "fresh": true, "tests": 18, "files": 3, "seconds": 12.73, "actualWorkerdSqliteRoutesAlarms": true, "externalProvidersMocked": true },
+    "test:browser": { "result": "passed", "fresh": true, "startedAt": "2026-09-13T11:36:57.175Z", "durationMs": 78713.398, "tests": 36, "skipped": 0, "unexpected": 0, "flaky": 0, "retries": 0, "chromium": 12, "firefox": 12, "webkit": 12, "target": "compiled vinext Cloudflare artifact, local Wrangler", "audioAndAccountHttpFixtures": "synthetic", "serviceWorkers": "blocked in HTTP-mocked specs only", "physicalAcoustics": "not tested" },
+    "build:vinext": { "result": "passed", "fresh": true, "warningsRetained": ["unsupported Next webpack config", "large optional chunks"] },
+    "artifact-smoke": { "result": "passed", "publicHttpChecks": 5, "serverInferenceRefusalProbe": "503 INFERENCE_DISABLED", "scope": "local compiled bytes, unreleased SHA before commit; final committed SHA rechecked at delivery" },
+    "dependency-audit": { "result": "passed with narrow reviewed exceptions", "remainingHighAdvisories": 2, "package": "image-size@1.2.1", "paths": "optional mobile Metro tooling", "exceptionExpiry": "2026-09-27", "report": "../readiness-2026-09-13T11-31-40-557Z/dependency-audit.json" }
+  },
+  "githubActions": { "result": "externally blocked", "runId": 34749619784, "jobId": 103703605359, "startedSteps": 0, "reason": "Account payments/spending limit; rechecked through GitHub API. No account setting changed." },
+  "liveDeploymentPerformed": false,
+  "realProviderInferencePerformed": false,
+  "realEmailOrAlertSent": false,
+  "payments": "excluded and disabled",
+  "remainingGates": ["explicit deployment approval", "real provider budget and device acceptance", "verified sender and delivery", "external backup and restore/RPO/RTO commitment", "external alerts and operator ownership", "independent legal/security/provider-retention review", "full accessibility and physical mobile performance audit"],
+  "detailedLedger": "../../docs/READINESS-IMPLEMENTATION.md"
+}

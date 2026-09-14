@@ -95,8 +95,8 @@ export function MomentsView({
       {tab === "photos" ? (
         <div className="album-view">
           <div className="album-toolbar">
-            <div><h2>Our photos</h2><p>{state.photos.length} moments in your private album</p></div>
-            <button type="button" className="luma-button luma-button--accent" onClick={onGenerateSelfie}><Camera aria-hidden="true" /> Ask for a selfie</button>
+            <div><h2>Companion artwork</h2><p>{state.photos.length} moments in your private album</p></div>
+            <button type="button" className="luma-button luma-button--accent" disabled onClick={onGenerateSelfie}><Camera aria-hidden="true" /> AI selfies unavailable</button>
           </div>
           {state.photos.length ? <div className="photo-grid">
             {state.photos.map((photo, index) => (
@@ -105,14 +105,14 @@ export function MomentsView({
                 <figcaption><span>{photo.caption}</span><time>{new Date(photo.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></figcaption>
               </motion.figure>
             ))}
-          </div> : <div className="empty-state"><Images aria-hidden="true" /><h2>Your private album is ready.</h2><p>Ask {state.companion.name} for the first selfie to begin it.</p><button type="button" className="luma-button luma-button--accent" onClick={onGenerateSelfie}><Camera aria-hidden="true" /> Ask for a selfie</button></div>}
+          </div> : <div className="empty-state"><Images aria-hidden="true" /><h2>Your private album is ready.</h2><p>New image generation is unavailable. Existing companion pictures are preselected artwork.</p><button type="button" className="luma-button luma-button--accent" disabled onClick={onGenerateSelfie}><Camera aria-hidden="true" /> AI selfies unavailable</button></div>}
         </div>
       ) : null}
 
       {tab === "thoughts" ? (
         <div className="reflection-view">
-          <div className="reflection-hero"><Brain aria-hidden="true" weight="duotone" /><div><span className="luma-kicker">What stays with her</span><h2>{state.companion.name}’s reflections</h2><p>Short thoughts formed from your shared moments—not a hidden transcript. Any linked memory remains under your control.</p></div></div>
-          {state.companionReflections.length ? <div className="reflection-feed">{state.companionReflections.map((reflection) => <article key={reflection.id}><span>{new Date(reflection.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric" })}</span><h3>{reflection.title}</h3><p>{reflection.thought}</p><footer><Brain aria-hidden="true" /> Shaped by {reflection.memoryIds.length} approved {reflection.memoryIds.length === 1 ? "memory" : "memories"}</footer></article>)}</div> : <div className="empty-state"><Brain aria-hidden="true" /><h2>Nothing reflected yet.</h2><p>Reflections appear after meaningful conversations and use only memories you can inspect.</p></div>}
+          <div className="reflection-hero"><Brain aria-hidden="true" weight="duotone" /><div><span className="luma-kicker">What stays with her</span><h2>{state.companion.name}’s reflections</h2><p>Saved reflections from previous versions. Automatic reflection generation is unavailable in this beta.</p></div></div>
+          {state.companionReflections.length ? <div className="reflection-feed">{state.companionReflections.map((reflection) => <article key={reflection.id}><span>{new Date(reflection.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric" })}</span><h3>{reflection.title}</h3><p>{reflection.thought}</p><footer><Brain aria-hidden="true" /> Shaped by {reflection.memoryIds.length} approved {reflection.memoryIds.length === 1 ? "memory" : "memories"}</footer></article>)}</div> : <div className="empty-state"><Brain aria-hidden="true" /><h2>Nothing reflected yet.</h2><p>Automatic AI reflections are unavailable in this beta. Your saved memories remain inspectable.</p></div>}
         </div>
       ) : null}
 

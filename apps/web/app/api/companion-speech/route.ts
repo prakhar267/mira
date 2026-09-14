@@ -1,7 +1,11 @@
 import { createInworldSpeechRequest, decodeInworldAudio, fitInworldSpeechPrompt, INWORLD_TTS_ENDPOINT } from "@/lib/inworld-speech";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson, recordServiceMetric } from "@/lib/edge-security";
 import { withProviderDeadline } from "@/lib/provider-resilience";
-import { consumeCapacity } from "@/lib/capacity";
+import { withInferenceCapacity } from "@/lib/capacity";
+import { authorizeInference } from "@/lib/inference-policy";
+import { parseSpeechPayload } from "@/lib/inference-payloads";
+import { unsafeCompanionOutput } from "@/lib/companion-safety";
+import { providerFetch } from "@/lib/provider-fetch";
 
 const VOICE = {
   model: "inworld-tts-2-flash",
@@ -12,7 +16,7 @@ const VOICE = {
 
 async function generateInworldSpeech(prompt: string, apiKey: string, requestSignal: AbortSignal) {
   return withProviderDeadline("inworld-speech", async (signal) => {
-  const response = await fetch(INWORLD_TTS_ENDPOINT, {...createInworldSpeechRequest(prompt, apiKey),signal});
+  const response = await providerFetch(INWORLD_TTS_ENDPOINT, {...createInworldSpeechRequest(prompt, apiKey),signal});
   if (!response.ok) throw new Error(`Inworld generation returned ${response.status}.`);
   const body = await response.json() as { audioContent?: unknown };
   if (typeof body.audioContent !== "string") throw new Error("Inworld returned no audio.");
@@ -52,21 +56,25 @@ export async function POST(request: Request) {
   const respond = (body: unknown, status = 200, details: Record<string, unknown> = {}) => edgeJson(requestId, "companion-speech", startedAt, body, status, details);
   try {
     assertEdgeSameOrigin(request);
+    const principal = await authorizeInference(request, "speech");
     if (await edgeRateLimited(request, "companion-speech", 36)) return respond({ error: "Voice thoda cool down kar raha hai. Ek moment mein try karo." }, 429, { limited: true });
-    const body = await readEdgeJson(request, 5_000) as { text?: unknown } | null;
-    const prompt = fitInworldSpeechPrompt(typeof body?.text === "string" ? body.text : "");
+    const prompt = fitInworldSpeechPrompt(parseSpeechPayload(await readEdgeJson(request, 5_000)));
     if (!prompt) return respond({ error: "Speech text is required." }, 400);
+    if (unsafeCompanionOutput(prompt)) throw new EdgeRequestError("This speech request could not be delivered safely.", 422, "UNSAFE_SPEECH");
 
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const apiKey = (env as typeof env & { INWORLD_API_KEY?: string }).INWORLD_API_KEY?.trim();
     if (!apiKey) return respond({ error: "Mira's selected Priya voice is not configured yet." }, 503, { provider: VOICE.provider, model: VOICE.model, configuration: "missing" });
-    await consumeCapacity("speech");
-
-    const audio = await generateInworldSpeech(prompt, apiKey, request.signal);
+    const audio = await withInferenceCapacity("speech", principal, prompt.length, async () => {
+      await authorizeInference(request, "speech");
+      return generateInworldSpeech(prompt, apiKey, request.signal);
+    });
+    await authorizeInference(request, "speech");
+    request.signal.throwIfAborted();
     recordServiceMetric("companion-speech",false,Date.now()-startedAt);
     return audioResponse(audio, requestId, startedAt);
   } catch (cause) {
-    console.error("Mira Inworld speech failed", cause instanceof Error ? cause.message : "unknown");
+    console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-speech" }));
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-speech", startedAt, cause);
     return respond({ error: "Mira ki voice abhi connect nahi ho paayi. Please phir try karo." }, 503, { provider: VOICE.provider, model: VOICE.model });
   }

@@ -4,6 +4,8 @@ export interface LaunchEnvironment {
   EMAIL_FROM?: string;
   MIRA_ALERT_WEBHOOK?: string;
   MIRA_SUPPORT_OWNER?: string;
+  MIRA_BACKUP_KEY?: string;
+  MIRA_BACKUP_KEY_ID?: string;
   BILLING_ENABLED?: string;
   DODO_PAYMENTS_ENVIRONMENT?: string;
   DODO_PAYMENTS_API_KEY?: string;
@@ -23,6 +25,7 @@ export function launchReadiness(env: LaunchEnvironment) {
     recovery: { configured: present(["RESEND_API_KEY","EMAIL_FROM","SITE_ORIGIN"]).length === 0, missing: present(["RESEND_API_KEY","EMAIL_FROM","SITE_ORIGIN"]), action: "Verify the sending domain and receive a real password-reset email." },
     alerts: { configured: Boolean(env.MIRA_ALERT_WEBHOOK), action: "Configure an approved HTTPS webhook; verify delivery and recovery notifications." },
     support: { ownerConfigured: Boolean(env.MIRA_SUPPORT_OWNER), action: "Confirm an on-call owner and response hours; dashboard availability is not staffed support." },
+    backups: { encryptionConfigured: /^[A-Za-z0-9+/]{43}=$/.test(env.MIRA_BACKUP_KEY ?? "") && /^[A-Za-z0-9_-]{1,64}$/.test(env.MIRA_BACKUP_KEY_ID ?? ""), independentArchiveVerified: false, sourceLossRecoveryVerified: false, action: "Configure the encrypted archive key separately from an independent vault. Export and verify the deletion ledger independently. A surviving-source transfer drill is not proof of source-loss disaster recovery; require a trusted latest ledger and recorded production restore evidence." },
     externalSignOffs: ["real-device call acceptance", "independent security review", "legal and provider-retention review", "age-assurance decision", "GitHub Actions account access", "YouTube upload Terms approval"],
   };
 }

@@ -26,7 +26,9 @@ const securityHeaders = {
 };
 
 export function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname === "/app" && !request.cookies.has("__Host-companaro_session")) {
+  // Onboarding is a public form, not an authenticated account. Every account
+  // API still enforces its own session; this query flag grants no API access.
+  if (request.nextUrl.pathname === "/app" && request.nextUrl.searchParams.get("onboarding") !== "1" && !request.cookies.has("__Host-companaro_session")) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = "";

@@ -41,6 +41,7 @@ export function AppShell({
 }) {
   return (
     <div className={`app-frame ${immersive ? "app-frame--immersive" : ""}`}>
+      <a className="skip-link" href="#app-content" tabIndex={0}>Skip to main content</a>
       <aside className="sidebar" aria-label="Primary navigation">
         <button className="sidebar__brand" type="button" onClick={() => onNavigate("home")} aria-label={`Go to ${companionName} home`}>
           <span>{brand.displayName}</span>
@@ -66,7 +67,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="app-main">{children}</main>
+      <main id="app-content" tabIndex={-1} className="app-main">{children}</main>
 
       {onCall && active !== "home" && active !== "chat" ? (
         <button type="button" className="floating-call" onClick={onCall} aria-label={`Call ${companionName}`}>

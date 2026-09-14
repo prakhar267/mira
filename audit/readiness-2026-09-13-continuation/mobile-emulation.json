@@ -1,0 +1,405 @@
+{
+  "measuredAt": "2026-09-13T13:44:07.113Z",
+  "conditions": "Local compiled Worker, Chromium, 393x851, cold cache, 4x CPU throttle, 1.6Mbps/150ms; not physical phone or production field data",
+  "measurements": [
+    {
+      "sample": 1,
+      "lcp": 1456,
+      "cls": 0.006128026869643788,
+      "session": 0.006128026869643788,
+      "first": 2016.9000000003725,
+      "last": 2233.199999999255,
+      "longTasks": 1,
+      "longTaskMs": 70,
+      "overflow": false,
+      "assets": [
+        {
+          "path": "/assets/mira/loft-morning-delivery.webp",
+          "transferBytes": 135678,
+          "decodedBytes": 135378,
+          "durationMs": 2329.5,
+          "type": "link"
+        },
+        {
+          "path": "/_next/static/css/layout.BsQ6YAmj.css",
+          "transferBytes": 35998,
+          "decodedBytes": 145399,
+          "durationMs": 1130.4000000003725,
+          "type": "link"
+        },
+        {
+          "path": "/_next/static/chunks/rolldown-runtime-hePW80VL.js",
+          "transferBytes": 728,
+          "decodedBytes": 716,
+          "durationMs": 198,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/index-stLV8mUY.js",
+          "transferBytes": 34840,
+          "decodedBytes": 132908,
+          "durationMs": 1090,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/framework-DTZGTDtF.js",
+          "transferBytes": 59368,
+          "decodedBytes": 190109,
+          "durationMs": 1472.1000000014901,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/error-DL2wCAzF.js",
+          "transferBytes": 636,
+          "decodedBytes": 525,
+          "durationMs": 392.3999999985099,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/link-B6c2Zgdz.js",
+          "transferBytes": 5030,
+          "decodedBytes": 12166,
+          "durationMs": 715.0999999996275,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/query-DugiHe4Q.js",
+          "transferBytes": 787,
+          "decodedBytes": 984,
+          "durationMs": 910.2999999988824,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/layout-segment-context-C3t04l-W.js",
+          "transferBytes": 642,
+          "decodedBytes": 496,
+          "durationMs": 1105.5,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/vinext-DoYiQdwv.js",
+          "transferBytes": 38983,
+          "decodedBytes": 129921,
+          "durationMs": 1187.699999999255,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/ServiceWorker-u8-5bu8v.js",
+          "transferBytes": 511,
+          "decodedBytes": 259,
+          "durationMs": 1262,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/Icon-jpk45vUa.js",
+          "transferBytes": 960,
+          "decodedBytes": 1082,
+          "durationMs": 1307.0999999996275,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/media/manrope-latin-600-normal.4f0koTD-.woff2",
+          "transferBytes": 14472,
+          "decodedBytes": 14172,
+          "durationMs": 618.2999999988824,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-600-normal.Cpve2RO_.woff2",
+          "transferBytes": 23756,
+          "decodedBytes": 23456,
+          "durationMs": 836.4000000003725,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/manrope-latin-400-normal.PaqtzbVb.woff2",
+          "transferBytes": 14408,
+          "decodedBytes": 14108,
+          "durationMs": 737.8000000007451,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-500-normal.CO6zq4Dz.woff2",
+          "transferBytes": 23620,
+          "decodedBytes": 23320,
+          "durationMs": 880.9000000003725,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-ext-600-normal.C4fLZpRr.woff2",
+          "transferBytes": 20624,
+          "decodedBytes": 20324,
+          "durationMs": 893.4000000003725,
+          "type": "css"
+        }
+      ],
+      "scriptDecodedBytes": 320746
+    },
+    {
+      "sample": 2,
+      "lcp": 1388,
+      "cls": 0.006128026869643788,
+      "session": 0.006128026869643788,
+      "first": 1936.2999999988824,
+      "last": 2167.699999999255,
+      "longTasks": 0,
+      "longTaskMs": 0,
+      "overflow": false,
+      "assets": [
+        {
+          "path": "/assets/mira/loft-morning-delivery.webp",
+          "transferBytes": 135678,
+          "decodedBytes": 135378,
+          "durationMs": 2332.9000000003725,
+          "type": "link"
+        },
+        {
+          "path": "/_next/static/chunks/rolldown-runtime-hePW80VL.js",
+          "transferBytes": 728,
+          "decodedBytes": 716,
+          "durationMs": 196.5,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/index-stLV8mUY.js",
+          "transferBytes": 34840,
+          "decodedBytes": 132908,
+          "durationMs": 1088.9000000003725,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/css/layout.BsQ6YAmj.css",
+          "transferBytes": 35998,
+          "decodedBytes": 145399,
+          "durationMs": 1125,
+          "type": "link"
+        },
+        {
+          "path": "/_next/static/chunks/error-DL2wCAzF.js",
+          "transferBytes": 636,
+          "decodedBytes": 525,
+          "durationMs": 390,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/link-B6c2Zgdz.js",
+          "transferBytes": 5030,
+          "decodedBytes": 12166,
+          "durationMs": 713.7000000011176,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/vinext-DoYiQdwv.js",
+          "transferBytes": 38983,
+          "decodedBytes": 129921,
+          "durationMs": 1192.5,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/framework-DTZGTDtF.js",
+          "transferBytes": 59368,
+          "decodedBytes": 190109,
+          "durationMs": 1515.9000000003725,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/query-DugiHe4Q.js",
+          "transferBytes": 787,
+          "decodedBytes": 984,
+          "durationMs": 907.1999999992549,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/layout-segment-context-C3t04l-W.js",
+          "transferBytes": 642,
+          "decodedBytes": 496,
+          "durationMs": 1095.0999999996275,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/ServiceWorker-u8-5bu8v.js",
+          "transferBytes": 511,
+          "decodedBytes": 259,
+          "durationMs": 1259.5999999996275,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/Icon-jpk45vUa.js",
+          "transferBytes": 960,
+          "decodedBytes": 1082,
+          "durationMs": 1288.9000000003725,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/media/manrope-latin-600-normal.4f0koTD-.woff2",
+          "transferBytes": 14472,
+          "decodedBytes": 14172,
+          "durationMs": 591.4000000003725,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-600-normal.Cpve2RO_.woff2",
+          "transferBytes": 23756,
+          "decodedBytes": 23456,
+          "durationMs": 823.9000000003725,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/manrope-latin-400-normal.PaqtzbVb.woff2",
+          "transferBytes": 14408,
+          "decodedBytes": 14108,
+          "durationMs": 733.5999999996275,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-500-normal.CO6zq4Dz.woff2",
+          "transferBytes": 23620,
+          "decodedBytes": 23320,
+          "durationMs": 876.0999999996275,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-ext-600-normal.C4fLZpRr.woff2",
+          "transferBytes": 20624,
+          "decodedBytes": 20324,
+          "durationMs": 922.5999999996275,
+          "type": "css"
+        }
+      ],
+      "scriptDecodedBytes": 320746
+    },
+    {
+      "sample": 3,
+      "lcp": 1280,
+      "cls": 0.006128026869643788,
+      "session": 0.006128026869643788,
+      "first": 1919.2000000011176,
+      "last": 2063.800000000745,
+      "longTasks": 1,
+      "longTaskMs": 50,
+      "overflow": false,
+      "assets": [
+        {
+          "path": "/assets/mira/loft-morning-delivery.webp",
+          "transferBytes": 135678,
+          "decodedBytes": 135378,
+          "durationMs": 2333.0999999996275,
+          "type": "link"
+        },
+        {
+          "path": "/_next/static/css/layout.BsQ6YAmj.css",
+          "transferBytes": 35998,
+          "decodedBytes": 145399,
+          "durationMs": 1012.8000000007451,
+          "type": "link"
+        },
+        {
+          "path": "/_next/static/chunks/rolldown-runtime-hePW80VL.js",
+          "transferBytes": 728,
+          "decodedBytes": 716,
+          "durationMs": 195.89999999850988,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/framework-DTZGTDtF.js",
+          "transferBytes": 59368,
+          "decodedBytes": 190109,
+          "durationMs": 1561,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/index-stLV8mUY.js",
+          "transferBytes": 34840,
+          "decodedBytes": 132908,
+          "durationMs": 1673,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/error-DL2wCAzF.js",
+          "transferBytes": 636,
+          "decodedBytes": 525,
+          "durationMs": 203,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/vinext-DoYiQdwv.js",
+          "transferBytes": 38983,
+          "decodedBytes": 129921,
+          "durationMs": 1087.199999999255,
+          "type": "script"
+        },
+        {
+          "path": "/_next/static/chunks/query-DugiHe4Q.js",
+          "transferBytes": 787,
+          "decodedBytes": 984,
+          "durationMs": 390.40000000037253,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/link-B6c2Zgdz.js",
+          "transferBytes": 5030,
+          "decodedBytes": 12166,
+          "durationMs": 495,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/layout-segment-context-C3t04l-W.js",
+          "transferBytes": 642,
+          "decodedBytes": 496,
+          "durationMs": 569.6999999992549,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/ServiceWorker-u8-5bu8v.js",
+          "transferBytes": 511,
+          "decodedBytes": 259,
+          "durationMs": 674,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/chunks/Icon-jpk45vUa.js",
+          "transferBytes": 960,
+          "decodedBytes": 1082,
+          "durationMs": 794.9000000003725,
+          "type": "other"
+        },
+        {
+          "path": "/_next/static/media/manrope-latin-600-normal.4f0koTD-.woff2",
+          "transferBytes": 14472,
+          "decodedBytes": 14172,
+          "durationMs": 650.8000000007451,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-600-normal.Cpve2RO_.woff2",
+          "transferBytes": 23756,
+          "decodedBytes": 23456,
+          "durationMs": 830.9000000003725,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-500-normal.CO6zq4Dz.woff2",
+          "transferBytes": 23620,
+          "decodedBytes": 23320,
+          "durationMs": 852.5,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/manrope-latin-400-normal.PaqtzbVb.woff2",
+          "transferBytes": 14408,
+          "decodedBytes": 14108,
+          "durationMs": 980.8000000007451,
+          "type": "css"
+        },
+        {
+          "path": "/_next/static/media/cormorant-garamond-latin-ext-600-normal.C4fLZpRr.woff2",
+          "transferBytes": 20624,
+          "decodedBytes": 20324,
+          "durationMs": 1071.2999999988824,
+          "type": "css"
+        }
+      ],
+      "scriptDecodedBytes": 320746
+    }
+  ]
+}

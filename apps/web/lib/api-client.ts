@@ -102,8 +102,8 @@ export const companionApi = {
   hasSession: () => Boolean(storedTokens()?.accessToken),
   clearSession: () => saveTokens(null),
 
-  async demoReply(input: EdgeCompanionRequest) {
-    return requestFreeCompanionReply(input);
+  async demoReply(input: EdgeCompanionRequest, signal?: AbortSignal, onDelta?: (delta: string) => void) {
+    return requestFreeCompanionReply(input, signal, onDelta);
   },
 
   async semanticMemories(query: string, memories: MemoryRecord[], limit = 8) {
@@ -121,11 +121,12 @@ export const companionApi = {
     return { matches: body.matches, model: body.model ?? "unknown" };
   },
 
-  async edgeTranscribe(audioBase64: string, contentType: string) {
+  async edgeTranscribe(audioBase64: string, contentType: string, signal?: AbortSignal) {
     const response = await fetch("/api/companion-transcribe", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ audioBase64, contentType }),
+      ...(signal ? { signal } : {}),
     });
     const body = await response.json().catch(() => null) as { text?: string; language?: string; error?: string } | null;
     if (!response.ok || !body?.text) throw new Error(body?.error ?? "The voice note could not be transcribed.");
@@ -189,10 +190,11 @@ export const companionApi = {
   feedback: (conversationId: string, messageId: string, feedback: "up" | "down", note?: string) => request<{ message: ChatMessage }>(`/conversations/${conversationId}/messages/${messageId}/feedback`, { method: "PATCH", body: JSON.stringify({ feedback, ...(note ? { note } : {}) }) }),
   regenerate: (conversationId: string, messageId: string, memoryEnabled: boolean, responsePreferences?: ResponsePreferences) => request<ChatMessage>(`/conversations/${conversationId}/messages/${messageId}/regenerate`, { method: "POST", body: JSON.stringify({ memoryEnabled, responsePreferences }) }),
 
-  async streamChat(input: { conversationId: string; companionId: string; content: string; clientMessageId: string; memoryEnabled?: boolean; responsePreferences?: ResponsePreferences }, onDelta: (delta: string) => void) {
+  async streamChat(input: { conversationId: string; companionId: string; content: string; clientMessageId: string; memoryEnabled?: boolean; responsePreferences?: ResponsePreferences }, onDelta: (delta: string) => void, signal?: AbortSignal) {
     const response = await authorizedFetch("/chat/stream", {
       method: "POST",
       body: JSON.stringify(input),
+      ...(signal ? { signal } : {}),
     });
     if (!response.ok || !response.body) {
       const message = await response.json().catch(() => null) as ApiEnvelope<never> | null;

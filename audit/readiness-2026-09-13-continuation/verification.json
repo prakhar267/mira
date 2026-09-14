@@ -1,0 +1,69 @@
+{
+  "baseCommit": "4f2ce1df8d8626afc30e846c6f769cb61b8dc059",
+  "paymentsEnabled": false,
+  "productionDeployed": false,
+  "checks": {
+    "web": {
+      "passed": 301,
+      "files": 40,
+      "fresh": true
+    },
+    "worker": {
+      "passed": 24,
+      "files": 5,
+      "fresh": true
+    },
+    "callFocused": {
+      "passed": 51,
+      "newSoakTests": 15
+    },
+    "backup": {
+      "passed": 6,
+      "sourceLossAdmissionDenied": true,
+      "sourceLossRecoveryImplemented": false
+    },
+    "browser": {
+      "startTime": "2026-09-13T13:47:30.593Z",
+      "duration": 155958.776,
+      "expected": 90,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "marketingAssets": "both budgets/dimensions/format checks passed; 3-engine decode tests passed",
+    "mobilePerformance": "three cold throttled observations, complete resource timings retained",
+    "lint": "passed; active web fresh; 11 other workspace tasks cached",
+    "typecheck": "passed via next typegen + tsc; active web fresh; 11 other tasks cached",
+    "workspaceTestCache": "12 unrelated tasks cached; 301 active web tests fresh",
+    "build": "vinext compiled browser artifact passed; optional Next webpack build passed, 55 static pages",
+    "dependencies": "only two reviewed mobile image-size 1.2.1 mitigated exceptions; expire 2026-09-27"
+  },
+  "initialBrowserFailure": {
+    "stats": {
+      "startTime": "2026-09-13T13:41:04.255Z",
+      "duration": 123117.511,
+      "expected": 87,
+      "skipped": 0,
+      "unexpected": 3,
+      "flaky": 0
+    },
+    "cause": "Three new lazy portrait tests invoked decode before native lazy image load began; trace showed no portrait request. Replaced immediate decode with required image readiness followed by decode. Full 90-scenario rerun passed without retries."
+  },
+  "externalCheck": {
+    "at": "2026-09-13T13:48:50.073Z",
+    "productionVersionId": "52fcff83-a365-41ee-a502-7413d8c2689b",
+    "productionCommitSha": null,
+    "configuredSecretNames": [
+      "INWORLD_API_KEY",
+      "MIRA_ADMIN_KEY"
+    ],
+    "inferenceProbed": false
+  },
+  "remaining": [
+    "GitHub Actions account access and successful trusted main artifact before reviewed merge/deploy",
+    "Independent latest-deletion authority/write-ahead suppression and writer fencing integration, vault/key custody and source-loss drill",
+    "Actual approved sender/mailbox and alert recipient delivery evidence",
+    "Real-device multilingual/acoustic and independent security/legal/provider/accessibility review"
+  ],
+  "note": "Final exact committed-source artifact smoke/seal and fresh GitHub run status are recorded in the handoff. Local runtime and synthetic assertions are not production certification."
+}

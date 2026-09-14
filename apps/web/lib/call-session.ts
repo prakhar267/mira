@@ -1,5 +1,6 @@
 import type { CallListeningOptions, CallListeningSession } from "./call-listening";
 import type { playCompanionSpeech, CompanionSpeechPlayback } from "./speech";
+import type { TurnContext } from "./conversation-turn";
 
 export type CallPhase = "idle" | "opening-mic" | "listening" | "transcribing" | "thinking" | "preparing" | "speaking" | "error" | "closed";
 export interface CallSnapshot {
@@ -15,11 +16,11 @@ type SpeechOptions = NonNullable<Parameters<typeof playCompanionSpeech>[1]>;
 export interface CallAdapters {
   listen(options: CallListeningOptions): Promise<CallListeningSession>;
   speak(text: string, options: SpeechOptions): CompanionSpeechPlayback;
-  respond(text: string): Promise<string>;
+  respond(text: string, context: TurnContext): Promise<string>;
   update(snapshot: CallSnapshot): void;
   onAudioLevel?: SpeechOptions["onAudioLevel"];
   onBoundary?: SpeechOptions["onBoundary"];
-  onTiming?: (name: "call_transcribe_ms" | "call_reply_ms" | "call_speech_ms" | "call_roundtrip_ms", ms: number) => void;
+  onTiming?: (name: "call_endpoint_ms" | "call_transcribe_ms" | "call_reply_ms" | "call_speech_ms" | "call_roundtrip_ms", ms: number) => void;
 }
 
 /** Shared voice/video lifecycle. Every async callback is fenced to its call and
@@ -30,11 +31,15 @@ export class CallSession {
   private listenId = 0;
   private speechId = 0;
   private turnId = 0;
+  private turnAbort: AbortController | null = null;
+  private failedTurnId: string | null = null;
   private listenPending = false;
   private listener: CallListeningSession | null = null;
+  private listenAbort: AbortController | null = null;
   private playback: CompanionSpeechPlayback | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private speechEndedAt = 0;
+  private transcriptionStartedAt = 0;
   constructor(private adapters: CallAdapters, greeting: string) {
     this.state = { phase: "idle", userLine: "", companionLine: greeting, error: "", muted: false, speaker: true, talkOver: false };
   }
@@ -45,6 +50,7 @@ export class CallSession {
   }
   private clearTimer() { if (this.timer) clearTimeout(this.timer); this.timer = undefined; }
   private stopListening() {
+    this.listenAbort?.abort(); this.listenAbort = null;
     this.listenId++;
     this.listenPending = false;
     this.listener?.cancel();
@@ -112,25 +118,29 @@ export class CallSession {
     if (this.state.phase === "speaking" && !interruption) return;
     this.clearTimer();
     const id = ++this.listenId;
+    this.listenAbort = new AbortController();
     this.listenPending = true;
     const current = () => !this.closed && id === this.listenId;
     const complete = () => { this.listenId++; this.listener = null; this.listenPending = false; };
     if (!interruption) this.patch({ phase: "opening-mic", userLine: "" });
     void this.adapters.listen({
+      signal: this.listenAbort.signal,
       interruption,
       onSpeechStart: () => {
         if (!current()) return;
         if (this.state.phase === "speaking") this.stopSpeaking();
         this.patch({ phase: "listening", userLine: "Hearing you…", error: "" });
       },
-      onSpeechEnd: () => {
+      onSpeechEnd: (endpointingMs = 0) => {
         if (!current()) return;
-        this.speechEndedAt = performance.now();
+        this.speechEndedAt = performance.now() - endpointingMs;
+        this.transcriptionStartedAt = performance.now();
+        this.adapters.onTiming?.("call_endpoint_ms", endpointingMs);
         this.patch({ phase: "transcribing" });
       },
       onTranscript: text => {
         if (!current()) return;
-        if (this.speechEndedAt) this.adapters.onTiming?.("call_transcribe_ms", performance.now() - this.speechEndedAt);
+        if (this.transcriptionStartedAt) this.adapters.onTiming?.("call_transcribe_ms", performance.now() - this.transcriptionStartedAt);
         complete();
         void this.submit(text);
       },
@@ -159,25 +169,33 @@ export class CallSession {
       this.patch({ phase: "error", error: error instanceof Error ? error.message : "Allow microphone access, then try again." });
     });
   }
-  private async submit(text: string) {
+  private async submit(text: string, retry = false) {
     if (this.closed || !text.trim() || this.state.phase === "thinking") return;
     this.stopListening();
     this.stopSpeaking();
     const id = ++this.turnId;
+    this.turnAbort?.abort();
+    const abort = new AbortController();
+    this.turnAbort = abort;
+    const turnId = retry && this.failedTurnId ? this.failedTurnId : crypto.randomUUID();
+    this.failedTurnId = turnId;
     const started = performance.now();
     this.patch({ phase: "thinking", userLine: text.trim(), error: "" });
     try {
-      const reply = await this.adapters.respond(text.trim());
+      const reply = await this.adapters.respond(text.trim(), { signal: abort.signal, turnId });
       if (this.closed || id !== this.turnId) return;
+      this.failedTurnId = null;
+      this.turnAbort = null;
       this.adapters.onTiming?.("call_reply_ms", performance.now() - started);
       this.say(reply);
-    } catch {
+    } catch (error) {
       if (this.closed || id !== this.turnId) return;
-      this.patch({ phase: "error", error: "The reply service is unavailable. Your last message is still shown; retry when you’re ready." });
+      this.turnAbort = null;
+      this.patch({ phase: "error", error: error instanceof Error && error.name !== "AbortError" ? error.message : "Your last message is still shown. Unmute and retry when you’re ready." });
     }
   }
   retry() {
-    if (this.state.phase === "error" && this.state.userLine && this.state.userLine !== "Hearing you…") { void this.submit(this.state.userLine); return; }
+    if (this.state.phase === "error" && this.state.userLine && this.state.userLine !== "Hearing you…") { void this.submit(this.state.userLine, true); return; }
     this.patch({ error: "" });
     this.listen();
   }
@@ -190,6 +208,12 @@ export class CallSession {
   setMuted(muted: boolean) {
     this.patch({ muted });
     if (muted) {
+      if (this.turnAbort) {
+        this.turnAbort.abort();
+        this.turnAbort = null;
+        this.turnId++;
+        this.patch({ phase: "error", error: "Reply cancelled while muted. Unmute and retry your last message." });
+      }
       this.clearTimer();
       this.stopListening();
       if (["listening", "opening-mic", "transcribing"].includes(this.state.phase)) this.patch({ phase: "idle" });
@@ -215,6 +239,8 @@ export class CallSession {
     if (this.closed) return;
     this.closed = true;
     this.turnId++;
+    this.turnAbort?.abort();
+    this.turnAbort = null;
     this.clearTimer();
     this.stopListening();
     this.stopSpeaking();

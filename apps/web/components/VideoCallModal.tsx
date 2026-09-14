@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Camera,
@@ -16,8 +16,10 @@ import {
   VideoCamera,
   Waveform,
 } from "@phosphor-icons/react";
-import { LiveAvatar3D } from "@/components/LiveAvatar3D";
 import { useCompanionCall } from "./useCompanionCall";
+import type { TurnContext } from "@/lib/conversation-turn";
+import { useCallDialog } from "./useCallDialog";
+const LiveAvatar3D = lazy(() => import("./LiveAvatar3D").then(module => ({ default: module.LiveAvatar3D })));
 
 const callActivities = ["Would you rather", "Relationship cards", "Plan a date", "Tell me about your day"];
 
@@ -26,12 +28,14 @@ export function VideoCallModal({
   userName,
   onUserTurn,
   onAnalyzeFrame,
+  frameUnderstanding = false,
   onClose,
 }: {
   companionName: string;
   userName: string;
   initialEnvironment: string;
-  onUserTurn: (content: string) => Promise<string>;
+  onUserTurn: (content: string, context: TurnContext) => Promise<string>;
+  frameUnderstanding?: boolean;
   onAnalyzeFrame: (dataBase64: string, contentType: string) => Promise<string>;
   onClose: (durationSeconds: number) => void;
 }) {
@@ -52,6 +56,7 @@ export function VideoCallModal({
   const streamRef = useRef<MediaStream | null>(null);
   const activeRef = useRef(true);
   const cameraAttempt = useRef(0);
+  const dialogRef = useCallDialog(() => { activeRef.current = false; cameraAttempt.current++; streamRef.current?.getTracks().forEach(track => track.stop()); call.current?.close(); onClose(seconds); });
   useEffect(() => {
     activeRef.current = true;
     const attemptRef = cameraAttempt;
@@ -63,7 +68,15 @@ export function VideoCallModal({
       }, 3400 + Math.round(Math.random() * 4200));
     };
     blink();
+    const visibility = () => {
+      if (!document.hidden) return;
+      cameraAttempt.current++; streamRef.current?.getTracks().forEach(track => track.stop()); streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      setCameraOn(false);
+    };
+    document.addEventListener("visibilitychange", visibility);
     return () => {
+      document.removeEventListener("visibilitychange", visibility);
       activeRef.current = false;
       attemptRef.current++;
       streamRef.current?.getTracks().forEach(track => track.stop());
@@ -96,6 +109,7 @@ export function VideoCallModal({
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      if (!activeRef.current || attempt !== cameraAttempt.current) { stream.getTracks().forEach(track => track.stop()); return; }
       setCameraOn(true);
     } catch {
       streamRef.current?.getTracks().forEach(track => track.stop());
@@ -135,9 +149,9 @@ export function VideoCallModal({
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
   return (
-    <motion.div className="live-call live-call--video" role="dialog" aria-modal="true" aria-label={`Video call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    <motion.div ref={dialogRef} className="live-call live-call--video" role="dialog" aria-modal="true" aria-label={`Video call with ${companionName}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <div className={speaking ? "video-call__avatar-feed video-call__avatar-feed--speaking" : "video-call__avatar-feed"}>
-        <LiveAvatar3D
+        <Suspense fallback={<p role="status">Loading avatar… Voice and captions remain available.</p>}><LiveAvatar3D
           companionName={companionName}
           speaking={speaking}
           thinking={thinking}
@@ -145,7 +159,7 @@ export function VideoCallModal({
           blinking={blinking}
           mouthPose={mouthPose}
           emotion="natural"
-        />
+        /></Suspense>
         <span className="video-call__feed-badge"><i className="status-dot" /> Live 3D avatar · expression synced</span>
       </div>
       <div className="live-call__veil live-call__veil--video" />
@@ -163,7 +177,7 @@ export function VideoCallModal({
         <span className="video-call__avatar-label">English · Hindi · Hinglish · Priya</span>
         <button type="button" aria-pressed={talkOver} onClick={() => call.current?.setTalkOver(!talkOver)}>Talk-over · headphones beta · {talkOver ? "On" : "Off"}</button>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
-        <button type="button" disabled={!cameraOn || visionBusy} onClick={() => void shareCurrentFrame()}><Camera aria-hidden="true" /> {visionBusy ? "Looking…" : "Show frame"}</button>
+        <button type="button" disabled={!frameUnderstanding || !cameraOn || visionBusy} onClick={() => void shareCurrentFrame()}><Camera aria-hidden="true" /> {!frameUnderstanding ? "Frame understanding unavailable" : visionBusy ? "Looking…" : "Show frame"}</button>
       </div>
 
       {activityOpen ? <div className="call-activity-menu">{callActivities.map((item) => <button type="button" key={item} onClick={() => { setActivity(item); setActivityOpen(false); }}>{item}</button>)}</div> : null}

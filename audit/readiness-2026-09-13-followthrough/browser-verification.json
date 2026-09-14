@@ -1,0 +1,1096 @@
+{
+  "stats": {
+    "startTime": "2026-09-13T13:30:47.588Z",
+    "duration": 120386.085,
+    "expected": 87,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "results": [
+    {
+      "title": "automatic WCAG checks /",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 738,
+      "audits": [
+        {
+          "name": "--axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 2
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /login",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 441,
+      "audits": [
+        {
+          "name": "-login-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /signup",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 424,
+      "audits": [
+        {
+          "name": "-signup-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /forgot-password",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 427,
+      "audits": [
+        {
+          "name": "-forgot-password-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /privacy",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 355,
+      "audits": [
+        {
+          "name": "-privacy-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /demo",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 343,
+      "audits": [
+        {
+          "name": "-demo-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "chat, profile and memory dialog automatic checks",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 1183,
+      "audits": [
+        {
+          "name": "chat-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 22
+            }
+          ]
+        },
+        {
+          "name": "profile-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        },
+        {
+          "name": "memory-dialog-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "narrow reflow and reduced motion retain readable controls",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 671,
+      "audits": [
+        {
+          "name": "narrow-chat-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "voice call permission-error controls remain accessible",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 1518,
+      "audits": [
+        {
+          "name": "voice-permission-error-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 33
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "video call permission-error controls remain accessible",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 3820,
+      "audits": [
+        {
+          "name": "video-permission-error-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 39
+            },
+            {
+              "rule": "video-caption",
+              "nodeCount": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Home view automatic checks",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 826,
+      "audits": [
+        {
+          "name": "home-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 16
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Moments view automatic checks",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 635,
+      "audits": [
+        {
+          "name": "moments-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Wardrobe view automatic checks",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 698,
+      "audits": [
+        {
+          "name": "wardrobe-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "keyboard can skip navigation and return from a dialog",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 626,
+      "audits": []
+    },
+    {
+      "title": "automatic WCAG checks /",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 1134,
+      "audits": [
+        {
+          "name": "--axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 2
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /login",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 504,
+      "audits": [
+        {
+          "name": "-login-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /signup",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 531,
+      "audits": [
+        {
+          "name": "-signup-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /forgot-password",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 535,
+      "audits": [
+        {
+          "name": "-forgot-password-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /privacy",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 503,
+      "audits": [
+        {
+          "name": "-privacy-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /demo",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 473,
+      "audits": [
+        {
+          "name": "-demo-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "chat, profile and memory dialog automatic checks",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 1784,
+      "audits": [
+        {
+          "name": "chat-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 22
+            }
+          ]
+        },
+        {
+          "name": "profile-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        },
+        {
+          "name": "memory-dialog-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "narrow reflow and reduced motion retain readable controls",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 874,
+      "audits": [
+        {
+          "name": "narrow-chat-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "voice call permission-error controls remain accessible",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 1378,
+      "audits": [
+        {
+          "name": "voice-permission-error-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 32
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "video call permission-error controls remain accessible",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 2804,
+      "audits": [
+        {
+          "name": "video-permission-error-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 38
+            },
+            {
+              "rule": "video-caption",
+              "nodeCount": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Home view automatic checks",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 1100,
+      "audits": [
+        {
+          "name": "home-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 16
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Moments view automatic checks",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 897,
+      "audits": [
+        {
+          "name": "moments-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Wardrobe view automatic checks",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 941,
+      "audits": [
+        {
+          "name": "wardrobe-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "keyboard can skip navigation and return from a dialog",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 653,
+      "audits": []
+    },
+    {
+      "title": "automatic WCAG checks /",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1352,
+      "audits": [
+        {
+          "name": "--axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 2
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /login",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 739,
+      "audits": [
+        {
+          "name": "-login-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /signup",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 756,
+      "audits": [
+        {
+          "name": "-signup-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /forgot-password",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 768,
+      "audits": [
+        {
+          "name": "-forgot-password-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /privacy",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 653,
+      "audits": [
+        {
+          "name": "-privacy-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "automatic WCAG checks /demo",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 622,
+      "audits": [
+        {
+          "name": "-demo-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "chat, profile and memory dialog automatic checks",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1826,
+      "audits": [
+        {
+          "name": "chat-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 22
+            }
+          ]
+        },
+        {
+          "name": "profile-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        },
+        {
+          "name": "memory-dialog-axe",
+          "violations": [],
+          "manualReview": []
+        }
+      ]
+    },
+    {
+      "title": "narrow reflow and reduced motion retain readable controls",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1057,
+      "audits": [
+        {
+          "name": "narrow-chat-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "voice call permission-error controls remain accessible",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1404,
+      "audits": [
+        {
+          "name": "voice-permission-error-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 32
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "video call permission-error controls remain accessible",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1647,
+      "audits": [
+        {
+          "name": "video-permission-error-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 38
+            },
+            {
+              "rule": "video-caption",
+              "nodeCount": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Home view automatic checks",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1253,
+      "audits": [
+        {
+          "name": "home-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 16
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Moments view automatic checks",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 994,
+      "audits": [
+        {
+          "name": "moments-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "aria-prohibited-attr",
+              "nodeCount": 1
+            },
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Wardrobe view automatic checks",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1262,
+      "audits": [
+        {
+          "name": "wardrobe-axe",
+          "violations": [],
+          "manualReview": [
+            {
+              "rule": "color-contrast",
+              "nodeCount": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "keyboard can skip navigation and return from a dialog",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 922,
+      "audits": []
+    },
+    {
+      "title": "account signup, login, conflict recovery, reauthenticated export and deletion",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 5533,
+      "audits": []
+    },
+    {
+      "title": "account signup, login, conflict recovery, reauthenticated export and deletion",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 7453,
+      "audits": []
+    },
+    {
+      "title": "account signup, login, conflict recovery, reauthenticated export and deletion",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 8089,
+      "audits": []
+    },
+    {
+      "title": "failed chat stays a failed turn and explicit retry does not duplicate it",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 692,
+      "audits": []
+    },
+    {
+      "title": "memory remains inspectable while paused and forgetting removes its contents",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 756,
+      "audits": []
+    },
+    {
+      "title": "voice call releases microphone and restores keyboard focus after hang-up",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 1837,
+      "audits": []
+    },
+    {
+      "title": "voice call fences a microphone permission result arriving after hang-up",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 1427,
+      "audits": []
+    },
+    {
+      "title": "video call releases microphone and restores keyboard focus after hang-up",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 3854,
+      "audits": []
+    },
+    {
+      "title": "video call fences a microphone permission result arriving after hang-up",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 4127,
+      "audits": []
+    },
+    {
+      "title": "streamed text is visible before completion but saved only after terminal success",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 529,
+      "audits": []
+    },
+    {
+      "title": "post-header stream failure removes partial reply and retries the original user turn",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 600,
+      "audits": []
+    },
+    {
+      "title": "navigation cancels streaming and removes its unsaved draft",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 567,
+      "audits": []
+    },
+    {
+      "title": "failed chat stays a failed turn and explicit retry does not duplicate it",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 878,
+      "audits": []
+    },
+    {
+      "title": "memory remains inspectable while paused and forgetting removes its contents",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 966,
+      "audits": []
+    },
+    {
+      "title": "voice call releases microphone and restores keyboard focus after hang-up",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 1762,
+      "audits": []
+    },
+    {
+      "title": "voice call fences a microphone permission result arriving after hang-up",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 1573,
+      "audits": []
+    },
+    {
+      "title": "video call releases microphone and restores keyboard focus after hang-up",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 2056,
+      "audits": []
+    },
+    {
+      "title": "video call fences a microphone permission result arriving after hang-up",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 2636,
+      "audits": []
+    },
+    {
+      "title": "streamed text is visible before completion but saved only after terminal success",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 694,
+      "audits": []
+    },
+    {
+      "title": "post-header stream failure removes partial reply and retries the original user turn",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 778,
+      "audits": []
+    },
+    {
+      "title": "navigation cancels streaming and removes its unsaved draft",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 777,
+      "audits": []
+    },
+    {
+      "title": "failed chat stays a failed turn and explicit retry does not duplicate it",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 964,
+      "audits": []
+    },
+    {
+      "title": "memory remains inspectable while paused and forgetting removes its contents",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1018,
+      "audits": []
+    },
+    {
+      "title": "voice call releases microphone and restores keyboard focus after hang-up",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1500,
+      "audits": []
+    },
+    {
+      "title": "voice call fences a microphone permission result arriving after hang-up",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1679,
+      "audits": []
+    },
+    {
+      "title": "video call releases microphone and restores keyboard focus after hang-up",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 2029,
+      "audits": []
+    },
+    {
+      "title": "video call fences a microphone permission result arriving after hang-up",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 1722,
+      "audits": []
+    },
+    {
+      "title": "streamed text is visible before completion but saved only after terminal success",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 801,
+      "audits": []
+    },
+    {
+      "title": "post-header stream failure removes partial reply and retries the original user turn",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 834,
+      "audits": []
+    },
+    {
+      "title": "navigation cancels streaming and removes its unsaved draft",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 855,
+      "audits": []
+    },
+    {
+      "title": "landing fits 360px with reachable navigation",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 211,
+      "audits": []
+    },
+    {
+      "title": "landing fits 390px with reachable navigation",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 214,
+      "audits": []
+    },
+    {
+      "title": "landing fits 1280px with reachable navigation",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 336,
+      "audits": []
+    },
+    {
+      "title": "demo requires explicit current disclosures",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 192,
+      "audits": []
+    },
+    {
+      "title": "recovery has labels and missing mail configuration is honest",
+      "project": "chromium",
+      "status": "passed",
+      "durationMs": 358,
+      "audits": []
+    },
+    {
+      "title": "landing fits 360px with reachable navigation",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 297,
+      "audits": []
+    },
+    {
+      "title": "landing fits 390px with reachable navigation",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 268,
+      "audits": []
+    },
+    {
+      "title": "landing fits 1280px with reachable navigation",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 289,
+      "audits": []
+    },
+    {
+      "title": "demo requires explicit current disclosures",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 219,
+      "audits": []
+    },
+    {
+      "title": "recovery has labels and missing mail configuration is honest",
+      "project": "firefox",
+      "status": "passed",
+      "durationMs": 364,
+      "audits": []
+    },
+    {
+      "title": "landing fits 360px with reachable navigation",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 421,
+      "audits": []
+    },
+    {
+      "title": "landing fits 390px with reachable navigation",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 429,
+      "audits": []
+    },
+    {
+      "title": "landing fits 1280px with reachable navigation",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 555,
+      "audits": []
+    },
+    {
+      "title": "demo requires explicit current disclosures",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 376,
+      "audits": []
+    },
+    {
+      "title": "recovery has labels and missing mail configuration is honest",
+      "project": "webkit",
+      "status": "passed",
+      "durationMs": 526,
+      "audits": []
+    }
+  ],
+  "note": "Compiled local Worker, synthetic media/provider fixtures, selected Axe A/AA rules. Not real devices, production providers, full screen reader review or acoustic acceptance."
+}

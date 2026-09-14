@@ -1,0 +1,14 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "mira-local-synthetic",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "vars": {"SITE_ORIGIN":"http://127.0.0.1:4397","MIRA_LOCAL_TEST":"synthetic-only","BILLING_ENABLED":"false","INWORLD_API_KEY":"synthetic-not-a-secret","CHAT_DAILY_LIMIT":"600","SPEECH_DAILY_LIMIT":"600","TRANSCRIBE_DAILY_LIMIT":"600"},
+  "durable_objects": {"bindings":[{"name":"MIRA_STORE","class_name":"MiraStore"},{"name":"MIRA_RECOVERY_TEST","class_name":"MiraRecoveryDrill"}]},
+  "migrations":[{"tag":"synthetic-v1","new_sqlite_classes":["MiraStore","MiraRecoveryDrill"]}],
+  "kv_namespaces":[{"binding":"LUMA_ACCOUNTS","id":"00000000000000000000000000000000"}],
+  "services":[{"binding":"AI","service":"mira-local-synthetic","entrypoint":"MockAI"},{"binding":"MIRA_TEST_PROVIDERS","service":"mira-local-synthetic","entrypoint":"MockProviders"}],
+  "assets":{"directory":"../../public","binding":"ASSETS"}
+}

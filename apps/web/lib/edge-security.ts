@@ -8,7 +8,7 @@ export function recordServiceMetric(route:string,failed:boolean,duration:number)
 }
 
 export class EdgeRequestError extends Error {
-  constructor(message: string, readonly status = 400) {
+  constructor(message: string, readonly status = 400, readonly code = status === 413 ? "INPUT_TOO_LARGE" : status === 401 ? "SESSION_REQUIRED" : status === 403 ? "POLICY_DENIED" : status === 429 ? "RATE_LIMITED" : status >= 500 ? "SERVICE_UNAVAILABLE" : "INVALID_REQUEST", readonly retryAfterSeconds?: number) {
     super(message);
   }
 }
@@ -35,9 +35,36 @@ export function assertEdgeSameOrigin(request: Request) {
 export async function readEdgeJson(request: Request, maximumBytes: number) {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > maximumBytes) throw new EdgeRequestError("That request is too large.", 413);
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > maximumBytes) throw new EdgeRequestError("That request is too large.", 413);
-  try { return JSON.parse(text) as unknown; } catch { throw new EdgeRequestError("The request was not valid JSON."); }
+  const reader = request.body?.getReader();
+  if (!reader) throw new EdgeRequestError("The request body is required.");
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let text = "";
+  let bytes = 0;
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      bytes += part.value.byteLength;
+      if (bytes > maximumBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new EdgeRequestError("That request is too large.", 413);
+      }
+      text += decoder.decode(part.value, { stream: true });
+    }
+    text += decoder.decode();
+    // Limit nesting before JSON.parse: valid tiny-but-deep JSON is also abusive.
+    let depth = 0, quoted = false, escaped = false;
+    for (const character of text) {
+      if (quoted) { if (escaped) escaped = false; else if (character === "\\") escaped = true; else if (character === '"') quoted = false; }
+      else if (character === '"') quoted = true;
+      else if (character === "{" || character === "[") { if (++depth > 12) throw new EdgeRequestError("The request has too many nested values."); }
+      else if (character === "}" || character === "]") depth--;
+    }
+    return JSON.parse(text) as unknown;
+  } catch (cause) {
+    if (cause instanceof EdgeRequestError) throw cause;
+    throw new EdgeRequestError("The request was not valid JSON.");
+  } finally { reader.releaseLock(); }
 }
 
 export async function edgeRateLimited(request: Request, scope: string, maximum: number, windowSeconds = 60) {
@@ -49,7 +76,8 @@ export async function edgeRateLimited(request: Request, scope: string, maximum: 
 export async function edgeJson(requestId: string, route: string, startedAt: number, body: unknown, status = 200, details: Record<string, unknown> = {}, extraHeaders: Record<string, string> = {}) {
   console.log(JSON.stringify({ event: "edge_request", requestId, route, status, latencyMs: Date.now() - startedAt, ...details }));
   recordServiceMetric(route,status>=500 || status===429,Date.now()-startedAt);
-  return Response.json(body, {
+  const errorBody = status >= 400 && body && typeof body === "object" ? { code: status === 429 ? "RATE_LIMITED" : status >= 500 ? "SERVICE_UNAVAILABLE" : "INVALID_REQUEST", ...body, requestId } : body;
+  return Response.json(errorBody, {
     status,
     headers: {
       "cache-control": "no-store",
@@ -63,7 +91,7 @@ export async function edgeJson(requestId: string, route: string, startedAt: numb
 
 export function edgeError(requestId: string, route: string, startedAt: number, cause: unknown) {
   const error = cause instanceof EdgeRequestError ? cause : new EdgeRequestError("The service is temporarily unavailable.", 503);
-  return edgeJson(requestId, route, startedAt, { error: error.message }, error.status);
+  return edgeJson(requestId, route, startedAt, { error: error.message, code: error.code, ...(error.retryAfterSeconds ? {retryAfterSeconds:error.retryAfterSeconds} : {}) }, error.status, {}, error.retryAfterSeconds ? {"retry-after":String(error.retryAfterSeconds)} : {});
 }
 
 export function containsDisallowedAbuse(text: string) {

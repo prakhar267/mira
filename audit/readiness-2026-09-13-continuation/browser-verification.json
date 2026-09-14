@@ -1,0 +1,1710 @@
+{
+  "stats": {
+    "startTime": "2026-09-13T13:47:30.593Z",
+    "duration": 155958.776,
+    "expected": 90,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "scenarios": [
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 852
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /login",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 559
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /signup",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 566
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /forgot-password",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 544
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /privacy",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 437
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /demo",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 443
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "chat, profile and memory dialog automatic checks",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1415
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "narrow reflow and reduced motion retain readable controls",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 792
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "voice call permission-error controls remain accessible",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1687
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "video call permission-error controls remain accessible",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1460
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Home view automatic checks",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 3297
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Moments view automatic checks",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 770
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Wardrobe view automatic checks",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 856
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "keyboard can skip navigation and return from a dialog",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 738
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1559
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /login",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 705
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /signup",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 669
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /forgot-password",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 749
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /privacy",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 636
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /demo",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 677
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "chat, profile and memory dialog automatic checks",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2239
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "narrow reflow and reduced motion retain readable controls",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1246
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "voice call permission-error controls remain accessible",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1631
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "video call permission-error controls remain accessible",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 3476
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Home view automatic checks",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1403
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Moments view automatic checks",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1125
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Wardrobe view automatic checks",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1191
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "keyboard can skip navigation and return from a dialog",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 793
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2848
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /login",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1477
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /signup",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1316
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /forgot-password",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1295
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /privacy",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1141
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "automatic WCAG checks /demo",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1116
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "chat, profile and memory dialog automatic checks",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 3391
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "narrow reflow and reduced motion retain readable controls",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1720
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "voice call permission-error controls remain accessible",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2517
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "video call permission-error controls remain accessible",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 3529
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Home view automatic checks",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2199
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Moments view automatic checks",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1584
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "Wardrobe view automatic checks",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2068
+        }
+      ]
+    },
+    {
+      "file": "accessibility.spec.mjs",
+      "title": "keyboard can skip navigation and return from a dialog",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1813
+        }
+      ]
+    },
+    {
+      "file": "account-flows.spec.mjs",
+      "title": "account signup, login, conflict recovery, reauthenticated export and deletion",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 5587
+        }
+      ]
+    },
+    {
+      "file": "account-flows.spec.mjs",
+      "title": "account signup, login, conflict recovery, reauthenticated export and deletion",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 6487
+        }
+      ]
+    },
+    {
+      "file": "account-flows.spec.mjs",
+      "title": "account signup, login, conflict recovery, reauthenticated export and deletion",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 8540
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "failed chat stays a failed turn and explicit retry does not duplicate it",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 695
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "memory remains inspectable while paused and forgetting removes its contents",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 722
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "voice call releases microphone and restores keyboard focus after hang-up",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1343
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "voice call fences a microphone permission result arriving after hang-up",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1424
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "video call releases microphone and restores keyboard focus after hang-up",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1378
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "video call fences a microphone permission result arriving after hang-up",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 3293
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "streamed text is visible before completion but saved only after terminal success",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2781
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "post-header stream failure removes partial reply and retries the original user turn",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 677
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "navigation cancels streaming and removes its unsaved draft",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 658
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "failed chat stays a failed turn and explicit retry does not duplicate it",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1356
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "memory remains inspectable while paused and forgetting removes its contents",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1375
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "voice call releases microphone and restores keyboard focus after hang-up",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1503
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "voice call fences a microphone permission result arriving after hang-up",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1841
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "video call releases microphone and restores keyboard focus after hang-up",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2154
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "video call fences a microphone permission result arriving after hang-up",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2000
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "streamed text is visible before completion but saved only after terminal success",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 952
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "post-header stream failure removes partial reply and retries the original user turn",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1022
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "navigation cancels streaming and removes its unsaved draft",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 998
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "failed chat stays a failed turn and explicit retry does not duplicate it",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1689
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "memory remains inspectable while paused and forgetting removes its contents",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1619
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "voice call releases microphone and restores keyboard focus after hang-up",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2542
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "voice call fences a microphone permission result arriving after hang-up",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2309
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "video call releases microphone and restores keyboard focus after hang-up",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2600
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "video call fences a microphone permission result arriving after hang-up",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 2729
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "streamed text is visible before completion but saved only after terminal success",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1259
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "post-header stream failure removes partial reply and retries the original user turn",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1373
+        }
+      ]
+    },
+    {
+      "file": "companion-flows.spec.mjs",
+      "title": "navigation cancels streaming and removes its unsaved draft",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1352
+        }
+      ]
+    },
+    {
+      "file": "marketing-assets.spec.mjs",
+      "title": "landing artwork decodes without original PNG downloads or app prefetch",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 367
+        }
+      ]
+    },
+    {
+      "file": "marketing-assets.spec.mjs",
+      "title": "landing artwork decodes without original PNG downloads or app prefetch",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 588
+        }
+      ]
+    },
+    {
+      "file": "marketing-assets.spec.mjs",
+      "title": "landing artwork decodes without original PNG downloads or app prefetch",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 877
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 360px with reachable navigation",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 245
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 390px with reachable navigation",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 238
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 1280px with reachable navigation",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 380
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "demo requires explicit current disclosures",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 207
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "recovery has labels and missing mail configuration is honest",
+      "project": "chromium",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 437
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 360px with reachable navigation",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 371
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 390px with reachable navigation",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 449
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 1280px with reachable navigation",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 421
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "demo requires explicit current disclosures",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 351
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "recovery has labels and missing mail configuration is honest",
+      "project": "firefox",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 1086
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 360px with reachable navigation",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 700
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 390px with reachable navigation",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 708
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "landing fits 1280px with reachable navigation",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 905
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "demo requires explicit current disclosures",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 645
+        }
+      ]
+    },
+    {
+      "file": "mobile.spec.mjs",
+      "title": "recovery has labels and missing mail configuration is honest",
+      "project": "webkit",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "retry": 0,
+          "durationMs": 865
+        }
+      ]
+    }
+  ],
+  "axe": [
+    {
+      "project": "chromium",
+      "context": "--axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 2
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 12
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "-login-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "chromium",
+      "context": "-signup-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "-forgot-password-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "chromium",
+      "context": "-privacy-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "chromium",
+      "context": "-demo-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "chromium",
+      "context": "chat-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 22
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "profile-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "memory-dialog-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "chromium",
+      "context": "narrow-chat-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "voice-permission-error-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 33
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "video-permission-error-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 38
+        },
+        {
+          "rule": "video-caption",
+          "impact": "critical",
+          "nodeCount": 1
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "home-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 16
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "moments-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "chromium",
+      "context": "wardrobe-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "--axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 2
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 12
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "-login-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "firefox",
+      "context": "-signup-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "-forgot-password-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "firefox",
+      "context": "-privacy-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "firefox",
+      "context": "-demo-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "firefox",
+      "context": "chat-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 22
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "profile-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "memory-dialog-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "firefox",
+      "context": "narrow-chat-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "voice-permission-error-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 32
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "video-permission-error-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 38
+        },
+        {
+          "rule": "video-caption",
+          "impact": "critical",
+          "nodeCount": 1
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "home-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 16
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "moments-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "firefox",
+      "context": "wardrobe-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "--axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 2
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 12
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "-login-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "webkit",
+      "context": "-signup-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 2
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "-forgot-password-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "webkit",
+      "context": "-privacy-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "webkit",
+      "context": "-demo-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "webkit",
+      "context": "chat-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 22
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "profile-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "memory-dialog-axe",
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "project": "webkit",
+      "context": "narrow-chat-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "voice-permission-error-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 33
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "video-permission-error-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 39
+        },
+        {
+          "rule": "video-caption",
+          "impact": "critical",
+          "nodeCount": 1
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "home-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 16
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "moments-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "aria-prohibited-attr",
+          "impact": "serious",
+          "nodeCount": 1
+        },
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    },
+    {
+      "project": "webkit",
+      "context": "wardrobe-axe",
+      "violations": [],
+      "incomplete": [
+        {
+          "rule": "color-contrast",
+          "impact": "serious",
+          "nodeCount": 8
+        }
+      ]
+    }
+  ],
+  "scope": "Compiled local Worker; synthetic HTTP/media fixtures. Axe incomplete findings require manual review. No physical microphones, provider inference or independent sign-off."
+}

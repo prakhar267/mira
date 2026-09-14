@@ -1,10 +1,15 @@
-import { buildDayCheckInReply, buildIdentityReply, buildMemoryRecallReply, canUseSavedMemoryReply, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "@/lib/companion-prompt";
-import { assessSafety } from "@companion/ai";
-import { assertEdgeSameOrigin, containsDisallowedAbuse, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
+import { buildDayCheckInReply, buildIdentityReply, buildMemoryRecallReply, canUseSavedMemoryReply, detectCompanionRequestLanguage, isIdentityRequest, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery } from "@/lib/companion-prompt";
+import { assertEdgeSameOrigin, edgeError, edgeJson, edgeRateLimited, readEdgeJson, EdgeRequestError } from "@/lib/edge-security";
 import { buildFreeChatMessages } from "@/lib/free-chat";
 import { withProviderDeadline } from "@/lib/provider-resilience";
-import { consumeCapacity } from "@/lib/capacity";
+import { withInferenceCapacity } from "@/lib/capacity";
 import { readChatStream } from "@/lib/chat-stream";
+import { authorizeInference } from "@/lib/inference-policy";
+import { parseChatPayload } from "@/lib/inference-payloads";
+import { assessCompanionSafety, safeOutputReplacement, unsafeCompanionOutput } from "@/lib/companion-safety";
+import { assertCurrentMemoryContext } from "@/lib/inference-context";
+import { chatDeliveryStream } from "@/lib/chat-delivery-stream";
+import { CHAT_STREAM_TYPE } from "@/lib/chat-stream-protocol";
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
@@ -32,89 +37,112 @@ function readModelText(result: unknown) {
   return "";
 }
 
-function parseRequest(value: unknown): EdgeCompanionRequest | null {
-  if (!value || typeof value !== "object") return null;
-  const raw = value as Record<string, unknown>;
-  if (!Array.isArray(raw.messages) || !raw.companion || !raw.user) return null;
-  const messages = raw.messages.slice(-48).flatMap((message) => {
-    if (!message || typeof message !== "object") return [];
-    const item = message as Record<string, unknown>;
-    if ((item.role !== "user" && item.role !== "assistant") || typeof item.content !== "string") return [];
-    const content = item.content.trim().slice(0, 2_000);
-    return content ? [{ role: item.role as "user" | "assistant", content }] : [];
-  });
-  if (!messages.length || messages.at(-1)?.role !== "user") return null;
-  const companion = raw.companion as Record<string, unknown>;
-  const user = raw.user as Record<string, unknown>;
-  if (typeof companion.name !== "string" || typeof user.name !== "string") return null;
-  return {
-    messages,
-    companion: {
-      name: companion.name.slice(0, 40),
-      ...(typeof companion.backstory === "string" ? { backstory: companion.backstory.slice(0, 500) } : {}),
-      ...(companion.personality && typeof companion.personality === "object" ? { personality: companion.personality as Record<string, number> } : {}),
-    },
-    user: { name: user.name.slice(0, 40) },
-    ...(typeof raw.relationshipMode === "string" ? { relationshipMode: raw.relationshipMode.slice(0, 24) } : {}),
-    ...(Array.isArray(raw.memories) ? { memories: raw.memories.filter((memory): memory is string => typeof memory === "string").slice(0, 8).map((memory) => memory.slice(0, 220)) } : {}),
-    ...(raw.responsePreferences && typeof raw.responsePreferences === "object" ? { responsePreferences: raw.responsePreferences as NonNullable<EdgeCompanionRequest["responsePreferences"]> } : {}),
-    ...(raw.delivery === "voice" || raw.delivery === "video" || raw.delivery === "text" ? { delivery: raw.delivery } : {}),
-  };
-}
-
 export async function POST(request: Request) {
   const startedAt = Date.now();
   const requestId = crypto.randomUUID();
   const respond = (body: unknown, status = 200, details: Record<string, unknown> = {}) => edgeJson(requestId, "companion-chat", startedAt, body, status, details);
   try {
     assertEdgeSameOrigin(request);
+    const principal = await authorizeInference(request, "chat");
     if (await edgeRateLimited(request, "companion-chat", 24)) return respond({ error: "Please give Mira a moment before sending more." }, 429, { limited: true });
-    const input = parseRequest(await readEdgeJson(request, 110_000));
-    if (!input) return respond({ error: "Invalid conversation request." }, 400);
+    const input = parseChatPayload(await readEdgeJson(request, 120_000), principal);
+    const selectedContext = (input.memories ?? []).map(content => ({ content }));
+    const recheckContext = async (signal = request.signal) => {
+      signal.throwIfAborted();
+      assertCurrentMemoryContext(await authorizeInference(request, "chat"), selectedContext);
+      signal.throwIfAborted();
+    };
     const latestUserMessage = input.messages.at(-1)?.content ?? "";
     const expectedLanguage = detectCompanionRequestLanguage(input);
-    const safety = assessSafety(latestUserMessage);
-    if (safety.level !== "safe" && safety.response) return respond({ reply: "Ismein main help nahi kar sakti. Agar kisi ko immediate danger hai, abhi local emergency support ya kisi trusted person se contact karo.", model: "safety" }, 200, { guard: safety.category });
-    if (containsDisallowedAbuse(latestUserMessage)) return respond({ reply: "Minors, bina consent, ya exploitation wali sexual cheezon mein main help nahi kar sakti. Hum consenting adults ke beech safe baat rakh sakte hain.", model: "safety" }, 200, { guard: "exploitation" });
-    if (isIdentityRequest(latestUserMessage)) return respond({ reply: buildIdentityReply(input.companion.name, expectedLanguage), model: "identity" }, 200, { model: "identity", language: expectedLanguage });
-    if (canUseSavedMemoryReply(input)) return respond({ reply: buildMemoryRecallReply(input), model: "memory" }, 200, { model: "memory" });
+    const incremental = (input.delivery ?? "text") === "text" && request.headers.get("accept")?.includes(CHAT_STREAM_TYPE);
+    const deliver = (reply: string, model: string, details: Record<string, unknown> = {}) => incremental
+      ? chatDeliveryStream({ requestId, startedAt, signal: request.signal, check: recheckContext, work: async () => ({ reply, model }) })
+      : respond({ reply, model }, 200, details);
+    const safeReply = (reply: string, model: string) => {
+      const unsafe = unsafeCompanionOutput(reply);
+      return deliver(unsafe ? safeOutputReplacement(unsafe, expectedLanguage) : reply, unsafe ? "safety" : model, { model: unsafe ? "safety" : model, ...(unsafe ? { guard: unsafe } : {}) });
+    };
+    const safety = assessCompanionSafety(input.messages, expectedLanguage);
+    if (safety) return deliver(safety.reply, "safety", { guard: safety.category });
+    if (isIdentityRequest(latestUserMessage)) return safeReply(buildIdentityReply(input.companion.name, expectedLanguage), "identity");
+    if (canUseSavedMemoryReply(input)) {
+      // Body streaming also yields after the initial account snapshot. Direct
+      // recall must respect a withdrawal during that wait, without a provider.
+      await recheckContext();
+      return safeReply(buildMemoryRecallReply(input), "memory");
+    }
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
     const dayReply = buildDayCheckInReply(latestUserMessage, expectedLanguage);
-    if (dayReply && !suppressQuestions) return respond({reply:dayReply,model:"day-check-in"},200,{model:"day-check-in",language:expectedLanguage});
-    await consumeCapacity("chat");
+    if (dayReply && !suppressQuestions) return deliver(dayReply,"day-check-in",{model:"day-check-in",language:expectedLanguage});
     const messages = buildFreeChatMessages(input);
+    const responseTokenLimit = input.delivery === "text" ? (input.responsePreferences?.responseLength === "deep" ? 500 : 260) : 190;
     const validReply = (reply: string) => !isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions, expectedLanguage);
     // Anonymous LLM7 is not an approved downstream production service. Use the
     // project's existing Workers AI binding without exposing conversations to it.
-    const runCloudflare = async (promptMessages: typeof messages) => sanitizeCompanionReplyForDelivery(readModelText(await withProviderDeadline("cloudflare-chat", async (signal) => {
+    const generate = async (onPrefix?: (prefix: string, providerSignal?: AbortSignal) => Promise<void>, deliverySignal = request.signal) => {
+    let emitted = false;
+    const checkPartial = onPrefix ? async (raw: string, providerSignal: AbortSignal) => {
+      // Never forward raw tokens. Hold the latest complete sentence as
+      // lookahead; check both accumulated raw output and the delivered prefix.
+      // Reasoning/markup and overlength candidates stay buffered until final.
+      if (unsafeCompanionOutput(raw)) throw new EdgeRequestError("This reply could not be safely completed. Retry this turn.", 503, "UNSAFE_STREAM");
+      if (/[<>]/u.test(raw) || raw.length > 700) return;
+      const text = sanitizeCompanionReplyForDelivery(raw, "text");
+      const sentences = [...text.matchAll(/[^.!?।]+[.!?।](?=\s|$)/gu)];
+      if (sentences.length < 2) return;
+      const previous = sentences.at(-2)!;
+      const prefix = text.slice(0, previous.index! + previous[0].length).trimEnd();
+      if (!prefix || unsafeCompanionOutput(prefix) || !validReply(prefix)) return;
+      await onPrefix(prefix, providerSignal); emitted = true;
+    } : undefined;
+    const runCloudflare = async (promptMessages: typeof messages) => readModelText(await withInferenceCapacity("chat", principal, promptMessages.reduce((count, message) => count + Math.ceil(message.content.length / 4), responseTokenLimit), () => withProviderDeadline("cloudflare-chat", async (signal) => {
+      await recheckContext(signal);
       const generated: unknown = await env.AI.run(MODEL as never, {
         messages: promptMessages,
         stream: true,
-        max_tokens: input.delivery === "text" ? 260 : 190,
+        max_tokens: responseTokenLimit,
         temperature: 0.68,
         top_p: 0.86,
         top_k: 40,
         repetition_penalty: 1.1,
       } as never);
-      return generated instanceof ReadableStream ? readChatStream(generated, signal, input.delivery !== "text") : generated;
-    }, Math.max(500, Math.min(8_000, 8_500 - (Date.now() - startedAt))), request.signal)), input.delivery);
-    let reply = await runCloudflare(messages);
-    if (!validReply(reply) && Date.now() - startedAt < 5_000) {
+      return generated instanceof ReadableStream ? readChatStream(generated, signal, input.delivery !== "text", checkPartial ? raw => checkPartial(raw, signal) : undefined) : generated;
+    }, Math.max(500, Math.min(8_000, 8_500 - (Date.now() - startedAt))), deliverySignal)));
+    let raw = await runCloudflare(messages);
+    await recheckContext(deliverySignal);
+    let unsafe = unsafeCompanionOutput(raw);
+    if (unsafe) {
+      if (emitted) throw new EdgeRequestError("This reply could not be safely completed. Retry this turn.", 503, "UNSAFE_STREAM");
+      return { reply: safeOutputReplacement(unsafe, expectedLanguage), model: "safety" };
+    }
+    let reply = sanitizeCompanionReplyForDelivery(raw, input.delivery);
+    if (!emitted && !validReply(reply) && Date.now() - startedAt < 5_000) {
       // One bounded repair for a wrong-script/style draft, never a retry loop.
       // It uses the same approved provider and counts against the upstream cap.
-      await consumeCapacity("chat");
       const language = expectedLanguage === "hi" ? "Hindi in Devanagari" : expectedLanguage === "hinglish" ? "Hindi mixed with English, using Roman letters ONLY" : "English ONLY";
-      reply = await runCloudflare([
+      raw = await runCloudflare([
         ...messages,
         {role:"assistant",content:reply},
         {role:"user",content:`Rewrite your last reply in ${language}. Preserve its concrete meaning and the people from our conversation. Use feminine first-person grammar for Mira. ${suppressQuestions ? "No questions or requests for more information." : "One or two short sentences."} Only the rewritten reply, no explanation.`},
       ]);
+      await recheckContext(deliverySignal);
+      reply = sanitizeCompanionReplyForDelivery(raw, input.delivery);
     }
-    if (!validReply(reply)) return respond({ error: "The generated reply missed the conversation style." }, 503, { model: MODEL, language: expectedLanguage });
-    return respond({ reply, model: MODEL }, 200, { model: MODEL, provider: "cloudflare", language: expectedLanguage, delivery: input.delivery ?? "text" });
+    unsafe = unsafeCompanionOutput(raw);
+    if (unsafe) {
+      if (emitted) throw new EdgeRequestError("This reply could not be safely completed. Retry this turn.", 503, "UNSAFE_STREAM");
+      return { reply: safeOutputReplacement(unsafe, expectedLanguage), model: "safety" };
+    }
+    deliverySignal.throwIfAborted();
+    if (!validReply(reply)) throw new EdgeRequestError("The generated reply missed the conversation style.", 503, "INVALID_REPLY");
+    return { reply, model: MODEL };
+    };
+    if (incremental) return chatDeliveryStream({ requestId, startedAt, signal: request.signal, check: recheckContext, work: generate });
+    const result = await generate();
+    return respond(result, 200, { model: result.model, provider: "cloudflare", language: expectedLanguage, delivery: input.delivery ?? "text" });
   } catch (error) {
-    console.error("Companion inference failed", error instanceof Error ? error.message : "unknown error");
+    console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-chat" }));
     if (error instanceof EdgeRequestError) return edgeError(requestId, "companion-chat", startedAt, error);
     return respond({ error: "Mira could not form a fresh reply just now." }, 503, { model: MODEL });
   }

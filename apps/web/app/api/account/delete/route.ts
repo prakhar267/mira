@@ -1,10 +1,10 @@
-import { accountErrorResponse, assertSameOrigin, clearSessionCookie, deleteAccount, requireAccount } from "@/lib/account-server";
+import { accountErrorResponse, assertSameOrigin, clearSessionCookie, deleteAccount, requireRecentAccount } from "@/lib/account-server";
 import {billingEntitlement,billingClient} from "@/lib/billing";
 
 export async function DELETE(request: Request) {
   try {
     assertSameOrigin(request);
-    const { account, tokenHash } = await requireAccount(request);
+    const { account, tokenHash } = await requireRecentAccount(request);
     const {record}=await billingEntitlement(account.id);
     // Never delete the billing link while a recurring charge remains active.
     if(record?.subscriptionId && ["active","on_hold"].includes(record.status)){

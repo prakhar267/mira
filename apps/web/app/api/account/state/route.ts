@@ -1,12 +1,14 @@
-import { accountErrorResponse, assertSameOrigin, parseJsonObject, publicAccount, readState, requireAccount, writeState } from "@/lib/account-server";
+import { accountErrorResponse, assertSameOrigin, parseJsonObject, publicAccount, readStateEnvelope, requireAccount, writeState } from "@/lib/account-server";
 import { billingEntitlement } from "@/lib/billing";
+import {cloudStore} from "@/lib/cloud-store";
 
 export async function GET(request: Request) {
   try {
     const { account } = await requireAccount(request);
-    const state=await readState(account.id) as Record<string,unknown>;
+    const {state,revision}=await readStateEnvelope(account.id);
     const {subscription}=await billingEntitlement(account.id);
-    return Response.json({ account: publicAccount(account), state:{...state,subscription} }, { headers: { "cache-control": "no-store" } });
+    const policy=JSON.parse(await cloudStore.get(`account-policy:${account.id}`)??"null");
+    return Response.json({ account: publicAccount(account), state:{...state,subscription},revision,policy }, { headers: { "cache-control": "no-store",etag:`"${revision}"` } });
   } catch (cause) {
     return accountErrorResponse(cause);
   }
@@ -20,8 +22,8 @@ export async function PUT(request: Request) {
     if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) throw new Error("Invalid state");
     const {subscription}=await billingEntitlement(account.id);
     // Client plan/entitlement fields are never authoritative.
-    await writeState(account.id, {...body.state,subscription});
-    return Response.json({ saved: true }, { headers: { "cache-control": "no-store" } });
+    const result=await writeState(account.id, {...body.state,subscription},body.revision);
+    return Response.json({ saved: true,state:{...result.state,subscription},revision:result.revision }, { headers: { "cache-control": "no-store",etag:`"${result.revision}"` } });
   } catch (cause) {
     return accountErrorResponse(cause);
   }
