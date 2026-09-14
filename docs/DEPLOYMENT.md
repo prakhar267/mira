@@ -8,7 +8,10 @@ The [continuation](READINESS-CONTINUATION.md) records measured compressed-asset 
 
 ## Verify locally without production access
 
-Use Node24.18.0 / pnpm11.19.0 and the lockfile:
+Use official Node24.18.0 binaries / pnpm11.19.0 and the lockfile. Avatar
+generation/checks pin the bundled zlib 1.3.1-e00f703 as well; Homebrew's
+system-zlib build produces different valid gzip bytes and is refused by that
+generator. CI's setup-node uses the official distribution.
 
 ```sh
 pnpm install --frozen-lockfile

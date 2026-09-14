@@ -20,6 +20,9 @@ export function decodeGlb(bytes) {
 // A delivery derivative, not a replacement for the source VRM. No resize,
 // quantization, vertex reduction, AI transform or lossy image encoding.
 export async function buildAvatarDelivery(source) {
+  // Node's version alone is insufficient: Homebrew links Apple's zlib 1.2.12,
+  // while official Node 24.18.0 uses this pinned compressor on macOS/Linux.
+  assert.equal(process.versions.zlib, "1.3.1-e00f703", "Use the official Node 24.18.0 binary for deterministic avatar generation/checks (not a system-zlib build)");
   assert.equal(digest(source), sourceDigest, "Review a new source avatar before regenerating delivery");
   assert.ok(compactAvatar(source).equals(source), "Source must be compacted before conversion");
   const { model, binary } = decodeGlb(source);

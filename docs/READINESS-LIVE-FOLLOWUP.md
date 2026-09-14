@@ -30,7 +30,7 @@ provider attempt per HTTP request; the report does not pretend to know credits.
 ## Smaller avatar delivery
 
 The canonical 9,001,324-byte VRM is preserved. A gzip-compressed GLB derivative
-now transfers **3,257,335 bytes (63.81% less)**. All 18 material images are
+now transfers **3,265,180 bytes (63.73% less)**. All 18 material images are
 lossless WebP with identical decoded RGBA pixels, not reduced-resolution or
 AI-redrawn artwork. Geometry, rig, expressions and embedded licensing remain
 unchanged. The unused embedded thumbnail becomes a reference to the original
@@ -54,12 +54,18 @@ Local Apple M4 / Metal, synthetic-media observations: cold ready time was
 **958.8 ms** on an unshaped connection and **23,957.9 ms** at 1.6 Mbps / 150 ms
 (previous baseline **56,082 ms**). The slow run still needs improvement before
 slow-network acceptance. These are mobile-sized desktop lab runs, not phones
-or audible speech/lip-sync tests. The avatar rig and decoded pixels are the same.
+or audible speech/lip-sync tests. Those timings used the original 3,257,335-byte
+macOS-compressed packaging; the final official-Node packaging is 7,845 bytes
+larger with the exact same decoded GLB. Final-package timings belong in the
+release evidence, not silently substituted into these earlier measurements.
 
 The first Linux CI asset check exposed host-specific gzip headers. The builder
 now sets the RFC 1952 OS byte to 255 (unknown), rather than macOS 19 / Linux 3;
-this does not change decoded content. CI must still verify identical generated
-bytes, pixel equality and the complete release checks after this change.
+this does not change decoded content. Further diagnosis reproduced Linux's
+exact 3,265,180-byte output/hash on the Mac using the official Node 24.18.0
+binary: Homebrew used zlib 1.2.12, official Node uses 1.3.1-e00f703. The builder
+now requires that official compressor, and the asset is regenerated with it.
+Strict generated-byte equality, pixel equality and release checks remain.
 
 ## Rechecked external gates
 
