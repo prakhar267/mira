@@ -16,7 +16,7 @@ function setup() {
   return {call,adapters,cancelMic,cancelSpeech,get listening(){return listening;},get speech(){return speech;}};
 }
 beforeEach(()=>vi.useFakeTimers());
-afterEach(()=>vi.useRealTimers());
+afterEach(()=>{vi.restoreAllMocks();vi.useRealTimers();});
 describe.each(["voice","video"])("%s shared call lifecycle",()=>{
   it("automatically opens the mic after playback, not during preparation",async()=>{
     const x=setup();x.call.start();expect(x.call.state.phase).toBe("preparing");
@@ -30,6 +30,25 @@ describe.each(["voice","video"])("%s shared call lifecycle",()=>{
     expect(x.adapters.respond).toHaveBeenCalledTimes(1);expect(x.call.state.phase).toBe("preparing");
     x.speech.onStart?.();x.speech.onEnd?.();await vi.advanceTimersByTimeAsync(200);expect(x.adapters.listen).toHaveBeenCalledTimes(2);
     expect(x.adapters.onTiming).toHaveBeenCalledWith("call_reply_ms",expect.any(Number));
+  });
+  it("includes endpointing in roundtrip timing and reports each stage separately",async()=>{
+    let now=1000;
+    vi.spyOn(performance,"now").mockImplementation(()=>now);
+    const x=setup();let resolveReply!:(text:string)=>void;
+    x.adapters.respond=vi.fn(()=>new Promise<string>(resolve=>{resolveReply=resolve;}));
+    x.call.listen();await tick();
+    x.listening.onSpeechEnd?.(650);
+    now=1250;x.listening.onTranscript("Actually Sunday, Saturday nahi");await tick();
+    now=1650;resolveReply("Sunday. Got it.");await tick();
+    now=2000;const playback=x.speech;playback.onStart?.();
+    expect(x.adapters.onTiming).toHaveBeenCalledWith("call_endpoint_ms",650);
+    expect(x.adapters.onTiming).toHaveBeenCalledWith("call_transcribe_ms",250);
+    expect(x.adapters.onTiming).toHaveBeenCalledWith("call_reply_ms",400);
+    expect(x.adapters.onTiming).toHaveBeenCalledWith("call_speech_ms",350);
+    expect(x.adapters.onTiming).toHaveBeenCalledWith("call_roundtrip_ms",1650);
+    expect(x.adapters.onTiming).toHaveBeenCalledTimes(5);
+    x.call.close();now=5000;playback.onStart?.();
+    expect(x.adapters.onTiming).toHaveBeenCalledTimes(5);
   });
   it("does not start audio from a late reply after hanging up",async()=>{
     const x=setup();let resolve!:(text:string)=>void;x.adapters.respond=vi.fn(()=>new Promise<string>(r=>{resolve=r;}));

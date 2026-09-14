@@ -8,7 +8,7 @@ Mira is an original AI companion, not a real person or a substitute for professi
 
 ## Current website
 
-The initial hardening release is deployed ([verified release evidence](docs/READINESS-RELEASE.md)). Subsequent streaming, protected-recovery and test-runtime work is tracked in [PR #3](https://github.com/prakhar267/mira/pull/3) and the [recovery/readiness report](docs/READINESS-RECOVERY-PREPARATION.md). Source availability does not itself prove deployment: check the PR's exact-commit promotion evidence and the live `/api/health` commit. Independent backup activation, real-device call acceptance, email/alert receipt and independent reviews remain separate gates; payments stay disabled.
+The hardening, incremental text streaming and protected-recovery v2 code is deployed at commit `f2d00cb4694d20f93b81c2c35e754dc8b7eeec60`. [PR #3's verified release evidence](https://github.com/prakhar267/mira/pull/3#issuecomment-5661724599) records successful main CI, exact-artifact promotion and live checks. Independent backup **activation**, real-device call acceptance, email/alert receipt and independent reviews remain separate gates; payments stay disabled. See the [current acceptance status](docs/READINESS-STATUS.md), not a dated audit, for the handoff.
 
 The [continuation](docs/READINESS-CONTINUATION.md) records further loading improvements and source-loss denial evidence, without claiming the outstanding physical-device, independent-review or production gates are complete.
 
@@ -76,10 +76,11 @@ The public deployment comes from `apps/web/`. Archived code and dated reports re
 
 - [Current deployment](docs/DEPLOYMENT.md)
 - [Current architecture, configuration and capabilities](docs/CURRENT-ARCHITECTURE.md)
+- [Current acceptance status and external inputs](docs/READINESS-STATUS.md)
 - [September 13 implementation and verification ledger](docs/READINESS-IMPLEMENTATION.md)
 - [Remaining-work follow-through and current gates](docs/READINESS-FOLLOWTHROUGH.md)
 - [Encrypted backup operations and recovery limitations](docs/ENCRYPTED-BACKUP-OPERATIONS.md)
-- [Dormant independent suppression acknowledgement and remaining recovery work](docs/SUPPRESSION-AUTHORITY.md)
+- [Protected recovery v2 and independent activation requirements](docs/PROTECTED-RECOVERY-V2.md)
 - [Launch operations, providers and remaining gates](docs/LAUNCH-OPERATIONS.md)
 - [Mira brand guide](docs/brand.md)
 - [Security reporting](SECURITY.md)
