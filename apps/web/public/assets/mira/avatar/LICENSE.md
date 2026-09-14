@@ -24,3 +24,22 @@ unavailable.
 
 The avatar is presented in the app as Mira. Companaro's motion, call layout,
 voice synchronization and companion identity are original application work.
+
+## Smaller web delivery derivative
+
+`mira-anime-delivery-v1.glb.gz` is generated from the shipped source above by
+`scripts/avatar-delivery.mjs`. Its 18 material textures are lossless WebP via
+`EXT_texture_webp`: every decoded RGBA pixel is checked against the PNG source.
+Geometry, nodes, skinning, morphs, expressions, material values and VRM metadata
+are preserved. The unreferenced final thumbnail buffer is replaced by a URI to
+the unchanged original PNG; its image index and the metadata reference survive.
+No material uses that thumbnail. The resulting GLB is gzip-compressed for
+transport, without a runtime decoder download or paid image service.
+
+- Compressed delivery: 3,257,335 bytes.
+- Gzip SHA-256: `e9bb7d483c5b1ef022d42e43b8c92d48862970149bb22cd5f9dcb6e796618728`.
+- Decoded GLB: 4,946,016 bytes; SHA-256 `3defff1a0f5e5f3d453ab8f944a1e6ef0e021ccceecf15a15ef16bc4337053b4`.
+- `mira-anime-portrait-v1.webp` is the same thumbnail encoded losslessly,
+  542,802 bytes; SHA-256 `e6b32a6793d2c81c217e744025bf8040c1271792b01da53b76b1523da459f6cf`.
+
+The original VRM/PNG remain available for compatibility and provenance.

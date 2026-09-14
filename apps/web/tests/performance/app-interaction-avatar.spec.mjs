@@ -42,7 +42,7 @@ test("three cold mobile-emulated app sessions record real interaction timing", a
         expect(requests).toMatchObject({ session: 1, chat: 1, speech: 0, unexpected: [] });
         expect(samples.at(-1).overflow).toBe(false);
         // The costly VRM must wait for an explicitly opened video call.
-        expect(assets.filter(asset => /\.(?:vrm|glb)$/i.test(asset.path))).toEqual([]);
+        expect(assets.filter(asset => /\.(?:vrm|glb)(?:\.gz)?$/i.test(asset.path))).toEqual([]);
         if (sample === 1) await page.screenshot({ path: testInfo.outputPath("app-memory-mobile.png") });
       } finally { await context.close(); }
     }
@@ -156,7 +156,7 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
       activeTracks: window.__miraLabMedia.activeTracks, cameraRequested: window.__miraLabMedia.cameraRequested,
     }, interactions: window.__miraInteractionLab.actions }));
     evidence.requests = requests;
-    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-live-v2.vrm"));
+    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-delivery-v1.glb.gz"));
     expect(model).toHaveLength(1);
     expect(model[0].decodedBytes).toBeGreaterThan(0);
     expect(evidence.load.callStartToReadyMs).toBeGreaterThan(0);
