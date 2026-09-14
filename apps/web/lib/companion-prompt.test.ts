@@ -13,6 +13,16 @@ const request = {
 };
 
 describe("edge companion prompting", () => {
+  it("preserves internal draft quotes and apostrophes but removes matching outer wrappers",()=>{
+    expect(sanitizeCompanionReply('You could say, "Good luck tomorrow."')).toBe('You could say, "Good luck tomorrow."');
+    expect(sanitizeCompanionReply('"Good luck tomorrow."')).toBe('Good luck tomorrow.');
+    expect(sanitizeCompanionReply("That bag is James'")).toBe("That bag is James'");
+  });
+  it("clips long Hindi speech at a danda sentence boundary",()=>{
+    const first="यह तुम्हारे लिए एक आसान तरीका हो सकता है और इसे अपनी सुविधा के हिसाब से बदल सकते हो। ".repeat(3);
+    const reply=sanitizeCompanionReplyForDelivery(first+"एक और बहुत लंबा अधूरा विचार ".repeat(5),"voice");
+    expect(reply.length).toBeLessThanOrEqual(290);expect(reply.endsWith("।")).toBe(true);
+  });
   it("anchors the current call language after history without dropping facts",()=>{
     const input={...request,messages:[{role:"user" as const,content:"Arjun ko bheed pasand nahi"},{role:"assistant" as const,content:"Haan, shaant jagah choose karenge."},{role:"user" as const,content:"Keep the plan simple, we are not trying to see everything"}]};
     const messages=buildFreeChatMessages(input);

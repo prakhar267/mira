@@ -18,7 +18,7 @@ test("closing during avatar download aborts it without a late mount or retry", a
       const original = window.fetch;
       window.__miraAvatarDownloads = [];
       window.fetch = (input, init) => {
-        if (String(input).includes("/mira-anime-call-v2.glb")) {
+        if (String(input).includes("/mira-anime-call-v3.mesh")) {
           const item = { aborted: init.signal.aborted };
           window.__miraAvatarDownloads.push(item);
           init.signal.addEventListener("abort", () => { item.aborted = true; }, { once: true });
@@ -26,7 +26,7 @@ test("closing during avatar download aborts it without a late mount or retry", a
         return original(input, init);
       };
     });
-    await page.route("**/mira-anime-call-v2.glb.gz*", async route => { await blocked; await route.abort().catch(() => undefined); });
+    await page.route("**/mira-anime-call-v3.mesh.gz*", async route => { await blocked; await route.abort().catch(() => undefined); });
     await enterDemo(page);
     expect(await page.evaluate(() => window.__miraAvatarDownloads)).toEqual([]);
     await page.getByRole("button", { name: "Chat", exact: true }).tap();
@@ -79,7 +79,7 @@ test("three cold mobile-emulated app sessions record real interaction timing", a
         expect(requests).toMatchObject({ session: 1, chat: 1, speech: 0, unexpected: [] });
         expect(samples.at(-1).overflow).toBe(false);
         // The costly VRM must wait for an explicitly opened video call.
-        expect(assets.filter(asset => /\.(?:vrm|glb)(?:\.gz)?$/i.test(asset.path))).toEqual([]);
+        expect(assets.filter(asset => /\.(?:vrm|glb|mesh)(?:\.gz)?$/i.test(asset.path))).toEqual([]);
         if (sample === 1) await page.screenshot({ path: testInfo.outputPath("app-memory-mobile.png") });
       } finally { await context.close(); }
     }
@@ -153,7 +153,7 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
     await enterDemo(page);
     await page.getByRole("button", { name: "Chat", exact: true }).tap();
     const before = await page.evaluate(measuredAssets);
-    expect(before.filter(asset => /\.(?:vrm|glb)$/i.test(asset.path))).toEqual([]);
+    expect(before.filter(asset => /\.(?:vrm|glb|mesh)(?:\.gz)?$/i.test(asset.path))).toEqual([]);
     const callStartedAt = await page.evaluate(() => performance.now());
     await recordInteraction(page, "open-video-call", () => page.getByRole("button", { name: "Start video call with Mira", exact: true }).tap(),
       () => expect(page.getByRole("dialog", { name: "Video call with Mira", exact: true })).toBeVisible());
@@ -193,7 +193,7 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
       activeTracks: window.__miraLabMedia.activeTracks, cameraRequested: window.__miraLabMedia.cameraRequested,
     }, interactions: window.__miraInteractionLab.actions }));
     evidence.requests = requests;
-    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-call-v2.glb.gz"));
+    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-call-v3.mesh.gz"));
     expect(model).toHaveLength(1);
     expect(model[0].decodedBytes).toBeGreaterThan(0);
     expect(evidence.load.callStartToReadyMs).toBeGreaterThan(0);

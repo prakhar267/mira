@@ -3,6 +3,8 @@ import {resolve} from "node:path";
 import {createHash} from "node:crypto";
 import {gunzipSync} from "node:zlib";
 import avatarDelivery from "../lib/avatar-call-manifest.json" with {type:"json"};
+import { MeshoptDecoder } from "meshoptimizer/decoder";
+import { decodeAvatarMesh } from "../lib/avatar-mesh-codec.ts";
 
 // Promotion smoke is read-only: no synthetic account creation, inference calls,
 // email or real conversations. Provider-backed evaluation is a separate gate.
@@ -47,14 +49,16 @@ await run("operational health and exact release correlation",async()=>{
   return `Worker version ${versionId}; commit ${body.commitSha??"not reported"}; inference not probed`;
 });
 await run("avatar asset availability",async()=>{
-  const response=await request(avatarDelivery.path);
+  const response=await request(avatarDelivery.meshPath);
   check(response.ok,`avatar HTTP ${response.status}`);
   // Streaming/local asset responses need not include Content-Length. Inspect
   // actual GLB/VRM bytes instead of treating that optional header as file size.
   const compressed=Buffer.from(await response.arrayBuffer());
-  check(compressed.length===avatarDelivery.bytes,"compressed avatar length mismatch");
-  check(createHash("sha256").update(compressed).digest("hex")===avatarDelivery.sha256,"compressed avatar digest mismatch");
-  const bytes=new Uint8Array(gunzipSync(compressed,{maxOutputLength:avatarDelivery.decodedBytes}));
+  check(compressed.length===avatarDelivery.meshBytes,"compressed avatar length mismatch");
+  check(createHash("sha256").update(compressed).digest("hex")===avatarDelivery.meshSha256,"compressed avatar digest mismatch");
+  await MeshoptDecoder.ready;
+  const packed=new Uint8Array(gunzipSync(compressed,{maxOutputLength:avatarDelivery.meshPackedBytes}));
+  const bytes=decodeAvatarMesh(packed,avatarDelivery.decodedBytes,MeshoptDecoder);
   check(bytes.length===avatarDelivery.decodedBytes&&createHash("sha256").update(bytes).digest("hex")===avatarDelivery.decodedSha256,"decoded avatar digest mismatch");
   check(bytes.length>1_000_000&&new TextDecoder().decode(bytes.slice(0,4))==="glTF","avatar response is not the expected GLB/VRM asset");
   return `compressed avatar verified (${compressed.length} bytes); no claim about frame rate or lip sync`;

@@ -4,6 +4,12 @@ Updated 14 September 2026. This is the current handoff; dated implementation rep
 
 ## Latest follow-up
 
+The [conversation and call-delivery follow-up](READINESS-CALL-QUALITY.md)
+adds a smaller 889 KB avatar transport, grounded conversational examples and
+speech quote/Hindi-boundary fixes. Its source and local checks are not a live
+deployment claim; use its PR promotion record for the exact release and live
+call results. Physical microphone/speaker and phone acceptance remain open.
+
 The [startup and conversation follow-through](READINESS-SPEED-CONVERSATION.md)
 adds a 1.24 MB call-ready avatar, three measured 10.8–10.9-second slow-network
 loads, stricter multi-fact evaluation and a short-Hinglish reply rejection fix.

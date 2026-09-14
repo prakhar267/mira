@@ -1,10 +1,10 @@
 {
   "sourceSha256": "3b5f011aa01902d8a64788af7713fe317fee3f7a38c0b6300003816f3374e69b",
-  "path": "/assets/mira/avatar/mira-anime-call-v3.glb.gz",
-  "bytes": 1088640,
-  "sha256": "d4ed93f49c2caacd5216cd263964d1718b573f6a323c6b9dcff8fa3231930896",
+  "path": "/assets/mira/avatar/mira-anime-call-v2.glb.gz",
+  "bytes": 1235862,
+  "sha256": "ca9f1f391ddf375ba5f538c94c7e6d4ff94a86cd91ef35d27a767f963fbca9a4",
   "decodedBytes": 2920764,
-  "decodedSha256": "27514c4f00858e15451965a04089f7246ae3685ed80752ffed9d488cde2e48cc",
+  "decodedSha256": "eac3a8b7c960897fbe9328988c2593e2e6f73667ddc5c57d91cacc3c630c39d5",
   "portraitPath": "/assets/mira/avatar/mira-anime-preview-v2.webp",
   "portraitBytes": 13868,
   "portraitSha256": "f60bf046bbe1b74b1da9a5ac1a6e321fc8943d1e4004173dad9b2cc0c78d96c4",
@@ -162,29 +162,9 @@
       "visibleRgbMae": 0.9971810800057871
     }
   ],
-  "rawPath": "/assets/mira/avatar/mira-anime-call-v3.glb",
+  "rawPath": "/assets/mira/avatar/mira-anime-call-v2.glb",
   "textureMaxEdge": 1024,
   "textureQuality": 90,
   "pixelIdentical": false,
-  "geometryIdentical": false,
-  "precision": {
-    "fractionBits": 14,
-    "maxComponentError": {
-      "NORMAL": 0.00003045797348022461,
-      "POSITION": 0.00006091594696044922,
-      "TEXCOORD_0": 0.000054836273193359375
-    },
-    "unchanged": [
-      "indices",
-      "joints",
-      "weights",
-      "rig",
-      "expressionBindings",
-      "textures"
-    ]
-  },
-  "meshPath": "/assets/mira/avatar/mira-anime-call-v3.mesh.gz",
-  "meshBytes": 888738,
-  "meshSha256": "6d47cd07b6885aa0bcfa02699b8c225acea406ec1264b31684eb6e0e01939c2d",
-  "meshPackedBytes": 1369857
+  "geometryIdentical": true
 }

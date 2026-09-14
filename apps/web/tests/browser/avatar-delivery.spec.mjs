@@ -1,5 +1,22 @@
 import { test, expect } from "@playwright/test";
 import manifest from "../../lib/avatar-call-manifest.json" with { type: "json" };
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const { build } = createRequire(require.resolve("vite"))("esbuild");
+
+test("the actual bounded mesh loader reconstructs the committed GLB in this browser", async ({ page, context }) => {
+  const bundled = await build({ entryPoints: [new URL("../../lib/avatar-delivery.ts", import.meta.url).pathname], bundle: true, write: false, platform: "browser", format: "esm" });
+  await context.route("**/*", route => new URL(route.request().url()).origin === "http://127.0.0.1:4397" ? route.continue() : route.abort());
+  await page.route("**/__qa/avatar-loader.js", route => route.fulfill({ contentType: "application/javascript", body: bundled.outputFiles[0].text }));
+  await page.goto("/");
+  const result = await page.evaluate(async () => {
+    const { fetchAvatarDelivery } = await import("/__qa/avatar-loader.js");
+    const bytes = await fetchAvatarDelivery(new AbortController().signal);
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), b => b.toString(16).padStart(2, "0")).join("");
+    return { bytes: bytes.byteLength, hash };
+  });
+  expect(result).toEqual({ bytes: manifest.decodedBytes, hash: manifest.decodedSha256 });
+});
 
 test("native gzip and every call-profile WebP avatar texture decode in this browser", async ({ page, context }) => {
   await context.route("**/*", route => new URL(route.request().url()).origin === "http://127.0.0.1:4397" ? route.continue() : route.abort());

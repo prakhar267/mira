@@ -292,8 +292,10 @@ export function sanitizeCompanionReply(value: string) {
     .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "")
     .replace(/<analysis>[\s\S]*?(?:<\/analysis>|$)/gi, "")
     .replace(/^\s*(?:Mira|Assistant)\s*:\s*/i, "")
-    .replace(/^['"]|['"]$/g, "")
     .trim();
+  // Remove a wrapper only as a matched pair. Stripping any trailing quote
+  // broke ready-to-send drafts such as: You could say, "Good luck tomorrow."
+  if ((reply.startsWith('"') && reply.endsWith('"')) || (reply.startsWith("'") && reply.endsWith("'"))) reply = reply.slice(1, -1).trim();
   if (reply.length > 700) reply = `${reply.slice(0, 697).replace(/[,:;\s]+$/, "")}…`;
   return reply;
 }
@@ -308,7 +310,7 @@ export function sanitizeCompanionReplyForDelivery(value: string, delivery: EdgeC
     .trim();
   if (spoken.length <= 290) return spoken;
   const clipped = spoken.slice(0, 290);
-  const sentenceEnd = Math.max(clipped.lastIndexOf("."), clipped.lastIndexOf("!"), clipped.lastIndexOf("?"));
+  const sentenceEnd = Math.max(clipped.lastIndexOf("."), clipped.lastIndexOf("!"), clipped.lastIndexOf("?"), clipped.lastIndexOf("।"));
   const wordEnd = clipped.lastIndexOf(" ");
   const end = sentenceEnd >= 180 ? sentenceEnd + 1 : wordEnd >= 180 ? wordEnd : 290;
   return clipped.slice(0, end).replace(/[,:;\s]+$/, "").trim();

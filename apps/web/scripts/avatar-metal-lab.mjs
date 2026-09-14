@@ -75,7 +75,7 @@ try {
   assert.equal(evidence.final.media.cameraRequested, 0);
   assert.deepEqual(requests, { session: 1, chat: 0, speech: 1, unexpected: [] });
   evidence.assets = await page.evaluate(() => performance.getEntriesByType('resource')
-    .filter(entry => /\.(?:vrm|glb)(?:\.gz)?$/.test(new URL(entry.name).pathname)).map(entry => ({ path: new URL(entry.name).pathname,
+    .filter(entry => /\.(?:vrm|glb|mesh)(?:\.gz)?$/.test(new URL(entry.name).pathname)).map(entry => ({ path: new URL(entry.name).pathname,
       durationMs: entry.duration, bytes: entry.decodedBodySize, transferBytes: entry.transferSize })));
   evidence.syntheticRequests = requests; evidence.passed = true;
 } catch (error) { evidence.error = error.message; process.exitCode = 1; }
@@ -90,4 +90,3 @@ finally {
     cleanup: evidence.final?.media, assets: evidence.assets, network: evidence.network,
     evidence: join(output, `${prefix}-gpu-evidence.json`) }, null, 2));
 }
-

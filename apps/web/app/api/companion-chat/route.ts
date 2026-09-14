@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     const dayReply = buildDayCheckInReply(latestUserMessage, expectedLanguage);
     if (dayReply && !suppressQuestions) return deliver(dayReply,"day-check-in",{model:"day-check-in",language:expectedLanguage});
     const messages = buildFreeChatMessages(input);
-    const responseTokenLimit = input.delivery === "text" ? (input.responsePreferences?.responseLength === "deep" ? 500 : 260) : 190;
+    const responseTokenLimit = input.delivery === "text" ? (input.responsePreferences?.responseLength === "deep" ? 500 : 260) : 144;
     const validReply = (reply: string) => !isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions, expectedLanguage);
     // Anonymous LLM7 is not an approved downstream production service. Use the
     // project's existing Workers AI binding without exposing conversations to it.
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
         messages: promptMessages,
         stream: true,
         max_tokens: responseTokenLimit,
-        temperature: 0.68,
+        temperature: 0.45,
         top_p: 0.86,
         top_k: 40,
         repetition_penalty: 1.1,

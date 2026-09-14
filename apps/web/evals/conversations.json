@@ -27,6 +27,12 @@
     {"text":"Yeah, it was just nice. No advice and no questions, please.","language":"en","noQuestion":true},
     {"text":"waise maine kis ke saath chai pi thi?","language":"hinglish","anchors":["mummy","maa","mom"]}
   ]},
+  {"id":"grounding-corrections","turns":[
+    {"text":"My cousin Arjun and I are travelling to Jaipur on Saturday morning. He likes photography.","language":"en"},
+    {"text":"Actually we changed the departure to Sunday morning because of work.","language":"en","reviewPhrases":["extra day","extra time","free time","more time to"]},
+    {"text":"हाँ, रविवार सुबह ही। काम की वजह से बदलना पड़ा।","language":"hi","reviewPhrases":["अतिरिक्त समय","ज़्यादा समय","ज्यादा समय"]},
+    {"text":"मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।","language":"hi","reviewPhrases":["अर्जुन","Arjun","उसकी बैटरी","बैटरी खत्म"]}
+  ]},
   {"id":"long-conversation-24-turns","turns":[
     {"text":"I'm planning a weekend trip to Jaipur with my cousin Arjun. We leave Saturday morning.","language":"en"},
     {"text":"hume museums pasand hain lekin shopping bilkul nahi","language":"hinglish"},
