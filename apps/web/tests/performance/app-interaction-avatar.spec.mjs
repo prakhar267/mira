@@ -165,7 +165,7 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
   }
 });
 
-test("unthrottled avatar keeps animating; severe rendering stalls use an explicit stable fallback", async ({ browser }, testInfo) => {
+test("actual avatar drawing followed by severe rendering stalls uses an explicit stable fallback", async ({ browser }, testInfo) => {
   const { context, page, requests } = await coldMobilePage(browser, 1);
   try {
     await syntheticCallMedia(page);
@@ -174,12 +174,14 @@ test("unthrottled avatar keeps animating; severe rendering stalls use an explici
     await page.getByRole("button", { name: "Chat", exact: true }).tap();
     await page.getByRole("button", { name: "Start video call with Mira", exact: true }).tap();
     await expect(page.locator(".live-avatar-3d--ready")).toBeVisible({ timeout: 90_000 });
-    const sample = await sampleAvatarCadence(page, "unthrottled-synthetic-speaking");
-    await expect(page.locator(".live-avatar-3d--ready")).toBeVisible();
-    expect(sample.drawCalls).toBeGreaterThan(0);
-    await testInfo.attach("unthrottled-avatar-cadence", { body: JSON.stringify(sample), contentType: "application/json" });
+    const beforeFault = await page.evaluate(() => ({ ...window.__miraAvatarLab }));
+    expect(beforeFault.drawCalls).toBeGreaterThan(0);
+    await testInfo.attach("avatar-before-scheduling-fault", { body: JSON.stringify(beforeFault), contentType: "application/json" });
     // Delay actual rAF callbacks while retaining the actual renderer. This
     // deterministic scheduling fault verifies fallback, not hardware speed.
+    // Apply immediately after actual drawing: removing CPU throttling does
+    // not make a software GPU capable of sustained animation. A four-second
+    // "must remain ready" assertion incorrectly rejected legitimate fallback.
     await page.evaluate(() => {
       const original = window.requestAnimationFrame.bind(window);
       window.requestAnimationFrame = callback => original(() => setTimeout(() => callback(performance.now()), 220));
