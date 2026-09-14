@@ -136,6 +136,10 @@ describe("consent-aware bounded conversation evaluator (synthetic only)",()=>{
     expect(evaluateTurn({language:"en",anchors:["Sunday"]},"Saturday works.")).toContain("context-anchor-review");
     expect(evaluateTurn({language:"en",noQuestion:true},"How did it go?")).toContain("unwanted-question");
     expect(evaluateTurn({language:"en"},"I caught that wrong.")).toContain("generic-misunderstanding");
+    expect(evaluateTurn({language:"hinglish"},"Riya Delhi gayi thi.")).toEqual([]);
+    expect(evaluateTurn({language:"hinglish"},"Mummy ke saath chai pi thi.")).toEqual([]);
+    expect(evaluateTurn({language:"hi"},"मुझे खेद है, Kabir ko bas itna kah sakte ho ki all the best.")).toContain("language");
+    expect(evaluateTurn({language:"hi"},"React में state बदलता है, props बाहर से आते हैं।")).toEqual([]);
   });
   it("keeps semantic flags failing even when every endpoint and release check succeeds",async()=>{
     const x=harness({reply:()=>Response.json({reply:"I caught that wrong. What happened?"})}),report=await x.run();

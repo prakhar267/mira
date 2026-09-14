@@ -44,6 +44,27 @@ describe("active inference route boundaries (mock providers)", () => {
     expect(await response.json()).toMatchObject({reply:"Riya Delhi gayi thi."});
     expect(mocks.provider).toHaveBeenCalledOnce();
   });
+  it.each(["voice","video"])("repairs mixed-script Hindi once without logging conversation content in %s", async delivery => {
+    const bad="मुझे खेद है, Kabir ko bas itna kah sakte ho ki all the best.";
+    const good="कबीर, पहली नौकरी के लिए शुभकामनाएँ!";
+    mocks.provider.mockResolvedValueOnce({response:bad}).mockResolvedValueOnce({response:good});
+    const log=vi.spyOn(console,"log").mockImplementation(()=>{});
+    try {
+      const response=await chat(request({...input,delivery,messages:[{role:"user",content:"मेरे भाई को क्या संदेश भेजूँ?"}]}));
+      expect(response.status).toBe(200);expect(await response.json()).toMatchObject({reply:good});
+      expect(mocks.provider).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(mocks.provider.mock.calls[1])).toContain("पूरा जवाब देवनागरी में लिखो");
+      const events=log.mock.calls.map(([value])=>JSON.parse(value as string));
+      expect(events).toContainEqual(expect.objectContaining({event:"reply_style_repair",reason:"language"}));
+      expect(JSON.stringify(events)).not.toContain("Kabir");expect(JSON.stringify(events)).not.toContain(good);
+    }finally{log.mockRestore();}
+  });
+  it("reports a bounded provider timeout without leaking the upstream exception or retrying",async()=>{
+    mocks.provider.mockRejectedValue(new DOMException("sensitive upstream details", "TimeoutError"));
+    const response=await chat(request(input));
+    const result=await response.json();expect(response.status).toBe(503);expect(result.code).toBe("PROVIDER_TIMEOUT");
+    expect(JSON.stringify(result)).not.toContain("sensitive");expect(mocks.provider).toHaveBeenCalledOnce();
+  });
   it("returns category-specific Hindi support without spending provider capacity", async () => {
     const response = await chat(request({ ...input, messages: [{ role: "user", content: "मुझे जीना नहीं है" }] }));
     const body = await response.json() as { reply: string; model: string };
