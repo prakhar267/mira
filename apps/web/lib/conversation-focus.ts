@@ -50,7 +50,7 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
   const latest=input.messages.at(-1)?.content.trim()??"";
   const draft=isDraftingRequest(input);
   const rewrite=rewritePattern.test(latest);
-  const correction=correctionPattern.test(latest);
+  const correction=draft ? correctionPattern.test(latest) : isFactCorrection(input);
   // A correction/translation edits the draft, not the user's biography.
   // Follow only a bounded chain of editing turns; unrelated topics or an
   // explicit cancellation end the task. Assistant text cannot start it.
@@ -68,7 +68,7 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
   if(correction)cues.push(draft
     ? "Apply the corrected fact/relationship inside the same draft. Return the revised message to the recipient, not an acknowledgement to the user."
     : language==="hi"
-    ? "बताया गया बदलाव और उसकी बताई हुई वजह ही स्वीकार करें। योजना बदली है; यात्रा हो चुकी है ऐसा मत कहो। भविष्य की योजना का सही काल रखो, नया फायदा/परिस्थिति/सवाल मत जोड़ो।"
+    ? "बताया गया बदलाव और उसकी बताई हुई वजह ही स्वीकार करें। भविष्य की योजना को घट चुकी घटना मत बनाओ। सही काल रखो, नया फायदा/परिस्थिति/सवाल मत जोड़ो।"
     : "Current task: acknowledge the corrected fact/timing and retain any stated reason in ONE short sentence, without a follow-up question. Replace the old fact; infer no additional circumstance or consequence. Continue the user's existing task.");
   return cues.join(" ");
 }
