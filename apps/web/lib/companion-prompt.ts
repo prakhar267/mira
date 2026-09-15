@@ -38,7 +38,11 @@ const roboticSelfDescriptionPattern = /\b(?:large language model|language model|
 export type CompanionLanguage = "en" | "hi" | "hinglish";
 
 function explicitlyRequestedLanguage(value: string): CompanionLanguage | null {
-  if (!/(?:speak|talk|reply|answer|chat|language|keep|say|switch|baat|bolo|बात|बोल|जवाब|भाषा|mein|में)/iu.test(value)) return null;
+  // Standalone spoken/text choices are commands too ("Hindi please"). Keep
+  // this anchored so mentioning a Hindi film/name is not a language switch.
+  const shortChoice = value.trim().match(/^(?:please\s+)?(?:in\s+)?(english|hindi|hinglish)(?:\s+please)?[.!?\s]*$/i)?.[1]?.toLowerCase();
+  if (shortChoice) return shortChoice === "hindi" ? "hi" : shortChoice === "hinglish" ? "hinglish" : "en";
+  if (!/\b(?:speak|talk|reply|answer|chat|language|keep|say|switch|baat|bolo|mein)\b|(?:बात|बोल|जवाब|भाषा|में)/iu.test(value)) return null;
 
   const mentions = [
     ...[...value.matchAll(/(?:hinglish|हिंग्लिश)/giu)].map((match) => ({ language: "hinglish" as const, index: match.index, value: match[0] })),

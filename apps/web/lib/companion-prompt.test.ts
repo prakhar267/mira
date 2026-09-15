@@ -117,6 +117,15 @@ describe("edge companion prompting", () => {
     ] })).toBe("en");
   });
 
+  it.each([["Hindi please", "hi"], ["please in Hindi", "hi"], ["Hinglish", "hinglish"], ["in Hinglish please!", "hinglish"], ["English please", "en"]] as const)("accepts the standalone language choice %s", (content, language) => {
+    expect(detectCompanionLanguage(content)).toBe(language);
+    expect(detectCompanionRequestLanguage({messages:[{role:"user",content},{role:"user",content:"okay"},{role:"user",content:"hmm"}]})).toBe(language);
+  });
+
+  it.each(["I watched a Hindi film", "No Hindi please", "My friend speaks Hindi"])("does not treat a mere mention or negative short choice as a standalone command: %s", content=>{
+    expect(detectCompanionLanguage(content)).toBe("en");
+  });
+
   it.each([
     ["आज ऑफिस में बहुत काम था।", "hi"],
     ["yaar aaj office mein bahut kaam tha", "hinglish"],

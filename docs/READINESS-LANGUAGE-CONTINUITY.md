@@ -9,6 +9,8 @@ the PR promotion record identifies the live SHA and actual-provider results.
   the most recent meaningful **user** language, not the previous acknowledgement
   or an assistant reply. Explicit switches and substantive English still switch
   immediately. This shared decision serves chat, voice and video.
+- Standalone choices such as `Hindi please` and `Hinglish` are recognized as
+  explicit switches, without treating a mere mention of a Hindi film as one.
 - Common inflected Hinglish such as `ab pakka select ho jayegi na?` was being
   classified as English. The existing two-marker heuristic now covers these
   future-tense/colloquial forms. A single name such as Sahi is not sufficient.
