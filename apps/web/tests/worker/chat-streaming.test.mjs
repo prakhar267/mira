@@ -18,12 +18,25 @@ function chat(cookie, content, delivery = "text") {
 }
 
 describe("text stream response body inside Workers with synthetic provider binding", () => {
+  it("streams Priya through real consent and capacity boundaries without leaking provider JSON", async()=>{
+    const cookie=await session();
+    const response=await SELF.fetch(`${origin}/api/companion-speech`,{method:"POST",headers:{origin,cookie,"content-type":"application/json","x-mira-audio-stream":"1"},body:JSON.stringify({text:"Aaj chai achhi thi."})});
+    expect(response.status).toBe(200);expect(response.headers.get("x-mira-audio-stream")).toBe("mp3");
+    expect(response.headers.get("x-companion-voice")).toBe("Priya");
+    expect(await response.text()).toBe("ID3synthetic-stream-not-acoustic-QA");
+  });
+  it("refuses streamed speech when demo consent has been revoked, before sending audio headers",async()=>{
+    const cookie=await session();
+    const revoked=await SELF.fetch(`${origin}/api/demo/session`,{method:"DELETE",headers:{origin,cookie}});await revoked.arrayBuffer();
+    const response=await SELF.fetch(`${origin}/api/companion-speech`,{method:"POST",headers:{origin,cookie,"content-type":"application/json","x-mira-audio-stream":"1"},body:JSON.stringify({text:"hello"})});
+    expect([401,403]).toContain(response.status);expect(response.headers.get("x-mira-audio-stream")).toBeNull();await response.arrayBuffer();
+  });
   it("finishes a pulled delta/done response through real policy, capacity and SQLite boundaries", async () => {
     const response = await chat(await session(), "Help me prepare for my interview tomorrow.");
     expect(response.status).toBe(200); expect(response.headers.get("content-type")).toContain("application/x-ndjson");
     const events = new TextDecoder().decode(await response.arrayBuffer()).trim().split("\n").map(JSON.parse);
     expect(events[0]).toMatchObject({ type: "delta", text: "That sounds good." });
-    expect(events.at(-1)).toMatchObject({ type: "done", reply: "That sounds good. Tell me a little more about it.", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" });
+    expect(events.at(-1)).toMatchObject({ type: "done", reply: "That sounds good. Tell me a little more about it.", model: "@cf/google/gemma-4-26b-a4b-it" });
     expect(events.every(event => event.requestId === response.headers.get("x-request-id"))).toBe(true);
     expect(events.filter(event => event.type === "done")).toHaveLength(1);
   });
@@ -40,7 +53,7 @@ describe("text stream response body inside Workers with synthetic provider bindi
     for (const delivery of ["voice", "video"]) {
       const response = await chat(cookie, "Help me prepare for my interview tomorrow.", delivery);
       expect(response.status).toBe(200); expect(response.headers.get("content-type")).toContain("application/json");
-      expect(await response.json()).toMatchObject({ reply: "That sounds good. Tell me a little more about it.", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" });
+      expect(await response.json()).toMatchObject({ reply: "That sounds good. Tell me a little more about it.", model: "@cf/google/gemma-4-26b-a4b-it" });
     }
   });
   it("keeps post-response work in the real execution context and drains it before cleanup", async () => {

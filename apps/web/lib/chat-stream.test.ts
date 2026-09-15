@@ -2,6 +2,12 @@ import {describe,expect,it} from "vitest";
 import {readChatStream} from "./chat-stream";
 function bytes(text:string){const data=new TextEncoder().encode(text);return new ReadableStream<Uint8Array>({start(c){for(let i=0;i<data.length;i+=3)c.enqueue(data.slice(i,i+3));c.close();}});}
 describe("spoken inference streaming",()=>{
+  it("reads visible OpenAI-shaped deltas without exposing reasoning or tools",async()=>{
+    const frames=[{choices:[{delta:{role:"assistant",reasoning_content:"private reasoning"}}]},{choices:[{delta:{content:"Kal ke liye "}}]},{choices:[{delta:{content:"all the best!"}}]}];
+    const received:string[]=[];
+    expect(await readChatStream(bytes(frames.map(frame=>`data: ${JSON.stringify(frame)}\n\n`).join("")+"data: [DONE]\n\n"),new AbortController().signal,false,async text=>{received.push(text);})).toBe("Kal ke liye all the best!");
+    expect(received.join("")).not.toContain("reasoning");
+  });
   it("waits for split closing quotes instead of cutting a message draft",async()=>{
     const draft='"All the best for your first day at work. I hope it goes really well!"';
     const stream=bytes(`data: ${JSON.stringify({response:draft.slice(0,-1)})}\n\ndata: ${JSON.stringify({response:'"'})}\n\ndata: [DONE]\n\n`);

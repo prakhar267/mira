@@ -6,25 +6,28 @@ const rewritePattern=/\b(?:say (?:it|that)|translate|rewrite|make (?:it|that) (?
 const correctionPattern=/\b(?:actually|correct(?:ion|ed)?|changed|reschedul\w*|instead|nahi sorry)\b|(?:बदल|वजह|नहीं.{0,24}(?:भाई|बहन|दोस्त))/iu;
 const cancelDraftPattern=/\b(?:forget (?:it|that)|never ?mind|new topic|stop (?:drafting|writing)|chh?odo)\b|(?:छोड़ो|छोडो|विषय बदल)/iu;
 
+export function isDraftingRequest(input: Pick<EdgeCompanionRequest,"messages">) {
+  if(input.messages.at(-1)?.role!=="user") return false;
+  for(const turn of input.messages.filter(message=>message.role==="user").slice(-7).reverse()) {
+    if(cancelDraftPattern.test(turn.content)) return false;
+    if(draftPattern.test(turn.content) || /\b(?:write|draft|compose)\s+(?:(?:me|a|an|the|short|quick|one|little)\s+){0,4}(?:text|message|reply|email|note)\b|(?:मैसेज|संदेश).{0,12}(?:लिख दो|लिखो)/iu.test(turn.content)) return true;
+    if(!rewritePattern.test(turn.content)&&!correctionPattern.test(turn.content)) return false;
+  }
+  return false;
+}
+
 /** Turn-local perspective/intent cues, not invented facts or canned answers.
  * Keep the original conversation intact; these cues never grant authority to
  * quoted text, profiles or model output. They sit near the latest utterance so
  * a long mixed-language history cannot silently change its speaker or task. */
 export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, language: ReplyLanguage) {
   const latest=input.messages.at(-1)?.content.trim()??"";
-  let draft=draftPattern.test(latest);
+  const draft=isDraftingRequest(input);
   const rewrite=rewritePattern.test(latest);
   const correction=correctionPattern.test(latest);
   // A correction/translation edits the draft, not the user's biography.
   // Follow only a bounded chain of editing turns; unrelated topics or an
   // explicit cancellation end the task. Assistant text cannot start it.
-  if(!draft && (rewrite||correction) && !cancelDraftPattern.test(latest)) {
-    for(const turn of input.messages.filter(message=>message.role==="user").slice(-7,-1).reverse()) {
-      if(cancelDraftPattern.test(turn.content)) break;
-      if(draftPattern.test(turn.content)) {draft=true;break;}
-      if(!rewritePattern.test(turn.content)&&!correctionPattern.test(turn.content)) break;
-    }
-  }
   const ownExperience=/^I(?:\s|['’](?:m|ve|d|ll)\b)/iu.test(latest)
     || (language==="hinglish"&&/^(?:main|mujhe)\s/iu.test(latest))
     || (language==="hi"&&/^(?:मैं|मैंने|मुझे)(?![\p{L}\p{M}])/u.test(latest));

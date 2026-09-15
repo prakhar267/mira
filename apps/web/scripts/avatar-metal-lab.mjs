@@ -75,8 +75,8 @@ try {
   assert.equal(evidence.final.media.cameraRequested, 0);
   assert.deepEqual(requests, { session: 1, chat: 0, speech: 1, unexpected: [] });
   evidence.assets = await page.evaluate(() => performance.getEntriesByType('resource')
-    .filter(entry => /\.(?:vrm|glb|mesh)(?:\.gz)?$/.test(new URL(entry.name).pathname)).map(entry => ({ path: new URL(entry.name).pathname,
-      durationMs: entry.duration, bytes: entry.decodedBodySize, transferBytes: entry.transferSize })));
+    .filter(entry => /\.(?:vrm|glb|mesh)(?:\.(?:gz|br))?$/.test(new URL(entry.name).pathname)).map(entry => ({ path: new URL(entry.name).pathname,
+      durationMs: entry.duration, bytes: entry.decodedBodySize, encodedBytes: entry.encodedBodySize, transferBytes: entry.transferSize })));
   evidence.syntheticRequests = requests; evidence.passed = true;
 } catch (error) { evidence.error = error.message; process.exitCode = 1; }
 finally {

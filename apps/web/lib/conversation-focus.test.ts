@@ -1,8 +1,11 @@
 import {describe,expect,it} from "vitest";
-import {conversationFocus} from "./conversation-focus";
+import {conversationFocus,isDraftingRequest} from "./conversation-focus";
 import {buildFreeChatMessages} from "./free-chat";
 
 describe("turn-local speaker and intent focus",()=>{
+  it.each(["Write a short message to my landlord.","Draft an email", "Compose a quick note", "एक मैसेज लिखो।"])("recognizes explicit drafting without needing a question: %s",content=>{
+    expect(isDraftingRequest({messages:[{role:"user",content}]})).toBe(true);
+  });
   const input=(content:string)=>({messages:[{role:"user" as const,content}],companion:{name:"Mira"},user:{name:"Synthetic QA"},delivery:"voice" as const});
   it.each(["मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।","मैं अपनी चाबी भूल गया।","मुझे नींद नहीं आ रही है।","मैंने अपना बैग वहीं छोड़ दिया।"])("keeps Hindi first-person experience with its speaker: %s",text=>{
     expect(conversationFocus(input(text),"hi")).toContain("उपयोगकर्ता का अपना अनुभव");

@@ -29,22 +29,23 @@ export async function fetchAvatarDelivery(signal: AbortSignal) {
   signal.throwIfAborted();
   const gzip = typeof DecompressionStream === "function";
   const mesh = gzip && typeof WebAssembly === "object";
+  let brotli: DecompressionStream | null = null;
+  if (mesh) { try { brotli = new DecompressionStream("brotli" as CompressionFormat); } catch { /* Older engines keep the verified gzip path. */ } }
   const decoder = mesh ? import("meshoptimizer/decoder").then(async ({ MeshoptDecoder }) => {
     await MeshoptDecoder.ready; return MeshoptDecoder;
   }) : undefined;
   // A failed/aborted download must not leave an unhandled dynamic-import error.
   void decoder?.catch(() => undefined);
-  const path = mesh ? manifest.meshPath : gzip ? manifest.path : manifest.rawPath;
-  const hash = mesh ? manifest.meshSha256 : gzip ? manifest.sha256 : manifest.decodedSha256;
+  const path = brotli ? manifest.meshWirePath : mesh ? manifest.meshPath : gzip ? manifest.path : manifest.rawPath;
+  const hash = brotli ? manifest.meshWireSha256 : mesh ? manifest.meshSha256 : gzip ? manifest.sha256 : manifest.decodedSha256;
   const response = await fetch(`${path}?v=${hash.slice(0, 16)}`, { signal, credentials: "omit", redirect: "error" });
   if (!response.ok || !response.body) throw new Error("Avatar download unavailable");
-  const compressed = await boundedBytes(response.body, mesh ? manifest.meshBytes : gzip ? manifest.bytes : manifest.decodedBytes);
+  const compressed = await boundedBytes(response.body, brotli ? manifest.meshWireBytes : mesh ? manifest.meshBytes : gzip ? manifest.bytes : manifest.decodedBytes);
   signal.throwIfAborted();
   await verify(compressed, hash);
   signal.throwIfAborted();
   if (!gzip) return compressed.buffer;
-  const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
-  const packed = await boundedBytes(stream, mesh ? manifest.meshPackedBytes : manifest.decodedBytes);
+  const packed = await boundedBytes(new Blob([compressed]).stream().pipeThrough(brotli ?? new DecompressionStream("gzip")), mesh ? manifest.meshPackedBytes : manifest.decodedBytes);
   const bytes = mesh ? decodeAvatarMesh(packed, manifest.decodedBytes, (await decoder)!, signal) : packed;
   signal.throwIfAborted();
   await verify(bytes, manifest.decodedSha256);

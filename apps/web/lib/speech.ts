@@ -1,3 +1,5 @@
+import { streamSpeechMedia } from "./streamed-speech-media";
+
 const devanagariIndependentVowels: Record<string, string> = {
   "अ": "a", "आ": "aa", "इ": "i", "ई": "ee", "उ": "u", "ऊ": "oo", "ऋ": "ri",
   "ए": "e", "ऐ": "ai", "ओ": "o", "औ": "au", "ऑ": "o",
@@ -130,7 +132,7 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
   stopCompanionSpeech();
   const abortController = new AbortController();
   let audio: HTMLAudioElement | null = null;
-  let objectUrl: string | null = null;
+  let media: ReturnType<typeof streamSpeechMedia> | null = null;
   let boundaryTimer: number | null = null;
   let retryDelay: { timer: number; resolve: () => void } | null = null;
   let decodedAudio: AudioBuffer | null = null;
@@ -150,11 +152,12 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
     }
     if (audio) {
       audio.onplaying = audio.onwaiting = audio.onpause = audio.onended = audio.onerror = null;
+      audio.pause();
       audio = null;
     }
     decodedAudio=null;
     options.onAudioLevel?.(0);
-    if (objectUrl) window.URL.revokeObjectURL(objectUrl);
+    media?.dispose(); media = null;
     if (activePlayback === playback) activePlayback = null;
     if (notify) options.onEnd?.();
   };
@@ -176,7 +179,7 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
       if (canceled || finished) return;
       response = await fetch("/api/companion-speech", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-mira-audio-stream": "1" },
         body: JSON.stringify({ text: text.replace(/\s+/g, " ").trim() }),
         signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(12_000)]),
       });
@@ -194,16 +197,21 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
       const body = await response.json().catch(() => null) as { error?: string } | null;
       throw new Error(body?.error ?? "Mira’s voice is temporarily unavailable.");
     }
-    const blob = await response.blob();
-    if (!blob.size || !/^audio\//i.test(blob.type)) throw new Error("Mira’s voice returned invalid audio.");
+    if (!/^audio\//i.test(response.headers.get("content-type") ?? "")) throw new Error("Mira’s voice returned invalid audio.");
     if (canceled || finished) return;
-    objectUrl = window.URL.createObjectURL(blob);
-    audio = new Audio(objectUrl);
+    audio = new Audio();
     // Decode a separate copy for animation; never route audible playback through
     // a new AudioContext (which can silently suspend audio on mobile Safari).
-    if(options.onAudioLevel && typeof OfflineAudioContext!=="undefined") {
-      void blob.arrayBuffer().then(data=>new OfflineAudioContext(1,1,44100).decodeAudioData(data)).then(buffer=>{if(!finished&&!canceled)decodedAudio=buffer;}).catch(()=>undefined);
-    }
+    let decoding = false, buffered: Blob | null = null;
+    const decode = (blob: Blob) => {
+      if (!options.onAudioLevel || typeof OfflineAudioContext === "undefined" || finished || canceled) return;
+      buffered = blob;
+      if (decoding) return;
+      decoding = true; buffered = null;
+      void blob.arrayBuffer().then(data=>new OfflineAudioContext(1,1,44100).decodeAudioData(data))
+        .then(buffer=>{if(!finished&&!canceled)decodedAudio=buffer;}).catch(()=>undefined)
+        .finally(()=>{decoding=false;if(buffered)decode(buffered);});
+    };
     audio.preload = "auto";
     audio.onplaying = () => {
       // A browser event may already be queued when cancel detaches handlers.
@@ -235,6 +243,12 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
       options.onError?.("Mira’s voice could not play. Please try again.");
       finish(false);
     };
+    media = streamSpeechMedia(audio, response, abortController.signal, decode);
+    // Attach the failure handler immediately: playback can still be waiting for
+    // its first buffered frame when the provider fails or the call is canceled.
+    const loaded = media.done.catch(cause => { if (!canceled && !finished) { options.onError?.(cause instanceof Error ? cause.message : "Voice interrupted"); finish(false); } });
+    if (!media.streaming) await loaded;
+    if (canceled || finished || !audio) return;
     await audio.play();
   })().catch((cause) => {
     if (canceled || finished) return;

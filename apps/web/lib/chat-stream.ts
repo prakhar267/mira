@@ -24,9 +24,14 @@ export async function readChatStream(stream: ReadableStream<Uint8Array>, signal:
         // marker. The marker, not TCP close, completes this reply.
         if (data === "[DONE]") return text.trim();
         if (!data) continue;
-        const part = JSON.parse(data) as {response?:string;error?:unknown};
+        const part = JSON.parse(data) as {response?:unknown;error?:unknown;choices?:{delta?:{content?:unknown}}[]};
         if (part.error) throw new Error("Inference stream failed");
-        text += part.response ?? "";
+        // Newer Workers models use OpenAI-shaped SSE. Only visible content is
+        // conversation text; reasoning_content, tool calls and role metadata
+        // must never reach captions, speech or the safety-prefix callback.
+        const delta = part.response ?? part.choices?.[0]?.delta?.content;
+        if (delta != null && typeof delta !== "string") throw new Error("Invalid inference text frame");
+        text += delta ?? "";
         if (text.length > 4000) throw new Error("Inference reply exceeded the limit");
         if (onText) await onText(text);
         // Complete sentences only; do not cut at a token/word or inside reasoning.

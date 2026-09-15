@@ -1,0 +1,373 @@
+{
+  "at": "2026-09-15T16:15:19.528Z",
+  "expectedSha": "abda0451b2069d06f97725729a16b9f3dfd8674b",
+  "method": "Actual production call UI, native Chromium MediaRecorder/WebAudio/HTMLAudio, real STT/chat/Priya TTS. Synthetic prerecorded input and muted speaker. NOT physical microphone, accent diversity, echo, subjective voice or phone acceptance.",
+  "caps": {
+    "companion-chat": 6,
+    "companion-transcribe": 6,
+    "companion-speech": 8
+  },
+  "requests": {
+    "companion-speech": 8,
+    "companion-transcribe": 6,
+    "companion-chat": 6
+  },
+  "turns": [
+    {
+      "kind": "voice",
+      "fixture": "english-clean",
+      "responses": [
+        {
+          "service": "companion-transcribe",
+          "status": 200,
+          "requestId": "ce9d0122-c300-4381-a43e-c0ec38f3ed87",
+          "streaming": false,
+          "headersMs": 1445,
+          "completeMs": 1452
+        },
+        {
+          "service": "companion-chat",
+          "status": 200,
+          "requestId": "6ea21d69-bd9f-400e-ae14-db8480ef3502",
+          "streaming": false,
+          "headersMs": 2102,
+          "completeMs": 2104
+        },
+        {
+          "service": "companion-speech",
+          "status": 200,
+          "requestId": "d47fccf6-5caf-4445-91c8-0fc8130967f8",
+          "streaming": false,
+          "headersMs": 2451,
+          "completeMs": 2455
+        }
+      ],
+      "transcript": "My brother Kabir has an interview tomorrow, and he is feeling nervous.",
+      "language": "en",
+      "reply": "Hope your brother Kabir's interview goes well tomorrow, what's the job for?",
+      "endOfClipToPlaybackMs": 7660,
+      "streamingAtStart": false,
+      "playbackSeconds": 4.752,
+      "expectedLanguage": "en",
+      "languageMatches": true,
+      "inputAnchorsMatch": true
+    },
+    {
+      "kind": "voice",
+      "fixture": "hindi-clean",
+      "responses": [
+        {
+          "service": "companion-transcribe",
+          "status": 200,
+          "requestId": "98d16d12-ed4f-44db-8397-b6fe217e0284",
+          "streaming": false,
+          "headersMs": 1461,
+          "completeMs": 1468
+        },
+        {
+          "service": "companion-chat",
+          "status": 200,
+          "requestId": "8df5e99f-be1c-4d07-a2b0-100788e71cd8",
+          "streaming": false,
+          "headersMs": 1841,
+          "completeMs": 1845
+        },
+        {
+          "service": "companion-speech",
+          "status": 200,
+          "requestId": "3104b031-1653-4e66-bf06-8c9e40a8f36e",
+          "streaming": false,
+          "headersMs": 2477,
+          "completeMs": 2481
+        }
+      ],
+      "transcript": "आज मेरा दिन अच्छा था। मेरी दोस्त नेहा कल पुणे आ रही है।",
+      "language": "hi",
+      "reply": "यह अच्छा है कि आज तुम्हारा दिन अच्छा था, कल नेहा से मिलने की उत्सुकता होगी।",
+      "endOfClipToPlaybackMs": 6012,
+      "streamingAtStart": false,
+      "playbackSeconds": 5.664,
+      "expectedLanguage": "hi",
+      "languageMatches": true,
+      "inputAnchorsMatch": true
+    },
+    {
+      "kind": "voice",
+      "fixture": "hinglish-clean",
+      "responses": [
+        {
+          "service": "companion-transcribe",
+          "status": 200,
+          "requestId": "a513490d-ed88-4302-a81f-0f13087684d1",
+          "streaming": false,
+          "headersMs": 1315,
+          "completeMs": 1324
+        },
+        {
+          "service": "companion-chat",
+          "status": 200,
+          "requestId": "14a714c2-4ce3-4ea2-91cc-89d0359acdda",
+          "streaming": false,
+          "headersMs": 2272,
+          "completeMs": 2277
+        },
+        {
+          "service": "companion-speech",
+          "status": 200,
+          "requestId": "900cc02a-2aeb-4551-b66f-ea4df36755da",
+          "streaming": false,
+          "headersMs": 1662,
+          "completeMs": 1674
+        }
+      ],
+      "transcript": "yaar aaj ophis men kaaphee stres thaa. bos ne meeting men daant diya.",
+      "language": "hinglish",
+      "reply": "office mein stress ho toh thakne lagte hain, bos ke daante se tumhare dil par kya asar hua?",
+      "endOfClipToPlaybackMs": 5555,
+      "streamingAtStart": false,
+      "playbackSeconds": 6.672,
+      "expectedLanguage": "hinglish",
+      "languageMatches": true,
+      "inputAnchorsMatch": true
+    },
+    {
+      "kind": "video",
+      "fixture": "english-synthetic-noise",
+      "responses": [
+        {
+          "service": "companion-transcribe",
+          "status": 200,
+          "requestId": "7009a995-d9d5-44f0-ab5d-7c617cdc6abe",
+          "streaming": false,
+          "headersMs": 1478,
+          "completeMs": 1486
+        },
+        {
+          "service": "companion-chat",
+          "status": 200,
+          "requestId": "ab2ee7f1-f69e-4eec-9657-70a19cc57ece",
+          "streaming": false,
+          "headersMs": 1551,
+          "completeMs": 1553
+        },
+        {
+          "service": "companion-speech",
+          "status": 200,
+          "requestId": "366c4757-78d0-4709-be48-4ba795249b70",
+          "streaming": false,
+          "headersMs": 1525,
+          "completeMs": 1529
+        }
+      ],
+      "transcript": "My brother Kabir has an interview tomorrow, and he is feeling nervous.",
+      "language": "en",
+      "reply": "What's his interview for, is there anything you're doing to help him feel more prepared?",
+      "endOfClipToPlaybackMs": 4801,
+      "streamingAtStart": false,
+      "playbackSeconds": 5.304,
+      "expectedLanguage": "en",
+      "languageMatches": true,
+      "inputAnchorsMatch": true
+    },
+    {
+      "kind": "video",
+      "fixture": "hindi-synthetic-noise",
+      "responses": [
+        {
+          "service": "companion-transcribe",
+          "status": 200,
+          "requestId": "cfdc4ad7-8699-4069-a712-e577db033d93",
+          "streaming": false,
+          "headersMs": 2420,
+          "completeMs": 2430
+        },
+        {
+          "service": "companion-chat",
+          "status": 200,
+          "requestId": "38bc5c60-5de4-4169-9573-adda2300c0c8",
+          "streaming": false,
+          "headersMs": 2840,
+          "completeMs": 2846
+        },
+        {
+          "service": "companion-speech",
+          "status": 200,
+          "requestId": "ba9c9c7a-06bd-4761-9a8c-5395c42a8cc7",
+          "streaming": false,
+          "headersMs": 1626,
+          "completeMs": 1633
+        }
+      ],
+      "transcript": "आज मेरा दिन अच्छा था। मेरी दोस्त नेहा कल पुणे आ रही है।",
+      "language": "hi",
+      "reply": "यह अच्छा है कि आज तुम्हारा दिन अच्छा था, कल नेहा से मिलने की उत्सुकता होगी, तुम उसके आने की क्या तैयारी कर रही हो?",
+      "endOfClipToPlaybackMs": 7130,
+      "streamingAtStart": false,
+      "playbackSeconds": 7.944,
+      "expectedLanguage": "hi",
+      "languageMatches": true,
+      "inputAnchorsMatch": true
+    },
+    {
+      "kind": "video",
+      "fixture": "hinglish-synthetic-noise",
+      "responses": [
+        {
+          "service": "companion-transcribe",
+          "status": 200,
+          "requestId": "ccff48ec-96e1-4517-8b96-1c9aca8ef232",
+          "streaming": false,
+          "headersMs": 1317,
+          "completeMs": 1326
+        },
+        {
+          "service": "companion-chat",
+          "status": 200,
+          "requestId": "76e88e1c-10a5-43ae-83ec-6c8069a91b0f",
+          "streaming": false,
+          "headersMs": 2606,
+          "completeMs": 2616
+        },
+        {
+          "service": "companion-speech",
+          "status": 200,
+          "requestId": "8f5d23bc-0941-44e1-a512-3f5e846f38bb",
+          "streaming": false,
+          "headersMs": 1623,
+          "completeMs": 1627
+        }
+      ],
+      "transcript": "yaar aaj ophis men kaaphee stres thaa. bos ne meeting men daant diya.",
+      "language": "hinglish",
+      "reply": "bos ki daant sunke tumhare dil par kya asar hua, ab tum kya soch rahe ho?",
+      "endOfClipToPlaybackMs": 5810,
+      "streamingAtStart": false,
+      "playbackSeconds": 5.904,
+      "expectedLanguage": "hinglish",
+      "languageMatches": true,
+      "inputAnchorsMatch": true
+    }
+  ],
+  "errors": [],
+  "passed": true,
+  "sessionRevoked": true,
+  "release": {
+    "commitSha": "abda0451b2069d06f97725729a16b9f3dfd8674b",
+    "versionId": "8ef8fcca-fac1-4bb6-8eea-186405240074"
+  },
+  "media": {
+    "requested": 8,
+    "stopped": 8,
+    "active": 0,
+    "events": [
+      {
+        "type": "playing",
+        "at": 4447.29999999702,
+        "duration": 3.384
+      },
+      {
+        "type": "ended",
+        "at": 7889.5,
+        "time": 3.384
+      },
+      {
+        "type": "fixture-ended",
+        "at": 14527.79999999702
+      },
+      {
+        "type": "playing",
+        "at": 20794.89999999851,
+        "duration": 4.752
+      },
+      {
+        "type": "ended",
+        "at": 25600.19999999553,
+        "time": 4.752
+      },
+      {
+        "type": "fixture-ended",
+        "at": 30469.09999999404
+      },
+      {
+        "type": "playing",
+        "at": 36475.89999999851,
+        "duration": 5.664
+      },
+      {
+        "type": "ended",
+        "at": 42197.5,
+        "time": 5.664
+      },
+      {
+        "type": "fixture-ended",
+        "at": 47930.29999999702
+      },
+      {
+        "type": "playing",
+        "at": 53483.39999999851,
+        "duration": 6.672
+      },
+      {
+        "type": "ended",
+        "at": 60205,
+        "time": 6.672
+      },
+      {
+        "type": "playing",
+        "at": 62418.89999999851,
+        "duration": 3.336
+      },
+      {
+        "type": "ended",
+        "at": 65803.39999999851,
+        "time": 3.336
+      },
+      {
+        "type": "fixture-ended",
+        "at": 70756.69999999553
+      },
+      {
+        "type": "playing",
+        "at": 75559.89999999851,
+        "duration": 5.304
+      },
+      {
+        "type": "ended",
+        "at": 80922.09999999404,
+        "time": 5.304
+      },
+      {
+        "type": "fixture-ended",
+        "at": 86122
+      },
+      {
+        "type": "playing",
+        "at": 93247.89999999851,
+        "duration": 7.944
+      },
+      {
+        "type": "ended",
+        "at": 101252.09999999404,
+        "time": 7.944
+      },
+      {
+        "type": "fixture-ended",
+        "at": 106692.59999999404
+      },
+      {
+        "type": "playing",
+        "at": 112503.19999999553,
+        "duration": 5.904
+      },
+      {
+        "type": "ended",
+        "at": 118468.59999999404,
+        "time": 5.904
+      }
+    ]
+  },
+  "finalRelease": {
+    "commitSha": "abda0451b2069d06f97725729a16b9f3dfd8674b",
+    "versionId": "8ef8fcca-fac1-4bb6-8eea-186405240074"
+  }
+}

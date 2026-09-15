@@ -8,7 +8,7 @@ test("landing artwork decodes without original PNG downloads or app prefetch", a
   const hero = page.locator(".marketing-hero__scene");
   await expect(hero).toBeVisible();
   expect(await hero.evaluate(async image => { await image.decode(); return [image.naturalWidth, image.naturalHeight]; })).toEqual([1536, 1024]);
-  expect(requests.some(path => /CompanionApp|\.(?:vrm|glb|mesh)(?:\.gz)?$/.test(path))).toBe(false);
+  expect(requests.some(path => /CompanionApp|\.(?:vrm|glb|mesh)(?:\.(?:gz|br))?$/.test(path))).toBe(false);
   const portrait = page.getByRole("img", { name: "Mira, an original AI companion avatar" });
   await portrait.scrollIntoViewIfNeeded();
   // Scrolling does not synchronously start a native lazy-image request.

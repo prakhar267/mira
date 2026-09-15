@@ -43,13 +43,17 @@ try {
     const service = new URL(response.url()).pathname.split("/").at(-1), turn = currentTurn;
     if (!(service in report.caps)) return;
     const work = (async () => {
-      const item = { service, status: response.status(), requestId: response.headers()["x-request-id"] ?? null };
+      const item = { service, status: response.status(), requestId: response.headers()["x-request-id"] ?? null, streaming: response.headers()["x-mira-audio-stream"] === "mp3" };
       if (turn) turn.responses.push(item);
       if (!response.ok()) { report.errors.push(`${service}: HTTP ${response.status()}`); return; }
       if (service === "companion-transcribe" || service === "companion-chat") {
         const body = await response.json();
         if (turn) { if (service === "companion-transcribe") { turn.transcript = body.text ?? body.transcript; turn.language = body.language; } else turn.reply = body.reply; }
       }
+      await response.finished();
+      const timing = response.request().timing();
+      item.headersMs = Math.round(timing.responseStart);
+      item.completeMs = Math.round(timing.responseEnd);
     })().catch(() => report.errors.push("Response inspection failed"));
     pending.add(work); void work.finally(() => pending.delete(work));
   });
@@ -110,9 +114,14 @@ try {
       await expect.poll(() => page.evaluate(() => window.__miraAudioQa.played), { timeout: 35_000 }).toBeGreaterThan(input.previousPlays);
       const playback = await page.evaluate(() => window.__miraAudioQa.events.filter(event => event.type === "playing").at(-1));
       turn.endOfClipToPlaybackMs = Math.round(playback.at - input.started - input.duration * 1000);
-      assert.ok(playback.duration > 0 && playback.duration < 45);
+      // MSE duration is Infinity until the provider reaches EOF. Verify the
+      // completed native playback below instead of mistaking streaming for bad audio.
+      turn.streamingAtStart = !Number.isFinite(playback.duration);
       await expect(dialog.getByRole("button", { name: "Listening automatically", exact: true })).toBeVisible({ timeout: 40_000 });
       await Promise.all(pending);
+      const ended = await page.evaluate(() => window.__miraAudioQa.events.filter(event => event.type === "ended").at(-1));
+      assert.ok(ended.at > playback.at && ended.time > 0 && ended.time < 45);
+      turn.playbackSeconds = ended.time;
       assert.equal(report.errors.length, 0); assert.ok(turn.transcript?.trim()); assert.ok(turn.reply?.trim());
       turn.expectedLanguage = { english: "en", hindi: "hi", hinglish: "hinglish" }[language];
       turn.languageMatches = turn.language === turn.expectedLanguage && matchesReplyLanguage(turn.reply, turn.expectedLanguage);
