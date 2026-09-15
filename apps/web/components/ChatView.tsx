@@ -1,4 +1,5 @@
 "use client";
+import { preloadVideoCall } from "@/lib/video-preload";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Camera, ImagePlus, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Send, Sparkles, ThumbsDown, ThumbsUp, Trash2, Video, Volume2 } from "lucide-react";
@@ -209,7 +210,7 @@ export function ChatView({ state, streaming, streamingText = "", processingEnabl
         <div className="chat__header-actions">
           <button type="button" className="chat__new-button" onClick={onNewConversation}><Plus aria-hidden="true" /><span>New chat</span></button>
           <button type="button" className="chat__call-button" aria-label={`Start voice call with ${state.companion.name}`} onClick={onCall}><Phone aria-hidden="true" /><span>Voice call</span></button>
-          <button type="button" className="chat__call-button chat__call-button--video" aria-label={`Start video call with ${state.companion.name}`} onClick={onVideoCall}><Video aria-hidden="true" /><span>Video call</span></button>
+          <button type="button" className="chat__call-button chat__call-button--video" aria-label={`Start video call with ${state.companion.name}`} onPointerEnter={preloadVideoCall} onFocus={preloadVideoCall} onPointerDown={preloadVideoCall} onClick={onVideoCall}><Video aria-hidden="true" /><span>Video call</span></button>
           <button type="button" className="icon-button chat__more-button" aria-label="Conversation tools" aria-expanded={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><MoreHorizontal aria-hidden="true" /></button>
         </div>
       </header>

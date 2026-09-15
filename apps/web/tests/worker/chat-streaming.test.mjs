@@ -18,6 +18,14 @@ function chat(cookie, content, delivery = "text") {
 }
 
 describe("text stream response body inside Workers with synthetic provider binding", () => {
+  it("delivers voice and video replies on model stop without waiting for transport EOF",async()=>{
+    const cookie=await session();
+    for(const delivery of ["voice","video"]){
+      const response=await chat(cookie,"Confirm the travel plan. [synthetic-model-stop]",delivery);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({reply:"Sunday morning departure, got it."});
+    }
+  });
   it("streams Priya through real consent and capacity boundaries without leaking provider JSON", async()=>{
     const cookie=await session();
     const response=await SELF.fetch(`${origin}/api/companion-speech`,{method:"POST",headers:{origin,cookie,"content-type":"application/json","x-mira-audio-stream":"1"},body:JSON.stringify({text:"Aaj chai achhi thi."})});

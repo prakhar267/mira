@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { avatarDelivery, fetchAvatarDelivery } from "./avatar-delivery";
 import losslessDelivery from "./avatar-delivery-manifest.json";
 import callV2 from "./avatar-call-v2-manifest.json";
+import callV3 from "./avatar-call-v3-manifest.json";
 import { MeshoptDecoder } from "meshoptimizer/decoder";
 import { decodeAvatarMesh } from "./avatar-mesh-codec";
 // @ts-expect-error Deliberate standalone Node asset tool.
@@ -109,6 +110,7 @@ describe("verified avatar delivery profiles", () => {
     expect(Buffer.from(await fetchAvatarDelivery(new AbortController().signal)).equals(await asset(avatarDelivery.rawPath))).toBe(true);
   });
   it("bounds precision only in render attributes; rig, weights, topology and textures stay byte-identical", async () => {
+    const avatarDelivery = callV3;
     const old = await asset(callV2.rawPath), next = await asset(avatarDelivery.rawPath);
     const source = decodeGlb(old), delivered = decodeGlb(next);
     expect(delivered.model).toEqual(source.model);
@@ -147,6 +149,52 @@ describe("verified avatar delivery profiles", () => {
     const packed = gunzipSync(await asset(avatarDelivery.meshPath));
     expect(Buffer.from(decodeAvatarMesh(packed, next.length, MeshoptDecoder)).equals(next)).toBe(true);
     expect(avatarDelivery.meshBytes).toBeLessThan(900_000);
+  });
+  it("keeps every bound VRM expression byte-identical while removing only unused zero-weight morphs", async () => {
+    const before = decodeGlb(await asset(callV3.rawPath)), after = decodeGlb(await asset(avatarDelivery.rawPath));
+    const viewBytes = (file: typeof before, id: number) => { const view = file.model.bufferViews[id]; return file.binary.subarray(view.byteOffset, view.byteOffset + view.byteLength); };
+    const sameBytes = (a: Uint8Array, b: Uint8Array) => expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
+    const sameAccessor = (oldId: number, newId: number) => {
+      const a = structuredClone(before.model.accessors[oldId]), b = structuredClone(after.model.accessors[newId]);
+      expect(b.bufferView !== undefined).toBe(a.bufferView !== undefined);
+      if (a.bufferView !== undefined) { sameBytes(viewBytes(before, a.bufferView), viewBytes(after, b.bufferView)); b.bufferView = a.bufferView; }
+      expect(!!b.sparse).toBe(!!a.sparse);
+      if (a.sparse) for (const key of ["indices", "values"]) {
+        sameBytes(viewBytes(before, a.sparse[key].bufferView), viewBytes(after, b.sparse[key].bufferView));
+        b.sparse[key].bufferView = a.sparse[key].bufferView;
+      }
+      expect(b).toEqual(a);
+    };
+    for (const key of ["asset", "nodes", "materials", "scenes", "samplers", "textures"]) expect(after.model[key]).toEqual(before.model[key]);
+    for (let m = 0; m < before.model.meshes.length; m++) for (let p = 0; p < before.model.meshes[m].primitives.length; p++) {
+      const old = before.model.meshes[m].primitives[p], next = after.model.meshes[m].primitives[p];
+      sameAccessor(old.indices, next.indices);
+      for (const kind of Object.keys(old.attributes)) sameAccessor(old.attributes[kind], next.attributes[kind]);
+    }
+    for (let i = 0; i < before.model.skins.length; i++) {
+      const old = structuredClone(before.model.skins[i]), next = structuredClone(after.model.skins[i]);
+      sameAccessor(old.inverseBindMatrices, next.inverseBindMatrices); next.inverseBindMatrices = old.inverseBindMatrices;
+      expect(next).toEqual(old);
+    }
+    for (let i = 0; i < 18; i++) sameBytes(viewBytes(after, after.model.images[i].bufferView), viewBytes(before, before.model.images[i].bufferView));
+    for (const group of Object.keys(before.model.extensions.VRMC_vrm.expressions)) for (const [name, original] of Object.entries(before.model.extensions.VRMC_vrm.expressions[group])) {
+      const old = structuredClone(original) as {morphTargetBinds?: {node:number;index:number;weight:number}[]};
+      const next = structuredClone(after.model.extensions.VRMC_vrm.expressions[group][name]);
+      for (let i = 0; i < (old.morphTargetBinds?.length ?? 0); i++) {
+        const a = old.morphTargetBinds![i]!, b = next.morphTargetBinds[i], mesh = before.model.nodes[a.node].mesh;
+        expect(b.node).toBe(a.node); expect(b.weight).toBe(a.weight);
+        for (let p = 0; p < before.model.meshes[mesh].primitives.length; p++) {
+          const x = before.model.meshes[mesh].primitives[p].targets[a.index], y = after.model.meshes[mesh].primitives[p].targets[b.index];
+          expect(Object.keys(y)).toEqual(Object.keys(x));
+          for (const kind of Object.keys(x)) sameAccessor(x[kind], y[kind]);
+        }
+        b.index = a.index;
+      }
+      expect(next).toEqual(old);
+    }
+    const extensions = structuredClone(after.model.extensions); extensions.VRMC_vrm.expressions = before.model.extensions.VRMC_vrm.expressions;
+    expect(extensions).toEqual(before.model.extensions);
+    expect(avatarDelivery.meshBytes).toBeLessThan(800_000);
   });
   it("does not decode an abandoned call", async () => {
     const controller = new AbortController(); controller.abort();

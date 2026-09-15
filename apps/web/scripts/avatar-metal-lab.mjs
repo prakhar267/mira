@@ -13,35 +13,48 @@ const require = createRequire(join(cwd, 'package.json'));
 const { chromium, expect } = require('@playwright/test');
 const output = await mkdtemp(join(tmpdir(), 'mira-avatar-metal-'));
 const slowNetwork = process.argv.includes('--slow-network');
+const live = process.argv.includes('--live-assets');
+const origin = live ? process.env.COMPANARO_URL : 'http://127.0.0.1:4397';
+if (live) {
+  assert.equal(origin, 'https://luma-companion.prakhargupta267.workers.dev');
+  assert.match(process.env.MIRA_EXPECTED_SHA ?? '', /^[a-f0-9]{40}$/);
+}
 const prefix = slowNetwork ? 'metal-slow-network' : 'metal';
 const directory = await mkdtemp(join(tmpdir(), 'mira-metal-runtime-'));
 const env = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR,
   XDG_CONFIG_HOME: join(directory, 'config'), XDG_CACHE_HOME: join(directory, 'cache'),
   CLOUDFLARE_API_TOKEN: 'mira-synthetic-only-no-cloud-access', CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false',
   WRANGLER_SEND_METRICS: 'false', CI: 'true' };
-const runtime = spawn(process.execPath, [join(cwd, 'scripts/built-artifact-runtime.mjs'),
+const runtime = live ? null : spawn(process.execPath, [join(cwd, 'scripts/built-artifact-runtime.mjs'),
   join(cwd, 'dist/server/wrangler.json'), directory, '4397'], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let runtimeOutput = '';
-runtime.stdout.on('data', chunk => { runtimeOutput = (runtimeOutput + chunk).slice(-12000); });
-runtime.stderr.on('data', chunk => { runtimeOutput = (runtimeOutput + chunk).slice(-12000); });
+runtime?.stdout.on('data', chunk => { runtimeOutput = (runtimeOutput + chunk).slice(-12000); });
+runtime?.stderr.on('data', chunk => { runtimeOutput = (runtimeOutput + chunk).slice(-12000); });
 let browser, context;
 const evidence = { at: new Date().toISOString(), sourceArtifact: 'Local compiled app; this is not proof of a sealed release or a deployment',
   conditions: 'Headless Chromium with ANGLE Metal on this Apple M4 Mac; 393x851 mobile emulation, DPR1, no CPU throttle, loopback network. Actual GPU, synthetic audio and microphone. Not an iPhone or an acoustic test.',
   network: slowNetwork ? 'After demo entry, CDP shaped loopback: 1.6 Mbps down, 0.8 Mbps up, 150ms latency; cold cache. Not a physical cellular connection.' : 'Unshaped loopback',
   providerRequests: 0, realMicrophoneRequests: 0, samples: [], passed: false };
 try {
-  let ready = false;
-  for (let attempt = 0; attempt < 60; attempt++) {
+  let ready = live;
+  if (live) {
+    const response = await fetch(`${origin}/api/health`, { signal: AbortSignal.timeout(10000) }); assert.equal(response.status,200);
+    evidence.release = await response.json(); assert.equal(evidence.release.commitSha, process.env.MIRA_EXPECTED_SHA);
+    evidence.sourceArtifact = 'Exact live release assets over Cloudflare CDN, all browser API/provider calls mocked, no real session or microphone.';
+    evidence.conditions = evidence.conditions.replace('loopback network', 'public Cloudflare CDN');
+    evidence.network = evidence.network.replace('loopback', 'public CDN');
+  }
+  for (let attempt = 0; !live && attempt < 60; attempt++) {
     if (runtime.exitCode !== null) throw Error('Isolated runtime exited before readiness');
     try { const r = await fetch('http://127.0.0.1:4397/api/health', { signal: AbortSignal.timeout(1000) }); if (r.ok) { await r.arrayBuffer(); ready = true; break; } } catch {}
     await new Promise(resolve => setTimeout(resolve, 500));
   }
   assert.ok(ready, 'Isolated runtime not ready');
   browser = await chromium.launch({ headless: true, args: ['--use-angle=metal'] });
-  const lab = await coldMobilePage(browser, 1); context = lab.context;
+  const lab = await coldMobilePage(browser, 1, origin); context = lab.context;
   const { page, requests } = lab; page.setDefaultTimeout(20000);
   await syntheticCallMedia(page); await observeAvatar(page); await observeInteractions(page);
-  await enterDemo(page);
+  await enterDemo(page, origin);
   await page.getByRole('button', { name: 'Chat', exact: true }).tap();
   if (slowNetwork) {
     const cdp = await context.newCDPSession(page);
@@ -54,6 +67,10 @@ try {
   const load = await page.evaluate(() => ({ ...window.__miraAvatarLab }));
   assert.match(load.renderer, /Apple M4/);
   evidence.load = { ...load, callToReadyMs: load.readyAt - start };
+  evidence.startupResources = await page.evaluate(start => performance.getEntriesByType('resource')
+    .filter(entry => entry.startTime >= start && entry.responseEnd <= window.__miraAvatarLab.readyAt)
+    .map(entry => ({ path: new URL(entry.name).pathname, startMs: entry.startTime - start,
+      durationMs: entry.duration, encodedBytes: entry.encodedBodySize, decodedBytes: entry.decodedBodySize })), start);
   await expect(page.locator('.video-call__status')).toContainText('Mira is speaking');
   evidence.samples.push(await sampleAvatarCadence(page, 'metal-synthetic-speaking'));
   await page.screenshot({ path: join(output, `${prefix}-speaking-mobile.png`) });
@@ -78,12 +95,15 @@ try {
     .filter(entry => /\.(?:vrm|glb|mesh)(?:\.(?:gz|br))?$/.test(new URL(entry.name).pathname)).map(entry => ({ path: new URL(entry.name).pathname,
       durationMs: entry.duration, bytes: entry.decodedBodySize, encodedBytes: entry.encodedBodySize, transferBytes: entry.transferSize })));
   evidence.syntheticRequests = requests; evidence.passed = true;
-} catch (error) { evidence.error = error.message; process.exitCode = 1; }
+  if (live) { const r = await fetch(`${origin}/api/health`,{signal:AbortSignal.timeout(10000)}); assert.equal(r.status,200); const health=await r.json(); assert.equal(health.commitSha,evidence.release.commitSha); assert.equal(health.versionId,evidence.release.versionId); }
+} catch (error) { evidence.passed = false; evidence.error = error.message; process.exitCode = 1; }
 finally {
   await context?.close(); await browser?.close();
-  runtime.kill('SIGTERM');
-  await Promise.race([new Promise(resolve => runtime.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 5000))]);
-  if (runtime.exitCode === null && runtime.signalCode === null) runtime.kill('SIGKILL');
+  if (runtime) {
+    runtime.kill('SIGTERM');
+    await Promise.race([new Promise(resolve => runtime.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 5000))]);
+    if (runtime.exitCode === null && runtime.signalCode === null) runtime.kill('SIGKILL');
+  }
   await writeFile(join(output, `${prefix}-gpu-evidence.json`), JSON.stringify(evidence, null, 2), { flag: 'wx' });
   console.log(JSON.stringify({ passed: evidence.passed, error: evidence.error, renderer: evidence.load?.renderer,
     readyMs: evidence.load?.callToReadyMs, samples: evidence.samples.map(({ label, drawCalls, medianRAFIntervalMs, maxRAFIntervalMs }) => ({ label, drawCalls, medianRAFIntervalMs, maxRAFIntervalMs })),

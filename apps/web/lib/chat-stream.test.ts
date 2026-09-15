@@ -33,4 +33,19 @@ describe("spoken inference streaming",()=>{
     const stream=new ReadableStream<Uint8Array>({start(c){c.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({response:reply})}\n\n`));},cancel(){return new Promise(()=>{});}});
     expect(await readChatStream(stream,new AbortController().signal,true)).toBe(reply);
   });
+  it("finishes a single sentence on the model stop frame even if SSE stays open",async()=>{
+    let canceled=false;
+    const stream=new ReadableStream<Uint8Array>({start(c){
+      c.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"तुम अपना कैमरा भूल गए थे।"}}]}\n\n'));
+      c.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n'));
+    },cancel(){canceled=true;return new Promise(()=>{});}});
+    expect(await readChatStream(stream,AbortSignal.timeout(500),true)).toBe("तुम अपना कैमरा भूल गए थे।");
+    expect(canceled).toBe(true);
+  });
+  it("does not treat length/tool-call markers as a successful model stop",async()=>{
+    for(const reason of ["length","tool_calls"]){
+      const stream=new ReadableStream<Uint8Array>({start(c){c.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({choices:[{delta:{content:"An incomplete"},finish_reason:reason}]})}\n\n`));}});
+      await expect(readChatStream(stream,AbortSignal.timeout(25),true)).rejects.toThrow();
+    }
+  });
 });

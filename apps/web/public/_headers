@@ -9,3 +9,6 @@
 
 /assets/mira/avatar/*
   Cache-Control: public, max-age=31536000, immutable
+
+/_next/static/chunks/*
+  Cache-Control: public, max-age=31536000, immutable

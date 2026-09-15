@@ -1,4 +1,5 @@
 "use client";
+import { preloadVideoCall } from "@/lib/video-preload";
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -159,7 +160,7 @@ export function HomeView({
         <motion.button type="button" className="mira-home-action mira-home-action--voice" onClick={onCall} whileTap={{ scale: 0.96 }} aria-label={`Start a voice call with ${state.companion.name}`}>
           <Microphone weight="fill" /><span>Talk</span>
         </motion.button>
-        <button type="button" className="mira-home-action" onClick={onVideoCall}><VideoCamera weight="fill" /><span>Video</span></button>
+        <button type="button" className="mira-home-action" onPointerEnter={preloadVideoCall} onFocus={preloadVideoCall} onPointerDown={preloadVideoCall} onClick={onVideoCall}><VideoCamera weight="fill" /><span>Video</span></button>
       </div>
 
       <small className="mira-home__disclosure">{state.companion.name} is an AI companion · You control memory and privacy</small>

@@ -1,8 +1,14 @@
 # Mira current readiness and acceptance status
 
-Updated 14 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
+Updated 15 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
 
 ## Latest follow-up
+
+The [context, stream-completion and avatar follow-up](READINESS-CONTEXT-STARTUP.md)
+adds bounded speaker-ownership repair, shorter ordinary-conversation instructions,
+successful model-stop handling and the 792 KB v4 avatar. Live CDN and local-server
+startup measurements are explicitly separated. Use its PR promotion record for
+the exact release and actual-provider outcomes, including failures.
 
 The [streaming Priya follow-up](READINESS-STREAMING-PRIYA.md) adds progressive
 native speech playback, a tested Cloudflare-hosted Gemma candidate, focused

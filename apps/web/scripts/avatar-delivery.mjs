@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { compactAvatar } from "./compact-avatar.mjs";
 import { packAvatarMesh } from "./avatar-mesh-delivery.mjs";
 import { boundCallPrecision } from "./avatar-call-precision.mjs";
+import { pruneCallMorphs } from "./avatar-call-morphs.mjs";
 
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const align = n => Math.ceil(n / 4) * 4;
@@ -21,7 +22,7 @@ export function decodeGlb(bytes) {
 
 // The archival delivery is pixel-identical. The separate call profile resizes
 // and compresses textures, never geometry, rigs or expressions.
-export async function buildAvatarDelivery(source, { fast = false, meshProfile = false } = {}) {
+export async function buildAvatarDelivery(source, { fast = false, meshProfile = false, pruneMorphs = false } = {}) {
   // Node's version alone is insufficient: Homebrew links Apple's zlib 1.2.12,
   // while official Node 24.18.0 uses this pinned compressor on macOS/Linux.
   assert.equal(process.versions.zlib, "1.3.1-e00f703", "Use the official Node 24.18.0 binary for deterministic avatar generation/checks (not a system-zlib build)");
@@ -88,13 +89,15 @@ export async function buildAvatarDelivery(source, { fast = false, meshProfile = 
   }
   model.buffers[0].byteLength = length;
   const json = Buffer.from(JSON.stringify(model)), jsonLength = align(json.length);
-  const glb = Buffer.alloc(28 + jsonLength + length);
+  let glb = Buffer.alloc(28 + jsonLength + length);
   glb.writeUInt32LE(0x46546c67, 0); glb.writeUInt32LE(2, 4); glb.writeUInt32LE(glb.length, 8);
   glb.writeUInt32LE(jsonLength, 12); glb.writeUInt32LE(0x4e4f534a, 16);
   glb.fill(32, 20, 20 + jsonLength); json.copy(glb, 20);
   glb.writeUInt32LE(length, 20 + jsonLength); glb.writeUInt32LE(0x004e4942, 24 + jsonLength);
   Buffer.concat(payloads).copy(glb, 28 + jsonLength);
   const precision = meshProfile ? boundCallPrecision(glb, model, 28 + jsonLength) : undefined;
+  let retainedMorphs;
+  if (pruneMorphs) { const pruned = pruneCallMorphs(glb); glb = pruned.glb; retainedMorphs = pruned.retained; }
   const gzip = gzipSync(glb, { level: 9 });
   // RFC 1952 OS=255 means unknown. zlib otherwise stamps the host OS (19 on
   // macOS, 3 on Linux), changing the hash of identical compressed content.
@@ -103,36 +106,37 @@ export async function buildAvatarDelivery(source, { fast = false, meshProfile = 
   gzip[9] = 255;
   assert.ok(gunzipSync(gzip).equals(glb), "Gzip must preserve every GLB byte");
   assert.ok(gzip.length < (fast ? 1_300_000 : 3_500_000) && portrait.length < (fast ? 40_000 : 600_000), `Delivery budgets exceeded: model=${gzip.length}, portrait=${portrait.length}`);
-  const profile = meshProfile ? "call-v3" : fast ? "call-v2" : "delivery-v1";
+  const profile = pruneMorphs ? "call-v4" : meshProfile ? "call-v3" : fast ? "call-v2" : "delivery-v1";
   const manifest = { sourceSha256: sourceDigest, path: `/assets/mira/avatar/mira-anime-${profile}.glb.gz`, bytes: gzip.length,
     sha256: digest(gzip), decodedBytes: glb.length, decodedSha256: digest(glb),
-    portraitPath: `/assets/mira/avatar/mira-anime-${fast ? "preview-v2" : "portrait-v1"}.webp`, portraitBytes: portrait.length, portraitSha256: digest(portrait), images,
+    portraitPath: `/assets/mira/avatar/mira-anime-${fast ? "preview-v2" : "portrait-v1"}.webp`, portraitBytes: portrait.length, portraitSha256: digest(portrait), images, ...(retainedMorphs ? { retainedMorphs } : {}),
     ...(fast ? { rawPath: `/assets/mira/avatar/mira-anime-${profile}.glb`, textureMaxEdge: 1024, textureQuality: 90, pixelIdentical: false, geometryIdentical: !meshProfile, ...(precision ? { precision } : {}) } : {}) };
   let mesh, wire;
   if (meshProfile) {
-    const packed = await packAvatarMesh(glb, model, 28 + jsonLength);
+    const decoded = decodeGlb(glb);
+    const packed = await packAvatarMesh(glb, decoded.model, glb.length - decoded.binary.length);
     mesh = gzipSync(packed, { level: 9 }); mesh[9] = 255;
     assert.ok(mesh.length < 900_000, `Mesh delivery budget exceeded: ${mesh.length}`);
-    Object.assign(manifest, { meshPath: "/assets/mira/avatar/mira-anime-call-v3.mesh.gz", meshBytes: mesh.length,
+    Object.assign(manifest, { meshPath: `/assets/mira/avatar/mira-anime-${profile}.mesh.gz`, meshBytes: mesh.length,
       meshSha256: digest(mesh), meshPackedBytes: packed.length });
     // Native DecompressionStream Brotli changes no model bytes. Engines without
     // that format retain the previous gzip transport; no extra decoder download.
     wire = brotliCompressSync(packed, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } });
     assert.ok(brotliDecompressSync(wire).equals(packed));
     assert.ok(wire.length < 820_000);
-    Object.assign(manifest, { meshWirePath: "/assets/mira/avatar/mira-anime-call-v3.mesh.br", meshWireBytes: wire.length,
+    Object.assign(manifest, { meshWirePath: `/assets/mira/avatar/mira-anime-${profile}.mesh.br`, meshWireBytes: wire.length,
       meshWireSha256: digest(wire), meshPackedSha256: digest(packed) });
   }
   return { gzip, glb, portrait, manifest, mesh, wire };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
- for (const [fast, meshProfile] of [[false, false], [true, false], [true, true]]) {
-  const result = await buildAvatarDelivery(await readFile(new URL("../public/assets/mira/avatar/mira-anime-live-v2.vrm", import.meta.url)), { fast, meshProfile });
+ for (const [fast, meshProfile, pruneMorphs] of [[false, false, false], [true, false, false], [true, true, false], [true, true, true]]) {
+  const result = await buildAvatarDelivery(await readFile(new URL("../public/assets/mira/avatar/mira-anime-live-v2.vrm", import.meta.url)), { fast, meshProfile, pruneMorphs });
   const files = [
     ["../public" + result.manifest.path, result.gzip],
     ["../public" + result.manifest.portraitPath, result.portrait],
-    [`../lib/avatar-${meshProfile ? "call" : fast ? "call-v2" : "delivery"}-manifest.json`, Buffer.from(JSON.stringify(result.manifest, null, 2) + "\n")],
+    [`../lib/avatar-${pruneMorphs ? "call" : meshProfile ? "call-v3" : fast ? "call-v2" : "delivery"}-manifest.json`, Buffer.from(JSON.stringify(result.manifest, null, 2) + "\n")],
     ...(fast ? [["../public" + result.manifest.rawPath, result.glb]] : []),
     ...(meshProfile ? [["../public" + result.manifest.meshPath, result.mesh]] : []),
     ...(meshProfile ? [["../public" + result.manifest.meshWirePath, result.wire]] : []),

@@ -6,6 +6,32 @@ const rewritePattern=/\b(?:say (?:it|that)|translate|rewrite|make (?:it|that) (?
 const correctionPattern=/\b(?:actually|correct(?:ion|ed)?|changed|reschedul\w*|instead|nahi sorry)\b|(?:बदल|वजह|नहीं.{0,24}(?:भाई|बहन|दोस्त))/iu;
 const cancelDraftPattern=/\b(?:forget (?:it|that)|never ?mind|new topic|stop (?:drafting|writing)|chh?odo)\b|(?:छोड़ो|छोडो|विषय बदल)/iu;
 
+export function isFactCorrection(input: Pick<EdgeCompanionRequest,"messages">) {
+  const latest = input.messages.at(-1)?.content ?? "";
+  return !isDraftingRequest(input) && correctionPattern.test(latest)
+    && !/[?？]|\b(?:what|how|why|explain|tell|recommend|suggest|write|story|please|help|should|could|kya|batao|bataana)\b|(?:क्या|कैसे|क्यों|बताओ|मदद|बताइए)/iu.test(latest);
+}
+
+/** Narrow self-contained habits do not depend on a relative mentioned earlier.
+ * References/quotations/drafts deliberately keep the full conversation. */
+export function isStandalonePersonalHabit(input: Pick<EdgeCompanionRequest,"messages">) {
+  const latest = input.messages.at(-1)?.content.trim() ?? "";
+  return !isDraftingRequest(input)
+    && /^(?:I\b|I'm\b|I’m\b|main\s|mujhe\s|मैं(?:\s|ने\s)|मुझे\s)/iu.test(latest)
+    && /\b(?:often|always|usually|habit|tend to|aksar|hamesha)\b|(?:अक्सर|हमेशा|आदत)/iu.test(latest)
+    && !/\b(?:he|she|him|her|they|them|their|his|it|this|that|same|usko|uske|usse|isko|woh|voh)\b|(?:उस|वह|उसे|वही|ये|यह)|["“”`]/iu.test(latest);
+}
+
+export function replyGroundingIssue(input: Pick<EdgeCompanionRequest,"messages">, reply: string) {
+  if (!isStandalonePersonalHabit(input)) return null;
+  const latest = input.messages.at(-1)!.content.toLocaleLowerCase();
+  const people = input.messages.filter(turn => turn.role === "user").flatMap(turn =>
+    [...turn.content.matchAll(/\b(?:[Mm]y|[Mm]eri|[Mm]era|[Mm]ere)\s+(?:cousin|brother|sister|friend|mother|father|colleague|boss)\s+([A-Z][\p{L}\p{M}'’-]{1,40})\b/gu)].map(match => match[1]!));
+  // Never infer names from prior assistant output or rewrite the user's text.
+  const words = new Set(reply.toLocaleLowerCase().match(/[\p{L}\p{M}'’-]+/gu) ?? []);
+  return people.some(person => !latest.includes(person.toLocaleLowerCase()) && words.has(person.toLocaleLowerCase())) ? "habit-owner" : null;
+}
+
 export function isDraftingRequest(input: Pick<EdgeCompanionRequest,"messages">) {
   if(input.messages.at(-1)?.role!=="user") return false;
   for(const turn of input.messages.filter(message=>message.role==="user").slice(-7).reverse()) {
@@ -35,14 +61,14 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
     ? "Current task: provide ONLY the user's ready-to-send wording addressed directly to the recipient, without a preface or quotation marks. The sender is the user, not Mira. Give the actual message, not advice about what to send, 'I think you should', or a factual recap."
     : "Perspective: the user's relatives and offline plans belong to the user. Address them as you/your, tum/tumhara, or तुम/तुम्हारा. Mira is not a participant in their offline trip or event."];
   if(draft&&language==="hinglish")cues.push("Message Roman Hinglish mein likho: Hindi ki boli aur English words mila ke, sirf English mein nahi. Seedha us insaan se baat karo; bhejne ki salah mat do.");
-  if(rewrite)cues.push("Continue the existing task in the requested language/length. Preserve its meaning and addressee. Use the user's first-person voice only for an explicitly requested draft, not for your own account of their life.");
+  if(rewrite)cues.push("Continue the existing task in the requested language/length. Preserve its meaning and addressee. Unless a first-person draft/quotation was explicitly requested, describe the user's plan as 'you and your companion', not 'my companion and I'. Do not copy first-person ownership from a prior assistant mistake.");
   if(ownExperience)cues.push(language==="hi"
-    ? "वक्ता उपयोगकर्ता है। यहाँ 'मैं/मुझे' उपयोगकर्ता का अपना अनुभव है, किसी और का नहीं। जवाब उन्हें संबोधित करके दें और इसी अनुभव पर रहें।"
+    ? "वक्ता उपयोगकर्ता है। यहाँ 'मैं/मुझे' उपयोगकर्ता का अपना अनुभव है। जवाब में सीधे 'तुम/तुम्हें/तुम्हारा' कहकर इसी बात पर रहो। पिछली बात में आए रिश्तेदार को इस अनुभव का मालिक मत बनाओ।"
     : "The latest speaker is the USER describing their OWN experience. Keep that experience with the user, even if another person in the history has a related interest. Address the user directly.");
   if(correction)cues.push(draft
     ? "Apply the corrected fact/relationship inside the same draft. Return the revised message to the recipient, not an acknowledgement to the user."
     : language==="hi"
-    ? "बताया गया बदलाव और उसकी बताई हुई वजह ही स्वीकार करें। अपने-आप कोई नई परिस्थिति न जोड़ें। पहले की गलत जानकारी को दोहराएँ नहीं।"
+    ? "बताया गया बदलाव और उसकी बताई हुई वजह ही स्वीकार करें। योजना बदली है; यात्रा हो चुकी है ऐसा मत कहो। भविष्य की योजना का सही काल रखो, नया फायदा/परिस्थिति/सवाल मत जोड़ो।"
     : "Current task: acknowledge the corrected fact/timing and retain any stated reason in ONE short sentence, without a follow-up question. Replace the old fact; infer no additional circumstance or consequence. Continue the user's existing task.");
   return cues.join(" ");
 }

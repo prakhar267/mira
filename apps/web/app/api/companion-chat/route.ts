@@ -12,6 +12,7 @@ import { chatDeliveryStream } from "@/lib/chat-delivery-stream";
 import { CHAT_STREAM_TYPE } from "@/lib/chat-stream-protocol";
 import { discardUnusedRequestBody } from "@/lib/unused-request-body";
 import { groundReplyPerspective } from "@/lib/reply-perspective";
+import { isFactCorrection, replyGroundingIssue } from "@/lib/conversation-focus";
 
 const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
@@ -74,12 +75,12 @@ export async function POST(request: Request) {
       return safeReply(buildMemoryRecallReply(input), "memory");
     }
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage);
+    const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage) || isFactCorrection(input);
     const dayReply = buildDayCheckInReply(latestUserMessage, expectedLanguage);
     if (dayReply && !suppressQuestions) return deliver(dayReply,"day-check-in",{model:"day-check-in",language:expectedLanguage});
     const messages = buildFreeChatMessages(input);
     const responseTokenLimit = input.delivery === "text" ? (input.responsePreferences?.responseLength === "deep" ? 500 : 260) : 144;
-    const validReply = (reply: string) => !isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions, expectedLanguage);
+    const validReply = (reply: string) => !isInvalidCompanionReply(reply, latestUserMessage, suppressQuestions, expectedLanguage) && !replyGroundingIssue(input, reply);
     // Anonymous LLM7 is not an approved downstream production service. Use the
     // project's existing Workers AI binding without exposing conversations to it.
     const generate = async (onPrefix?: (prefix: string, providerSignal?: AbortSignal) => Promise<void>, deliverySignal = request.signal) => {
@@ -119,12 +120,13 @@ export async function POST(request: Request) {
     }
     let reply = groundReplyPerspective(input, sanitizeCompanionReplyForDelivery(raw, input.delivery));
     if (!emitted && !validReply(reply) && Date.now() - startedAt < 5_000) {
-      console.log(JSON.stringify({event:"reply_style_repair",requestId,reason:companionReplyIssue(reply,latestUserMessage,suppressQuestions,expectedLanguage),language:expectedLanguage}));
+      const groundingIssue = replyGroundingIssue(input, reply);
+      console.log(JSON.stringify({event:"reply_style_repair",requestId,reason:groundingIssue ?? companionReplyIssue(reply,latestUserMessage,suppressQuestions,expectedLanguage),language:expectedLanguage}));
       // One bounded repair for a wrong-script/style draft, never a retry loop.
       // It uses the same approved provider and counts against the upstream cap.
       const language = expectedLanguage === "hi" ? "Hindi in Devanagari" : expectedLanguage === "hinglish" ? "Hindi mixed with English, using Roman letters ONLY" : "English ONLY";
       const scriptRule=expectedLanguage==="hi"?"पूरा जवाब देवनागरी में लिखो। हिंदी के शब्द रोमन में मत लिखो। English technical terms and names may remain separate words.":"";
-      raw = await runCloudflare([
+      raw = await runCloudflare(groundingIssue ? buildFreeChatMessages({ ...input, messages: [input.messages.at(-1)!] }) : [
         ...messages,
         {role:"assistant",content:reply},
         {role:"user",content:`Rewrite your last reply in ${language}. ${scriptRule} Preserve its concrete meaning and the people from our conversation. Use feminine first-person grammar for Mira. ${suppressQuestions ? "No questions or requests for more information." : "One or two short sentences."} Only the rewritten reply, no explanation.`},
@@ -139,7 +141,7 @@ export async function POST(request: Request) {
     }
     deliverySignal.throwIfAborted();
     if (!validReply(reply)) {
-      console.log(JSON.stringify({event:"reply_style_rejected",requestId,reason:companionReplyIssue(reply,latestUserMessage,suppressQuestions,expectedLanguage),language:expectedLanguage}));
+      console.log(JSON.stringify({event:"reply_style_rejected",requestId,reason:replyGroundingIssue(input,reply) ?? companionReplyIssue(reply,latestUserMessage,suppressQuestions,expectedLanguage),language:expectedLanguage}));
       throw new EdgeRequestError("The generated reply missed the conversation style.", 503, "INVALID_REPLY");
     }
     return { reply, model: MODEL };
