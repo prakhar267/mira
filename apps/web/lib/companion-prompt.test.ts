@@ -33,8 +33,10 @@ describe("edge companion prompting", () => {
     expect(buildFreeChatMessages({...input,messages:[{role:"user",content:"ab hinglish mein bolo"}]}).at(-1)?.content).toContain("Hinglish in Roman letters");
     const hindi=buildFreeChatMessages({...input,messages:[{role:"user",content:"इसे आसान उदाहरण से समझाओ"}]});
     expect(hindi.at(-1)?.content).toContain("पूरा जवाब देवनागरी में लिखो");
-    expect(hindi[0]?.content).toContain("short ready-to-send message addressed to that person");
-    expect(hindi[0]?.content).toContain("preserve the draft's meaning, facts, addressee and purpose");
+    expect(hindi[0]?.content).not.toContain("TASK MODE");
+    const draft=buildFreeChatMessages({...input,messages:[{role:"user",content:"Write a short message to my brother in Hindi"}]});
+    expect(draft[0]?.content).toContain("ready-to-send wording directly to the recipient");
+    expect(draft[0]?.content).toContain("a translation preserves its purpose and addressee");
   });
   it("answers simple day check-ins without depending on provider availability",()=>{expect(buildDayCheckInReply("आज तुम्हारा दिन कैसा था?")).toContain("तुम्हारे साथ");expect(buildDayCheckInReply("How was your day?")).toContain("conversation");expect(buildDayCheckInReply("tumhara din kaisa tha")).toContain("tumhare saath");expect(buildDayCheckInReply("My day was rough")).toBeNull();});
   it("forbids the canned listener language seen in the failed call", () => {

@@ -1,10 +1,10 @@
 {
   "sourceSha256": "3b5f011aa01902d8a64788af7713fe317fee3f7a38c0b6300003816f3374e69b",
-  "path": "/assets/mira/avatar/mira-anime-call-v4.glb.gz",
-  "bytes": 968343,
-  "sha256": "5508846c0b2cc0af0cfd9992c2240f68f4983ddcee8fddebe3ad05f8f3ce8166",
-  "decodedBytes": 2466656,
-  "decodedSha256": "063b3fe2ca59185e2bc734e0c884e912abbcab8b65a116a89c6d70cb5b1af6b4",
+  "path": "/assets/mira/avatar/mira-anime-call-v3.glb.gz",
+  "bytes": 1088640,
+  "sha256": "d4ed93f49c2caacd5216cd263964d1718b573f6a323c6b9dcff8fa3231930896",
+  "decodedBytes": 2920764,
+  "decodedSha256": "27514c4f00858e15451965a04089f7246ae3685ed80752ffed9d488cde2e48cc",
   "portraitPath": "/assets/mira/avatar/mira-anime-preview-v2.webp",
   "portraitBytes": 13868,
   "portraitSha256": "f60bf046bbe1b74b1da9a5ac1a6e321fc8943d1e4004173dad9b2cc0c78d96c4",
@@ -162,29 +162,7 @@
       "visibleRgbMae": 0.9971810800057871
     }
   ],
-  "retainedMorphs": [
-    {
-      "mesh": 1,
-      "original": 57,
-      "retained": [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        12,
-        13,
-        14,
-        36,
-        37,
-        38,
-        39,
-        40
-      ]
-    }
-  ],
-  "rawPath": "/assets/mira/avatar/mira-anime-call-v4.glb",
+  "rawPath": "/assets/mira/avatar/mira-anime-call-v3.glb",
   "textureMaxEdge": 1024,
   "textureQuality": 90,
   "pixelIdentical": false,
@@ -205,12 +183,12 @@
       "textures"
     ]
   },
-  "meshPath": "/assets/mira/avatar/mira-anime-call-v4.mesh.gz",
-  "meshBytes": 792437,
-  "meshSha256": "8f7cccafa8f9f9717ac1155fb92abced7c31b2b6a38a15a8392fc6deb0f047c8",
-  "meshPackedBytes": 1107936,
-  "meshWirePath": "/assets/mira/avatar/mira-anime-call-v4.mesh.br",
-  "meshWireBytes": 747746,
-  "meshWireSha256": "2754ee2209bcac4b04e85dfd56b3899875213926ab1d90e54d636be3c61fc5e5",
-  "meshPackedSha256": "fafcbf28cbce0914d063371d2e453245e438e077f131f7c3281d667c49a4e37b"
+  "meshPath": "/assets/mira/avatar/mira-anime-call-v3.mesh.gz",
+  "meshBytes": 888738,
+  "meshSha256": "6d47cd07b6885aa0bcfa02699b8c225acea406ec1264b31684eb6e0e01939c2d",
+  "meshPackedBytes": 1369857,
+  "meshWirePath": "/assets/mira/avatar/mira-anime-call-v3.mesh.br",
+  "meshWireBytes": 810708,
+  "meshWireSha256": "88cef647f05fd19d997bd4882a39b09cedbd96b65ac4f2b45b4822ed6ffe9e33",
+  "meshPackedSha256": "0b1bd14a5c29dd8b63d31bda05b61013424b1a1f39b376a43343befeb9991881"
 }

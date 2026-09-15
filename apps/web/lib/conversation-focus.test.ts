@@ -1,8 +1,27 @@
 import {describe,expect,it} from "vitest";
-import {conversationFocus,isDraftingRequest} from "./conversation-focus";
+import {conversationFocus,isDraftingRequest,isStandalonePersonalHabit,replyGroundingIssue,isFactCorrection} from "./conversation-focus";
 import {buildFreeChatMessages} from "./free-chat";
 
 describe("turn-local speaker and intent focus",()=>{
+  it.each(["I often forget my camera battery.","मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।","main aksar apni chabi bhool jata hoon"])("detects a self-contained habit: %s",content=>{
+    const input={messages:[{role:"user" as const,content:"My cousin Arjun likes photography."},{role:"user" as const,content}]};
+    expect(isStandalonePersonalHabit(input)).toBe(true);
+    expect(replyGroundingIssue(input,"Arjun needs your battery for photography.")).toBe("habit-owner");
+    expect(replyGroundingIssue(input,"You could keep a spare with your camera.")).toBeNull();
+  });
+  it.each(['I often help him pack.', 'I often lend Arjun my camera.', 'My sister said "I often forget my keys".', 'What should I text him?'])("preserves contextual people and quoted speakers: %s",content=>{
+    expect(replyGroundingIssue({messages:[{role:"user",content:"My cousin Arjun likes photography."},{role:"user",content}]},"Arjun can bring his camera.")).toBeNull();
+  });
+  it("does not turn corrections into another question or apply that rule inside a draft",()=>{
+    expect(isFactCorrection({messages:[{role:"user",content:"Actually we leave Sunday, not Saturday."}]})).toBe(true);
+    expect(isFactCorrection({messages:[{role:"user",content:"Write a message to my brother"},{role:"user",content:"Actually he starts Sunday"}]})).toBe(false);
+  });
+  it.each(["Actually I am anxious, please help", "Actually I need help packing", "Actually kya karu ab", "काम की वजह से देर हो गई, मेरी मदद करो", "In English, sum up our plan with the corrected day", "Recap the changed plan"])("keeps an additional request after a correction: %s", content=>{
+    const input={messages:[{role:"user" as const,content}]};
+    expect(isFactCorrection(input)).toBe(false);
+    expect(conversationFocus(input,"en")).not.toContain("acknowledge the corrected fact");
+    expect(conversationFocus(input,"hi")).not.toContain("बताया गया बदलाव");
+  });
   it.each(["Write a short message to my landlord.","Draft an email", "Compose a quick note", "एक मैसेज लिखो।"])("recognizes explicit drafting without needing a question: %s",content=>{
     expect(isDraftingRequest({messages:[{role:"user",content}]})).toBe(true);
   });

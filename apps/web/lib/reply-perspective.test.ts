@@ -2,8 +2,20 @@ import {describe,expect,it} from "vitest";
 import {groundReplyPerspective} from "./reply-perspective";
 const input=(latest:string)=>({messages:[{role:"user" as const,content:"I am travelling with my cousin Arjun to Jaipur on Sunday."},{role:"user" as const,content:latest}]});
 describe("user-owned offline summaries",()=>{
+  it("finishes a plain fact correction before unsolicited consequences or questions",()=>{
+    expect(groundReplyPerspective(input("Actually we leave Sunday, not Saturday"),"Sunday morning departure, got it. That gives you a free day!")).toBe("Sunday morning departure, got it.");
+    expect(groundReplyPerspective(input("हाँ, काम की वजह से बदलना पड़ा।"),"काम की वजह से अब रविवार सुबह निकलोगे। अब कम समय मिलेगा।")).toBe("काम की वजह से अब रविवार सुबह निकलोगे।");
+    const answer="Pack some snacks and water. You can also take a charger.";
+    expect(groundReplyPerspective(input("Actually we leave Sunday. What should we pack?"),answer)).toBe(answer);
+    expect(groundReplyPerspective(input("Actually we leave Sunday"),"Got it. Sunday morning it is.")).toBe("Got it. Sunday morning it is.");
+  });
   it("keeps people and dates, but does not turn Mira into a traveller",()=>{
     expect(groundReplyPerspective(input("In English, sum up our relaxed plan"),"We are leaving for Jaipur on Sunday morning with Arjun. Our trip is relaxed.")).toBe("You are leaving for Jaipur on Sunday morning with Arjun. Your trip is relaxed.");
+  });
+  it("keeps coordinated travel subjects in the user's perspective",()=>{
+    expect(groundReplyPerspective(input("Sum up our relaxed plan"),"Arjun and I are heading to Jaipur on Sunday.")).toBe("Arjun and you are heading to Jaipur on Sunday.");
+    expect(groundReplyPerspective(input("Recap the plan"),'They said "Arjun and I are heading to Jaipur."')).toBe('They said "Arjun and I are heading to Jaipur."');
+    expect(groundReplyPerspective(input("Write a message about our trip"),"Arjun and I are heading to Jaipur.")).toBe("Arjun and I are heading to Jaipur.");
   });
   it("preserves quotation ownership and incomplete streamed quotes",()=>{
     const reply='Your cousin said, "We are leaving on Sunday."';

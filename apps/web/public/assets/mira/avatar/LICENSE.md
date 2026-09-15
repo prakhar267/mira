@@ -60,7 +60,7 @@ the old 9 MB source. `mira-anime-preview-v2.webp` is a 384-pixel, 13,868-byte
 thumbnail for immediate loading/error display. Exact hashes and dimensions are
 recorded in `lib/avatar-call-v2-manifest.json`; the generator validates this profile.
 
-## Smaller call profile v3 (default)
+## Smaller call profile v3 (retained)
 
 The v3 derivative keeps v2's exact textures, indices, skin weights, joints, rig,
 materials, expression bindings and metadata. Only floating-point position,
@@ -75,7 +75,7 @@ meshoptimizer 1.1.1 lossless vertex/index codec (see [its licence](MESHOPTIMIZER
 third-party service is called. Decompression restores the exact v3 GLB, verified
 with SHA-256 before rendering. Unsupported browsers use the verified v3 gzip or
 raw GLB compatibility path. All sizes, hashes and measured precision bounds are
-in `lib/avatar-call-manifest.json`. Startup download and decoding begin only
+in `lib/avatar-call-v3-manifest.json`. Startup download and decoding begin only
 after opening a call. Neither this precision bound nor draw submissions certify
 physical-phone performance or lip-sync accuracy.
 
@@ -83,3 +83,26 @@ physical-phone performance or lip-sync accuracy.
 (810,708 bytes rather than the 888,738-byte gzip transport). Native support is
 feature-detected; other browsers retain gzip. Both restore the same hash-verified
 v3 GLB. This transport change does not alter geometry, textures or licensing.
+
+## Expression-pruned call profile v4 (default)
+
+The v4 derivative retains all 14 of the 57 face morph targets referenced by
+VRM expressions, and would retain any additional nonzero default-weight target.
+Only unused, zero-weight targets are removed. Target names, weights and VRM
+bindings are remapped together. Every retained base attribute, morph delta,
+index, skin, texture, material, rig node and licence field is byte-identical to
+v3; the v3 precision and texture-compression disclosures above still apply.
+The source has no animation clips. The generator refuses animation clips and
+unknown reference-bearing extensions instead of guessing how to rewrite them.
+
+`scripts/avatar-call-morphs.mjs` implements this pruning; the existing MMP1
+codec and browser decoder are unchanged. The default transport is 792,437
+bytes with gzip or 747,746 bytes with native Brotli; the reconstructed GLB is
+2,466,656 bytes. Hash-verified gzip GLB and raw GLB compatibility paths remain.
+Exact hashes, retained target indices and sizes are recorded in
+`lib/avatar-call-manifest.json`. Earlier derivatives remain unchanged.
+
+Focusing or pointing at a video-call button may preload static JavaScript
+modules (except on Save-Data connections). This does not start a call, download
+the avatar, activate WebGL or request camera/microphone access. Model transfer
+still starts only after the user opens a video call.

@@ -5,12 +5,12 @@ export const labOrigin = "http://127.0.0.1:4397";
 // Performance fixtures must never reach a real account, provider or device.
 // Unknown API calls fail closed, independently of the compiled runtime's kill
 // switch. The pages, JavaScript, styles, images and VRM remain the real build.
-export async function isolateDemo(context) {
+export async function isolateDemo(context, origin = labOrigin) {
   const requests = { session: 0, chat: 0, speech: 0, unexpected: [] };
   let consent = false;
   await context.route("**/*", async route => {
     const request = route.request(), url = new URL(request.url());
-    if (url.origin !== labOrigin) {
+    if (url.origin !== origin) {
       requests.unexpected.push({ method: request.method(), origin: url.origin, path: url.pathname });
       return route.abort("blockedbyclient");
     }
@@ -40,8 +40,8 @@ export async function isolateDemo(context) {
   return requests;
 }
 
-export async function enterDemo(page) {
-  await page.goto(`${labOrigin}/demo`, { waitUntil: "load" });
+export async function enterDemo(page, origin = labOrigin) {
+  await page.goto(`${origin}/demo`, { waitUntil: "load" });
   await expect(page.getByRole("checkbox")).toHaveCount(3);
   for (const checkbox of await page.getByRole("checkbox").all()) await checkbox.check();
   await page.getByRole("button", { name: "Meet Mira", exact: true }).click();
@@ -49,9 +49,9 @@ export async function enterDemo(page) {
   await page.evaluate(() => document.fonts.ready);
 }
 
-export async function coldMobilePage(browser, cpuThrottle = 4) {
+export async function coldMobilePage(browser, cpuThrottle = 4, origin = labOrigin) {
   const context = await browser.newContext({ viewport: { width: 393, height: 851 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1, serviceWorkers: "block" });
-  const requests = await isolateDemo(context);
+  const requests = await isolateDemo(context, origin);
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   await cdp.send("Network.enable");

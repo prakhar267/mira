@@ -6,6 +6,16 @@ export class MockAI extends WorkerEntrypoint {
     if(model.includes("whisper"))return {text:"Aaj chai peene ka mann hai.",language:"hi"};
     const last=input.messages?.at(-1)?.content??"";
     const visible = text => model.includes("gemma-4") ? {choices:[{delta:{content:text}}]} : {response:text};
+    if(input.stream&&last.includes("[synthetic-model-stop]")) {
+      let cleanup;
+      return new ReadableStream({start(controller){
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(visible("Sunday morning departure, got it."))}\n\ndata: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n`));
+        // No [DONE], and EOF would arrive well after the route's deadline.
+        // Keep a real pending event so workerd doesn't classify the fixture
+        // itself as hung. Successful model-stop consumption cancels the timer.
+        cleanup=setTimeout(()=>controller.close(),15_000);
+      },cancel(){clearTimeout(cleanup);}});
+    }
     if(input.stream&&last.includes("[synthetic-stream-failure]"))return new Response(`data: ${JSON.stringify(visible("Let's practice your introduction. Start with your current role."))}\n\ndata: ${JSON.stringify({error:"Synthetic stream fixture failure"})}\n\n`,{headers:{"content-type":"text/event-stream"}}).body;
     const reply=/[\u0900-\u097f]/.test(last)?"हाँ, तुम्हारी बात समझ रही हूँ। आगे बताओ।":/\b(aaj|chai|kaise|tum|hai)\b/i.test(last)?"Haan, chai ka plan achha hai. Tum batao, kaisi chai pasand hai?":"That sounds good. Tell me a little more about it.";
     if(input.stream)return new Response(`data: ${JSON.stringify(visible(reply))}\n\ndata: [DONE]\n\n`,{headers:{"content-type":"text/event-stream"}}).body;

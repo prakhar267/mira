@@ -7,6 +7,22 @@ const measuredAssets = () => performance.getEntriesByType("resource").filter(ent
   encodedBytes: entry.encodedBodySize, decodedBytes: entry.decodedBodySize, durationMs: entry.duration,
 }));
 
+test("video-button intent warms only static code, never a model, media or provider", async ({ browser }) => {
+  const { context, page, requests } = await coldMobilePage(browser, 1);
+  try {
+    await syntheticCallMedia(page); await observeAvatar(page); await enterDemo(page);
+    await page.getByRole("button", { name: "Chat", exact: true }).tap();
+    const loaded = page.waitForResponse(response => /\/LiveAvatar3D-[^/]+\.js$/.test(new URL(response.url()).pathname) && response.ok());
+    await page.getByRole("button", { name: "Start video call with Mira", exact: true }).focus();
+    await loaded;
+    expect((await page.evaluate(measuredAssets)).filter(asset => /\.(?:vrm|glb|mesh)(?:\.(?:gz|br))?$/.test(asset.path))).toEqual([]);
+    await expect(page.getByRole("dialog", { name: "Video call with Mira", exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => window.__miraLabMedia.requested)).toBe(0);
+    expect(await page.evaluate(() => window.__miraAvatarLab.drawCalls)).toBe(0);
+    expect(requests).toEqual({ session: 1, chat: 0, speech: 0, unexpected: [] });
+  } finally { await context.close(); }
+});
+
 test("closing during avatar download aborts it without a late mount or retry", async ({ browser }) => {
   const { context, page, requests } = await coldMobilePage(browser, 1);
   let release;
@@ -18,7 +34,7 @@ test("closing during avatar download aborts it without a late mount or retry", a
       const original = window.fetch;
       window.__miraAvatarDownloads = [];
       window.fetch = (input, init) => {
-        if (String(input).includes("/mira-anime-call-v3.mesh")) {
+        if (String(input).includes("/mira-anime-call-v4.mesh")) {
           const item = { aborted: init.signal.aborted };
           window.__miraAvatarDownloads.push(item);
           init.signal.addEventListener("abort", () => { item.aborted = true; }, { once: true });
@@ -26,7 +42,7 @@ test("closing during avatar download aborts it without a late mount or retry", a
         return original(input, init);
       };
     });
-    await page.route("**/mira-anime-call-v3.mesh.gz*", async route => { await blocked; await route.abort().catch(() => undefined); });
+    await page.route("**/mira-anime-call-v4.mesh.gz*", async route => { await blocked; await route.abort().catch(() => undefined); });
     await enterDemo(page);
     expect(await page.evaluate(() => window.__miraAvatarDownloads)).toEqual([]);
     await page.getByRole("button", { name: "Chat", exact: true }).tap();
@@ -193,7 +209,7 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
       activeTracks: window.__miraLabMedia.activeTracks, cameraRequested: window.__miraLabMedia.cameraRequested,
     }, interactions: window.__miraInteractionLab.actions }));
     evidence.requests = requests;
-    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-call-v3.mesh.gz"));
+    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-call-v4.mesh.gz"));
     expect(model).toHaveLength(1);
     expect(model[0].decodedBytes).toBeGreaterThan(0);
     expect(evidence.load.callStartToReadyMs).toBeGreaterThan(0);
