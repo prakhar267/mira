@@ -47,6 +47,9 @@ companion small talk. Corrections and translations retain the recipient,
 purpose and user-as-sender perspective. Unrelated turns/cancellation end that
 mode. A narrow offline-travel summary normalization keeps Mira from joining
 the user's trip; authored first-person drafts and quotes are preserved.
+Language validation accepts short Hindi imperative phrases such as “phod dena”
+without forcing filler words or an unnecessary repair; English names alone do
+not qualify as Hinglish.
 
 A sequential 32-turn direct-provider candidate trial covered a corrected
 message draft, imperfect Hinglish transcription and a 24-turn trip across all

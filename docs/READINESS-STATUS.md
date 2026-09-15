@@ -4,6 +4,12 @@ Updated 14 September 2026. This is the current handoff; dated implementation rep
 
 ## Latest follow-up
 
+The [streaming Priya follow-up](READINESS-STREAMING-PRIYA.md) adds progressive
+native speech playback, a tested Cloudflare-hosted Gemma candidate, focused
+drafting and optional native Brotli avatar delivery. It retains raw fictional
+evaluation evidence and explicitly separates source tests from its eventual
+live promotion. Physical and independent-owner gates below remain open.
+
 The [conversation and call-delivery follow-up](READINESS-CALL-QUALITY.md)
 adds a smaller 889 KB avatar transport, grounded conversational examples and
 speech quote/Hindi-boundary fixes. Its source and local checks are not a live
