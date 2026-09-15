@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { matchesReplyLanguage } from "../lib/reply-language.ts";
+import { boundedCallDiagnostic, completedRequestTiming } from "../lib/call-qa-timing.ts";
 const require = createRequire(import.meta.url);
 const { chromium, expect } = require("@playwright/test");
 
@@ -42,19 +43,24 @@ try {
   page.on("response", response => {
     const service = new URL(response.url()).pathname.split("/").at(-1), turn = currentTurn;
     if (!(service in report.caps)) return;
-    const work = (async () => {
+    const work = boundedCallDiagnostic(async signal => {
       const item = { service, status: response.status(), requestId: response.headers()["x-request-id"] ?? null, streaming: response.headers()["x-mira-audio-stream"] === "mp3" };
       if (turn) turn.responses.push(item);
       if (!response.ok()) { report.errors.push(`${service}: HTTP ${response.status()}`); return; }
       if (service === "companion-transcribe" || service === "companion-chat") {
         const body = await response.json();
+        signal.throwIfAborted();
         if (turn) { if (service === "companion-transcribe") { turn.transcript = body.text ?? body.transcript; turn.language = body.language; } else turn.reply = body.reply; }
       }
-      await response.finished();
-      const timing = response.request().timing();
+      // On live canceled/consumed MP3 fetches Playwright's finished() remained
+      // unresolved despite finite responseEnd, ResourceTiming EOF and native
+      // audio ended. Use actual network timing, with a finite diagnostic bound.
+      const timing = await completedRequestTiming(() => response.request().timing(), signal);
+      signal.throwIfAborted();
+      item.timingSource = "browser-request-responseEnd";
       item.headersMs = Math.round(timing.responseStart);
       item.completeMs = Math.round(timing.responseEnd);
-    })().catch(() => report.errors.push("Response inspection failed"));
+    }).catch(() => report.errors.push("Response inspection failed or timed out"));
     pending.add(work); void work.finally(() => pending.delete(work));
   });
   await page.addInitScript(() => {
