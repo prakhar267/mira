@@ -11,8 +11,9 @@ import { assertCurrentMemoryContext } from "@/lib/inference-context";
 import { chatDeliveryStream } from "@/lib/chat-delivery-stream";
 import { CHAT_STREAM_TYPE } from "@/lib/chat-stream-protocol";
 import { discardUnusedRequestBody } from "@/lib/unused-request-body";
+import { groundReplyPerspective } from "@/lib/reply-perspective";
 
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
 function readModelText(result: unknown) {
   if (typeof result === "string") return result;
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
       // Reasoning/markup and overlength candidates stay buffered until final.
       if (unsafeCompanionOutput(raw)) throw new EdgeRequestError("This reply could not be safely completed. Retry this turn.", 503, "UNSAFE_STREAM");
       if (/[<>]/u.test(raw) || raw.length > 700) return;
-      const text = sanitizeCompanionReplyForDelivery(raw, "text");
+      const text = groundReplyPerspective(input, sanitizeCompanionReplyForDelivery(raw, "text"));
       const sentences = [...text.matchAll(/[^.!?।]+[.!?।](?=\s|$)/gu)];
       if (sentences.length < 2) return;
       const previous = sentences.at(-2)!;
@@ -102,11 +103,10 @@ export async function POST(request: Request) {
       const generated: unknown = await env.AI.run(MODEL as never, {
         messages: promptMessages,
         stream: true,
-        max_tokens: responseTokenLimit,
+        max_completion_tokens: responseTokenLimit,
         temperature: 0.45,
         top_p: 0.86,
-        top_k: 40,
-        repetition_penalty: 1.1,
+        chat_template_kwargs: { enable_thinking: false },
       } as never);
       return generated instanceof ReadableStream ? readChatStream(generated, signal, input.delivery !== "text", checkPartial ? raw => checkPartial(raw, signal) : undefined) : generated;
     }, Math.max(500, Math.min(8_000, 8_500 - (Date.now() - startedAt))), deliverySignal)));
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
       if (emitted) throw new EdgeRequestError("This reply could not be safely completed. Retry this turn.", 503, "UNSAFE_STREAM");
       return { reply: safeOutputReplacement(unsafe, expectedLanguage), model: "safety" };
     }
-    let reply = sanitizeCompanionReplyForDelivery(raw, input.delivery);
+    let reply = groundReplyPerspective(input, sanitizeCompanionReplyForDelivery(raw, input.delivery));
     if (!emitted && !validReply(reply) && Date.now() - startedAt < 5_000) {
       console.log(JSON.stringify({event:"reply_style_repair",requestId,reason:companionReplyIssue(reply,latestUserMessage,suppressQuestions,expectedLanguage),language:expectedLanguage}));
       // One bounded repair for a wrong-script/style draft, never a retry loop.
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         {role:"user",content:`Rewrite your last reply in ${language}. ${scriptRule} Preserve its concrete meaning and the people from our conversation. Use feminine first-person grammar for Mira. ${suppressQuestions ? "No questions or requests for more information." : "One or two short sentences."} Only the rewritten reply, no explanation.`},
       ]);
       await recheckContext(deliverySignal);
-      reply = sanitizeCompanionReplyForDelivery(raw, input.delivery);
+      reply = groundReplyPerspective(input, sanitizeCompanionReplyForDelivery(raw, input.delivery));
     }
     unsafe = unsafeCompanionOutput(raw);
     if (unsafe) {

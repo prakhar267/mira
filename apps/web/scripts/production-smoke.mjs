@@ -1,7 +1,7 @@
 import {mkdir,writeFile} from "node:fs/promises";
 import {resolve} from "node:path";
 import {createHash} from "node:crypto";
-import {gunzipSync} from "node:zlib";
+import {brotliDecompressSync,gunzipSync} from "node:zlib";
 import avatarDelivery from "../lib/avatar-call-manifest.json" with {type:"json"};
 import { MeshoptDecoder } from "meshoptimizer/decoder";
 import { decodeAvatarMesh } from "../lib/avatar-mesh-codec.ts";
@@ -54,14 +54,18 @@ await run("avatar asset availability",async()=>{
   // Streaming/local asset responses need not include Content-Length. Inspect
   // actual GLB/VRM bytes instead of treating that optional header as file size.
   const compressed=Buffer.from(await response.arrayBuffer());
-  check(compressed.length===avatarDelivery.meshBytes,"compressed avatar length mismatch");
-  check(createHash("sha256").update(compressed).digest("hex")===avatarDelivery.meshSha256,"compressed avatar digest mismatch");
+  check(compressed.length===avatarDelivery.meshBytes&&createHash("sha256").update(compressed).digest("hex")===avatarDelivery.meshSha256,"gzip avatar digest mismatch");
+  const packed=gunzipSync(compressed,{maxOutputLength:avatarDelivery.meshPackedBytes});
+  const compactResponse=await request(avatarDelivery.meshWirePath);
+  check(compactResponse.ok,`Brotli avatar HTTP ${compactResponse.status}`);
+  const compact=Buffer.from(await compactResponse.arrayBuffer());
+  check(compact.length===avatarDelivery.meshWireBytes&&createHash("sha256").update(compact).digest("hex")===avatarDelivery.meshWireSha256,"Brotli avatar digest mismatch");
+  check(brotliDecompressSync(compact,{maxOutputLength:avatarDelivery.meshPackedBytes}).equals(packed),"avatar transport differs");
   await MeshoptDecoder.ready;
-  const packed=new Uint8Array(gunzipSync(compressed,{maxOutputLength:avatarDelivery.meshPackedBytes}));
   const bytes=decodeAvatarMesh(packed,avatarDelivery.decodedBytes,MeshoptDecoder);
   check(bytes.length===avatarDelivery.decodedBytes&&createHash("sha256").update(bytes).digest("hex")===avatarDelivery.decodedSha256,"decoded avatar digest mismatch");
   check(bytes.length>1_000_000&&new TextDecoder().decode(bytes.slice(0,4))==="glTF","avatar response is not the expected GLB/VRM asset");
-  return `compressed avatar verified (${compressed.length} bytes); no claim about frame rate or lip sync`;
+  return `gzip and Brotli avatars verified (${compressed.length}/${compact.length} bytes); no claim about frame rate or lip sync`;
 });
 
 const failed=results.filter(result=>!result.passed).length;

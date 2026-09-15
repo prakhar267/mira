@@ -3,6 +3,9 @@
 export type ReplyLanguage = "en" | "hi" | "hinglish";
 export const hasInflectedHindi = (value: string) => (value.match(/\b(?:bhi|dono|rahega|rahegi|karoge|karogi|gaya|gayi|gai|tha|thi|raha|rahi|aap|nahin|waapas|waise|maine|kis|saath)\b/gi)?.length ?? 0) >= 2;
 const naturalHinglish = /\b(?:aaj|abhi|accha|arey|aur|bas|haan|hai|hoon|kaafi|kar|karo|karti|kya|kyun|lekin|main|matlab|mera|meri|mujhe|nahi|par|sach|theek|thoda|toh|tum|tumhara|uske|yaar|bilkul|badhai|shukriya|saath|chahiye|pasand|bataya)\b/i;
+// Short natural imperatives need not contain a filler such as "haan" or "yaar".
+// Match a Hindi verb phrase, not a lone token that may be an English name.
+const hindiImperative = /\b(?:(?:kar|bol|keh|bata|dikha|bhej|phod|fod)\s+(?:do|dena|dijiye)|dhya+an\s+rakhna|milte\s+hain)\b/i;
 const romanHindiWords = /\b(?:aaj|abhi|hoon|haan|hai|hain|mujhe|tum|tumhe|tumhara|tumhari|kaafi|nahi|nahin|yaar|karti|rahi|aap|dono|bhi|rahega|rahegi|karoge|karogi|waapas|aaoge|thakaan|hoga|hogi|accha|kaise|kya|aur)\b/gi;
 
 export function matchesReplyLanguage(reply: string, language: ReplyLanguage) {
@@ -14,6 +17,6 @@ export function matchesReplyLanguage(reply: string, language: ReplyLanguage) {
     return devanagari && romanGrammar < 3 && (reply.match(romanHindiWords)?.length ?? 0) < 2;
   }
   if (devanagari) return false;
-  if (language === "hinglish") return naturalHinglish.test(reply) || hasInflectedHindi(reply);
-  return (reply.match(romanHindiWords)?.length ?? 0) < 2;
+  if (language === "hinglish") return naturalHinglish.test(reply) || hasInflectedHindi(reply) || hindiImperative.test(reply);
+  return !hindiImperative.test(reply) && (reply.match(romanHindiWords)?.length ?? 0) < 2;
 }

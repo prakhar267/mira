@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, brotliDecompressSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { avatarDelivery, fetchAvatarDelivery } from "./avatar-delivery";
@@ -82,8 +82,7 @@ describe("verified avatar delivery profiles", () => {
   });
 
   it("loads, bounds, verifies and decompresses the actual committed payload", async () => {
-    const compressed = await asset(avatarDelivery.meshPath);
-    const fetchMock = vi.fn().mockResolvedValue(new Response(compressed)); vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = vi.fn(async(path:string,init?:RequestInit)=>{expect(init?.credentials).toBe("omit");return new Response(await asset(new URL(path,"https://local.test").pathname));}); vi.stubGlobal("fetch", fetchMock);
     const signal = new AbortController().signal;
     expect(Buffer.from(await fetchAvatarDelivery(signal)).equals(await asset(avatarDelivery.rawPath))).toBe(true);
     expect(fetchMock).toHaveBeenCalledOnce();
@@ -95,6 +94,14 @@ describe("verified avatar delivery profiles", () => {
       await expect(fetchAvatarDelivery(new AbortController().signal)).rejects.toThrow();
       expect(mock).toHaveBeenCalledOnce();
     }
+  });
+  it("keeps the existing gzip transport when the browser cannot decode Brotli",async()=>{
+    const Original=DecompressionStream;
+    vi.stubGlobal("DecompressionStream",class{constructor(format:CompressionFormat){if(String(format)==="brotli")throw Error("unsupported");return new Original(format);}});
+    const mock=vi.fn().mockResolvedValue(new Response(await asset(avatarDelivery.meshPath)));vi.stubGlobal("fetch",mock);
+    expect(Buffer.from(await fetchAvatarDelivery(new AbortController().signal)).equals(await asset(avatarDelivery.rawPath))).toBe(true);
+    expect(mock.mock.calls[0]?.[0]).toContain(avatarDelivery.meshPath);
+    expect(brotliDecompressSync(await asset(avatarDelivery.meshWirePath)).equals(gunzipSync(await asset(avatarDelivery.meshPath)))).toBe(true);
   });
   it("retains verified gzip compatibility without WebAssembly", async () => {
     vi.stubGlobal("WebAssembly", undefined);

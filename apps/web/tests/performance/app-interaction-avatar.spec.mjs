@@ -79,7 +79,7 @@ test("three cold mobile-emulated app sessions record real interaction timing", a
         expect(requests).toMatchObject({ session: 1, chat: 1, speech: 0, unexpected: [] });
         expect(samples.at(-1).overflow).toBe(false);
         // The costly VRM must wait for an explicitly opened video call.
-        expect(assets.filter(asset => /\.(?:vrm|glb|mesh)(?:\.gz)?$/i.test(asset.path))).toEqual([]);
+        expect(assets.filter(asset => /\.(?:vrm|glb|mesh)(?:\.(?:gz|br))?$/i.test(asset.path))).toEqual([]);
         if (sample === 1) await page.screenshot({ path: testInfo.outputPath("app-memory-mobile.png") });
       } finally { await context.close(); }
     }
@@ -153,7 +153,7 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
     await enterDemo(page);
     await page.getByRole("button", { name: "Chat", exact: true }).tap();
     const before = await page.evaluate(measuredAssets);
-    expect(before.filter(asset => /\.(?:vrm|glb|mesh)(?:\.gz)?$/i.test(asset.path))).toEqual([]);
+    expect(before.filter(asset => /\.(?:vrm|glb|mesh)(?:\.(?:gz|br))?$/i.test(asset.path))).toEqual([]);
     const callStartedAt = await page.evaluate(() => performance.now());
     await recordInteraction(page, "open-video-call", () => page.getByRole("button", { name: "Start video call with Mira", exact: true }).tap(),
       () => expect(page.getByRole("dialog", { name: "Video call with Mira", exact: true })).toBeVisible());

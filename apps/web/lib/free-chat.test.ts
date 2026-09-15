@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { buildFreeChatSystemPrompt, createFreeChatRequest, FREE_CHAT_MODEL, readFreeChatResponse } from "./free-chat";
 
 describe("free chat inference", () => {
+  it("gives drafting precedence over persona and unsolicited-advice preferences",()=>{
+    const prompt=buildFreeChatSystemPrompt({messages:[{role:"user",content:"usko ek chhota sa message kya bheju"}],companion:{name:"Mira",personality:{curiosity:1}},user:{name:"QA"},delivery:"voice"});
+    expect(prompt).toContain("TASK MODE");expect(prompt).not.toContain("Be a warm, familiar Indian friend");
+    expect(prompt).not.toContain("Ask permission before unsolicited advice");expect(prompt).toContain("sender's gender only if explicitly stated");
+  });
+  it("does not add a habitual follow-up after a recent assistant question",()=>{
+    const prompt=buildFreeChatSystemPrompt({messages:[{role:"assistant",content:"How did that feel?"},{role:"user",content:"It felt peaceful."}],companion:{name:"Mira"},user:{name:"QA"},delivery:"voice"});
+    expect(prompt).toContain("Do not ask a question.");
+  });
   it("creates an anonymous low-latency short-form request", () => {
     const request = createFreeChatRequest([{ role: "user", content: "yaar aaj kaafi hectic tha" }], "voice");
     expect(request.headers).toEqual({ authorization: "Bearer unused", "content-type": "application/json" });

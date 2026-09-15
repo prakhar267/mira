@@ -1,12 +1,14 @@
 import { createInworldSpeechRequest, decodeInworldAudio, fitInworldSpeechPrompt, INWORLD_TTS_ENDPOINT } from "@/lib/inworld-speech";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson, recordServiceMetric } from "@/lib/edge-security";
 import { withProviderDeadline } from "@/lib/provider-resilience";
-import { withInferenceCapacity } from "@/lib/capacity";
+import { reserveCapacity, withInferenceCapacity } from "@/lib/capacity";
 import { authorizeInference } from "@/lib/inference-policy";
 import { parseSpeechPayload } from "@/lib/inference-payloads";
 import { unsafeCompanionOutput } from "@/lib/companion-safety";
 import { providerFetch } from "@/lib/provider-fetch";
 import { discardUnusedRequestBody } from "@/lib/unused-request-body";
+import { readInworldAudioStream } from "@/lib/inworld-audio-stream";
+import { speechDeliveryStream } from "@/lib/speech-delivery-stream";
 
 const VOICE = {
   model: "inworld-tts-2-flash",
@@ -25,7 +27,7 @@ async function generateInworldSpeech(prompt: string, apiKey: string, requestSign
   },10000,requestSignal);
 }
 
-function audioResponse(audio: Uint8Array, requestId: string, startedAt: number) {
+function audioResponse(audio: Uint8Array | ReadableStream<Uint8Array>, requestId: string, startedAt: number) {
   console.log(JSON.stringify({
     event: "edge_request",
     requestId,
@@ -39,7 +41,7 @@ function audioResponse(audio: Uint8Array, requestId: string, startedAt: number) 
   }));
   return new Response(audio as unknown as BodyInit, {
     headers: {
-      "cache-control": "no-store",
+      "cache-control": "no-store, no-transform",
       "content-type": "audio/mpeg",
       "x-companion-voice": VOICE.name,
       "x-companion-voice-model": VOICE.model,
@@ -47,6 +49,7 @@ function audioResponse(audio: Uint8Array, requestId: string, startedAt: number) 
       "x-companion-language": VOICE.language,
       "x-content-type-options": "nosniff",
       "x-request-id": requestId,
+      ...(audio instanceof ReadableStream ? { "x-mira-audio-stream": "mp3" } : {}),
     },
   });
 }
@@ -66,6 +69,27 @@ export async function POST(request: Request) {
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const apiKey = (env as typeof env & { INWORLD_API_KEY?: string }).INWORLD_API_KEY?.trim();
     if (!apiKey) return respond({ error: "Mira's selected Priya voice is not configured yet." }, 503, { provider: VOICE.provider, model: VOICE.model, configuration: "missing" });
+    if (request.headers.get("x-mira-audio-stream") === "1") {
+      // Refuse quota/concurrency failures as HTTP 429 before committing headers.
+      const release = await reserveCapacity("speech", principal, prompt.length);
+      const body = speechDeliveryStream({
+        signal: request.signal,
+        check: async signal => { signal.throwIfAborted(); await authorizeInference(request, "speech"); signal.throwIfAborted(); },
+        work: async (emit, parent) => {
+          let unresolved = false;
+          try { await withProviderDeadline("inworld-speech", async signal => {
+            await authorizeInference(request, "speech"); signal.throwIfAborted();
+            const response = await providerFetch(`${INWORLD_TTS_ENDPOINT}:stream`, { ...createInworldSpeechRequest(prompt, apiKey), signal });
+            if (!response.ok || !response.body) { await response.body?.cancel(); throw Error("Speech provider unavailable"); }
+            await readInworldAudioStream(response.body, signal, emit);
+          }, 10_000, parent); }
+          catch (cause) { unresolved = cause instanceof Error && ["AbortError", "TimeoutError"].includes(cause.name); throw cause; }
+          finally { if (!unresolved) await release(); }
+        },
+        finish: failed => recordServiceMetric("companion-speech", failed, Date.now() - startedAt),
+      });
+      return audioResponse(body, requestId, startedAt);
+    }
     const audio = await withInferenceCapacity("speech", principal, prompt.length, async () => {
       await authorizeInference(request, "speech");
       return generateInworldSpeech(prompt, apiKey, request.signal);

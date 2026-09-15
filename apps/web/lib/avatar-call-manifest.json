@@ -186,5 +186,9 @@
   "meshPath": "/assets/mira/avatar/mira-anime-call-v3.mesh.gz",
   "meshBytes": 888738,
   "meshSha256": "6d47cd07b6885aa0bcfa02699b8c225acea406ec1264b31684eb6e0e01939c2d",
-  "meshPackedBytes": 1369857
+  "meshPackedBytes": 1369857,
+  "meshWirePath": "/assets/mira/avatar/mira-anime-call-v3.mesh.br",
+  "meshWireBytes": 810708,
+  "meshWireSha256": "88cef647f05fd19d997bd4882a39b09cedbd96b65ac4f2b45b4822ed6ffe9e33",
+  "meshPackedSha256": "0b1bd14a5c29dd8b63d31bda05b61013424b1a1f39b376a43343befeb9991881"
 }

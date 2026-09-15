@@ -1,0 +1,226 @@
+[
+  {
+    "scenario": "person-and-constraint",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "My brother Kabir starts his first job tomorrow. He hates long speeches.",
+    "reply": "Since he's not a fan of long speeches, maybe just a quick, sincere note or a short toast would work best. Do you want me to help you draft something brief?",
+    "ms": 2022
+  },
+  {
+    "scenario": "person-and-constraint",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "usko ek chhota sa message kya bheju",
+    "reply": "All the best for your first day tomorrow, Kabir! Phod dena.",
+    "ms": 1420
+  },
+  {
+    "scenario": "person-and-constraint",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "नहीं, वो मेरा भाई है, दोस्त नहीं।",
+    "reply": "कल के लिए बहुत शुभकामनाएँ, कबीर! अच्छे से करना।",
+    "ms": 1158
+  },
+  {
+    "scenario": "person-and-constraint",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "Now say it in English, one sentence, no advice",
+    "reply": "Good luck with your first day tomorrow, Kabir!",
+    "ms": 1124
+  },
+  {
+    "scenario": "rough-transcription",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "yar ofis mein boss ne sabke samne daant dia",
+    "reply": "Sabke samne daant khana bahut awkward hota hai. Kya zyada gussa kiya unhone?",
+    "ms": 1484
+  },
+  {
+    "scenario": "rough-transcription",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "galti meri nahi thi report kisi aur ne bheji thi",
+    "reply": "Yeh toh bahut unfair hai, jab galti kisi aur ki ho aur daant tumhein pade. Kya tumne unhe sach batane ki koshish ki?",
+    "ms": 1047
+  },
+  {
+    "scenario": "rough-transcription",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "I don't want you to solve it, just talk to me normally",
+    "reply": "Got it, I'll just be here to listen. That sounds incredibly frustrating to deal with.",
+    "ms": 780
+  },
+  {
+    "scenario": "rough-transcription",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "हाँ बस यही बात परेशान कर रही है",
+    "reply": "बिल्कुल, मैं समझ सकती हूँ। जब बिना वजह डाँट पड़ती है, तो मन में बस वही बात घूमती रहती है।",
+    "ms": 646
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "I'm planning a weekend trip to Jaipur with my cousin Arjun. We leave Saturday morning.",
+    "reply": "Jaipur sounds like a great plan for the weekend. Do you and Arjun have a specific itinerary in mind?",
+    "ms": 705
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "hume museums pasand hain lekin shopping bilkul nahi",
+    "reply": "Museums ke liye Jaipur best hai. Shopping skip karke tum log sirf history aur architecture enjoy kar sakte ho.",
+    "ms": 1059
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "हम ट्रेन से जाएंगे, और होटल स्टेशन के पास है।",
+    "reply": "ट्रेन से सफर और स्टेशन के पास होटल, यह तो बहुत सुविधाजनक रहेगा।",
+    "ms": 646
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "I want a relaxed trip, not a checklist of every monument",
+    "reply": "That sounds much more peaceful. Do you have a few specific museums you're definitely planning to visit?",
+    "ms": 683
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "aaj soch raha tha bas ek museum kaafi hai",
+    "reply": "Ek hi museum dekhna zyada relaxed rahega. Isse tum log bina kisi jaldi ke wahan ka mahol enjoy kar paoge.",
+    "ms": 981
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "Actually we changed the departure to Sunday morning, not Saturday",
+    "reply": "Sunday morning departure, got it.",
+    "ms": 675
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "हाँ, रविवार सुबह ही। काम की वजह से बदलना पड़ा।",
+    "reply": "काम की वजह से रविवार सुबह निकलना पड़ा, समझ सकती हूँ।",
+    "ms": 983
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "Arjun likes photography but dislikes crowded places",
+    "reply": "Since Arjun likes photography but hates crowds, you might want to look for some quieter, scenic spots. Want some suggestions for less crowded areas?",
+    "ms": 926
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "usko shaant jagah chahiye bas",
+    "reply": "Shaant jagah mil gayi toh Arjun ke liye photography bhi easy ho jayegi.",
+    "ms": 803
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "मुझे लगता है हमें दोपहर में आराम करना चाहिए।",
+    "reply": "दोपहर में आराम करना एक अच्छा विचार है, इससे तुम लोग थकान महसूस नहीं करोगे।",
+    "ms": 779
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "What should we pack for a short train journey? Just three things",
+    "reply": "Pack a power bank, some light snacks, and a reusable water bottle.",
+    "ms": 779
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "haan paani aur snacks toh rakhenge",
+    "reply": "Paani aur snacks toh zaroori hain. Power bank bhi saath rakh lena taaki phone charge rahe.",
+    "ms": 624
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।",
+    "reply": "कैमरे की बैटरी का ध्यान रखना बहुत ज़रूरी है, वरना फोटोग्राफी अधूरी रह जाएगी। क्या तुमने चार्जर भी चेक कर लिया है?",
+    "ms": 713
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "Tell me a small travel joke, not a whole story",
+    "reply": "Why don't mountains get cold in the winter? Because they wear snowcaps.",
+    "ms": 645
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "haha yaar ye toh mere saath ho chuka hai",
+    "reply": "Haha, aisa aksar hota hai. Kya tumhari battery bhi beech safar mein khatam ho gayi thi?",
+    "ms": 1326
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "We should probably save an offline map too",
+    "reply": "That is a smart move, especially if you run into areas with poor network.",
+    "ms": 869
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "हाँ, इंटरनेट पर पूरी तरह भरोसा नहीं कर सकते।",
+    "reply": "बिल्कुल, इंटरनेट पर पूरी तरह भरोसा न करना ही समझदारी है। Offline maps साथ रखना एक बहुत अच्छा फैसला है।",
+    "ms": 1040
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "Arjun just said he wants one good meal instead of lots of cafe stops",
+    "reply": "Focusing on one great meal instead of multiple cafe stops will definitely keep the trip more relaxed.",
+    "ms": 724
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "mujhe bhi ye plan accha lag raha hai",
+    "reply": "Chalo, achha hai ki tumhein ye plan pasand aa raha hai. Relaxed trip aur ek badhiya meal—sab set lag raha hai.",
+    "ms": 3925
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "Keep the plan simple, we are not trying to see everything",
+    "reply": "Keeping it simple will make the trip much more enjoyable. Do you have a specific type of cuisine in mind for that one good meal?",
+    "ms": 1572
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "Do you remember who I'm travelling with and which city we're visiting?",
+    "reply": "You are travelling with Arjun to Jaipur.",
+    "ms": 6893
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "हम अब किस दिन सुबह निकल रहे हैं?",
+    "reply": "तुम लोग रविवार सुबह निकल रहे हो।",
+    "ms": 1058
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "Arjun ko kaisi jagah pasand nahi hai?",
+    "reply": "Arjun ko crowded places pasand nahi hain.",
+    "ms": 1174
+  },
+  {
+    "scenario": "long-conversation-24-turns",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "user": "In English, sum up our relaxed plan with the corrected departure day",
+    "reply": "We are leaving for Jaipur on Sunday morning for a relaxed trip with Arjun, focusing on one museum and one great meal instead of a crowded checklist.",
+    "ms": 735
+  }
+]

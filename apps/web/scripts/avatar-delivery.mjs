@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { gzipSync, gunzipSync } from "node:zlib";
+import { gzipSync, gunzipSync, brotliCompressSync, brotliDecompressSync, constants } from "node:zlib";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 import { compactAvatar } from "./compact-avatar.mjs";
@@ -108,15 +108,22 @@ export async function buildAvatarDelivery(source, { fast = false, meshProfile = 
     sha256: digest(gzip), decodedBytes: glb.length, decodedSha256: digest(glb),
     portraitPath: `/assets/mira/avatar/mira-anime-${fast ? "preview-v2" : "portrait-v1"}.webp`, portraitBytes: portrait.length, portraitSha256: digest(portrait), images,
     ...(fast ? { rawPath: `/assets/mira/avatar/mira-anime-${profile}.glb`, textureMaxEdge: 1024, textureQuality: 90, pixelIdentical: false, geometryIdentical: !meshProfile, ...(precision ? { precision } : {}) } : {}) };
-  let mesh;
+  let mesh, wire;
   if (meshProfile) {
     const packed = await packAvatarMesh(glb, model, 28 + jsonLength);
     mesh = gzipSync(packed, { level: 9 }); mesh[9] = 255;
     assert.ok(mesh.length < 900_000, `Mesh delivery budget exceeded: ${mesh.length}`);
     Object.assign(manifest, { meshPath: "/assets/mira/avatar/mira-anime-call-v3.mesh.gz", meshBytes: mesh.length,
       meshSha256: digest(mesh), meshPackedBytes: packed.length });
+    // Native DecompressionStream Brotli changes no model bytes. Engines without
+    // that format retain the previous gzip transport; no extra decoder download.
+    wire = brotliCompressSync(packed, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } });
+    assert.ok(brotliDecompressSync(wire).equals(packed));
+    assert.ok(wire.length < 820_000);
+    Object.assign(manifest, { meshWirePath: "/assets/mira/avatar/mira-anime-call-v3.mesh.br", meshWireBytes: wire.length,
+      meshWireSha256: digest(wire), meshPackedSha256: digest(packed) });
   }
-  return { gzip, glb, portrait, manifest, mesh };
+  return { gzip, glb, portrait, manifest, mesh, wire };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -128,6 +135,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     [`../lib/avatar-${meshProfile ? "call" : fast ? "call-v2" : "delivery"}-manifest.json`, Buffer.from(JSON.stringify(result.manifest, null, 2) + "\n")],
     ...(fast ? [["../public" + result.manifest.rawPath, result.glb]] : []),
     ...(meshProfile ? [["../public" + result.manifest.meshPath, result.mesh]] : []),
+    ...(meshProfile ? [["../public" + result.manifest.meshWirePath, result.wire]] : []),
   ];
   for (const [path, bytes] of files) {
     const url = new URL(path, import.meta.url);

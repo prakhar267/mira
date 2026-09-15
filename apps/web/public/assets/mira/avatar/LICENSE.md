@@ -78,3 +78,8 @@ raw GLB compatibility path. All sizes, hashes and measured precision bounds are
 in `lib/avatar-call-manifest.json`. Startup download and decoding begin only
 after opening a call. Neither this precision bound nor draw submissions certify
 physical-phone performance or lip-sync accuracy.
+
+`mira-anime-call-v3.mesh.br` is the identical MMP1 payload encoded with Brotli
+(810,708 bytes rather than the 888,738-byte gzip transport). Native support is
+feature-detected; other browsers retain gzip. Both restore the same hash-verified
+v3 GLB. This transport change does not alter geometry, textures or licensing.
