@@ -16,7 +16,7 @@ describe("turn-local speaker and intent focus",()=>{
     expect(isFactCorrection({messages:[{role:"user",content:"Actually we leave Sunday, not Saturday."}]})).toBe(true);
     expect(isFactCorrection({messages:[{role:"user",content:"Write a message to my brother"},{role:"user",content:"Actually he starts Sunday"}]})).toBe(false);
   });
-  it.each(["Actually I am anxious, please help", "Actually I need help packing", "Actually kya karu ab", "काम की वजह से देर हो गई, मेरी मदद करो"])("keeps an additional request after a correction: %s", content=>{
+  it.each(["Actually I am anxious, please help", "Actually I need help packing", "Actually kya karu ab", "काम की वजह से देर हो गई, मेरी मदद करो", "In English, sum up our plan with the corrected day", "Recap the changed plan"])("keeps an additional request after a correction: %s", content=>{
     const input={messages:[{role:"user" as const,content}]};
     expect(isFactCorrection(input)).toBe(false);
     expect(conversationFocus(input,"en")).not.toContain("acknowledge the corrected fact");

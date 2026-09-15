@@ -8,8 +8,8 @@ const cancelDraftPattern=/\b(?:forget (?:it|that)|never ?mind|new topic|stop (?:
 
 export function isFactCorrection(input: Pick<EdgeCompanionRequest,"messages">) {
   const latest = input.messages.at(-1)?.content ?? "";
-  return !isDraftingRequest(input) && correctionPattern.test(latest)
-    && !/[?？]|\b(?:what|how|why|explain|tell|recommend|suggest|write|story|please|help|should|could|kya|batao|bataana)\b|(?:क्या|कैसे|क्यों|बताओ|मदद|बताइए)/iu.test(latest);
+  return !isDraftingRequest(input) && correctionPattern.test(latest) && !rewritePattern.test(latest)
+    && !/[?？]|\b(?:what|how|why|explain|tell|recommend|suggest|write|story|please|help|should|could|kya|batao|bataana|summari[sz]e|recap)\b|(?:क्या|कैसे|क्यों|बताओ|मदद|बताइए|सारांश|संक्षेप)/iu.test(latest);
 }
 
 /** Narrow self-contained habits do not depend on a relative mentioned earlier.
