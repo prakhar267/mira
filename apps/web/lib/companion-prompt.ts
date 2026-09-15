@@ -38,7 +38,11 @@ const roboticSelfDescriptionPattern = /\b(?:large language model|language model|
 export type CompanionLanguage = "en" | "hi" | "hinglish";
 
 function explicitlyRequestedLanguage(value: string): CompanionLanguage | null {
-  if (!/(?:speak|talk|reply|answer|chat|language|keep|say|switch|baat|bolo|बात|बोल|जवाब|भाषा|mein|में)/iu.test(value)) return null;
+  // Standalone spoken/text choices are commands too ("Hindi please"). Keep
+  // this anchored so mentioning a Hindi film/name is not a language switch.
+  const shortChoice = value.trim().match(/^(?:please\s+)?(?:in\s+)?(english|hindi|hinglish)(?:\s+please)?[.!?\s]*$/i)?.[1]?.toLowerCase();
+  if (shortChoice) return shortChoice === "hindi" ? "hi" : shortChoice === "hinglish" ? "hinglish" : "en";
+  if (!/\b(?:speak|talk|reply|answer|chat|language|keep|say|switch|baat|bolo|mein)\b|(?:बात|बोल|जवाब|भाषा|में)/iu.test(value)) return null;
 
   const mentions = [
     ...[...value.matchAll(/(?:hinglish|हिंग्लिश)/giu)].map((match) => ({ language: "hinglish" as const, index: match.index, value: match[0] })),
@@ -73,11 +77,16 @@ export function detectCompanionLanguage(value: string): CompanionLanguage {
 }
 
 export function detectCompanionRequestLanguage(input: Pick<EdgeCompanionRequest, "messages">): CompanionLanguage {
-  const latest = input.messages.at(-1)?.content.trim() ?? "";
-  const detected = detectCompanionLanguage(latest);
-  if (detected !== "en" || !/^(?:ok(?:ay)?|yes|no|right|sure|fine|hmm+|uh huh|go on)[.!?\s]*$/i.test(latest)) return detected;
-  const previousUserMessage = input.messages.slice(0, -1).reverse().find((message) => message.role === "user")?.content ?? "";
-  return previousUserMessage ? detectCompanionLanguage(previousUserMessage) : detected;
+  // A chain of neutral acknowledgements must not silently reset Hindi/Hinglish
+  // to English. Only user speech sets the language, never a model's reply.
+  for (let index = input.messages.length - 1; index >= 0; index--) {
+    const message = input.messages[index]!;
+    if (message.role !== "user") continue;
+    const content = message.content.trim();
+    if (!content || /^(?:ok(?:ay)?|yes|no|right|sure|fine|hmm+|uh huh|go on)[.!?\s]*$/i.test(content)) continue;
+    return detectCompanionLanguage(content);
+  }
+  return "en";
 }
 
 export function requestsListeningOnly(value: string) {

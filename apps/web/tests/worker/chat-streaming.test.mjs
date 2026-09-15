@@ -18,6 +18,18 @@ function chat(cookie, content, delivery = "text") {
 }
 
 describe("text stream response body inside Workers with synthetic provider binding", () => {
+  it.each(["text","voice","video"])("preserves language through acknowledgement chains and switches explicitly in %s", async delivery=>{
+    const cookie=await session();
+    for(const [content,expected] of [["हिंदी में बात करो।","बारिश में चाय अच्छी लगती है।"],["ab hinglish mein bolo","Baarish mein chai acchi lagti hai."],["Now speak English","Tea is nice when it rains."]]) {
+      const messages=[{role:"user",content:"आज बारिश हो रही है। [synthetic-language-chain]"},{role:"user",content},{role:"assistant",content:"A previous English reply does not set your language."},{role:"user",content:"okay"},{role:"assistant",content:"Tea is nice."},{role:"user",content:"hmm"}];
+      const response=await SELF.fetch(`${origin}/api/companion-chat`,{method:"POST",headers:{origin,cookie,"content-type":"application/json",accept:"application/x-ndjson"},body:JSON.stringify({messages,companion:{name:"Mira"},user:{name:"Synthetic adult"},delivery})});
+      expect(response.status).toBe(200);
+      if(delivery==="text") {
+        const events=new TextDecoder().decode(await response.arrayBuffer()).trim().split("\n").map(JSON.parse);
+        expect(events.at(-1)).toMatchObject({type:"done",reply:expected});
+      } else expect(await response.json()).toMatchObject({reply:expected});
+    }
+  });
   it("delivers voice and video replies on model stop without waiting for transport EOF",async()=>{
     const cookie=await session();
     for(const delivery of ["voice","video"]){

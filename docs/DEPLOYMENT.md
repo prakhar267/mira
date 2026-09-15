@@ -58,7 +58,7 @@ MIRA_EVAL_SCENARIOS=daily-smalltalk \
 node apps/web/scripts/conversation-eval.mjs
 ```
 
-Replace the example origin with the explicitly approved deployment; do not interpret the example as authorization to call production. The script creates one limited demo session through the real declaration contract, keeps its secure cookie in memory and attempts revocation on exit. It does not renew sessions to bypass the server's limits. The full dataset has 76 turns, while a demo principal allows at most 40 chat provider attempts; select an appropriate smaller subset. Model repair attempts can exhaust that allowance earlier.
+Replace the example origin with the explicitly approved deployment; do not interpret the example as authorization to call production. The script creates one limited demo session through the real declaration contract, keeps its secure cookie in memory and attempts revocation on exit. It does not renew sessions to bypass the server's limits. The dataset exceeds a demo principal's maximum of 40 chat provider attempts; select an appropriate smaller subset. Model repair attempts can exhaust that allowance earlier.
 
 `MIRA_EVAL_MAX_REQUESTS` caps attempted **chat HTTP requests**, including failures, not provider credits or individual upstream attempts. A single accepted request can use bounded server repair attempts. There are no client inference retries. Budget exhaustion, authentication/provider errors, invalid responses, failed demo revocation or a changed release produce an incomplete/failed report rather than a passing result. Server unit/daily/concurrency caps still apply. Health/session/revocation requests are separate from this chat cap.
 

@@ -1,4 +1,14 @@
 [
+  {"id":"neutral-language-continuity","turns":[
+    {"text":"आज अच्छी बारिश हो रही है, हिंदी में बात करो।","language":"hi"},
+    {"text":"okay","language":"hi"},
+    {"text":"hmm","language":"hi"},
+    {"text":"Hinglish please","language":"hinglish"},
+    {"text":"right","language":"hinglish"},
+    {"text":"okay","language":"hinglish"},
+    {"text":"Now let's talk in English. I enjoy watching the rain from my balcony.","language":"en"},
+    {"text":"sure","language":"en"}
+  ]},
   {"id":"daily-smalltalk","turns":[{"text":"आज तुम्हारा दिन कैसा था?","language":"hi"},{"text":"mera din toh bilkul monotonous tha yaar","language":"hinglish"},{"text":"Nothing bad happened, just the same routine again","language":"en"},{"text":"चलो कोई मज़ेदार सा सवाल पूछो","language":"hi"}]},
   {"id":"person-and-constraint","turns":[{"text":"My brother Kabir starts his first job tomorrow. He hates long speeches.","language":"en"},{"text":"usko ek chhota sa message kya bheju","language":"hinglish","anchors":["Kabir","kal","job","naukri","tomorrow","kaam"]},{"text":"नहीं, वो मेरा भाई है, दोस्त नहीं।","language":"hi"},{"text":"Now say it in English, one sentence, no advice","language":"en","anchorGroups":[["good luck","all the best","best of luck","you've got this","you’ve got this"],["Kabir","brother","bro","tomorrow","job","first day"]]}]},
   {"id":"rough-transcription","turns":[{"text":"yar ofis mein boss ne sabke samne daant dia","language":"hinglish"},{"text":"galti meri nahi thi report kisi aur ne bheji thi","language":"hinglish"},{"text":"I don't want you to solve it, just talk to me normally","language":"en"},{"text":"हाँ बस यही बात परेशान कर रही है","language":"hi"}]},
@@ -43,7 +53,7 @@
     {"text":"हाँ, रविवार सुबह ही। काम की वजह से बदलना पड़ा।","language":"hi","reviewPhrases":["अतिरिक्त समय","ज़्यादा समय","ज्यादा समय","एक दिन और मिल"]},
     {"text":"Arjun likes photography but dislikes crowded places","language":"en"},
     {"text":"usko shaant jagah chahiye bas","language":"hinglish"},
-    {"text":"मुझे लगता है हमें दोपहर में आराम करना चाहिए।","language":"hi"},
+    {"text":"मुझे लगता है हमें दोपहर में आराम करना चाहिए।","language":"hi","reviewPhrases":["थकान नहीं होगी","थकान भी नहीं होगी","थकान से बच सकोगे"]},
     {"text":"What should we pack for a short train journey? Just three things","language":"en"},
     {"text":"haan paani aur snacks toh rakhenge","language":"hinglish"},
     {"text":"मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।","language":"hi","reviewPhrases":["अर्जुन","Arjun","उसके कैमरे","उसकी बैटरी"]},
@@ -53,7 +63,7 @@
     {"text":"हाँ, इंटरनेट पर पूरी तरह भरोसा नहीं कर सकते।","language":"hi"},
     {"text":"Arjun just said he wants one good meal instead of lots of cafe stops","language":"en"},
     {"text":"mujhe bhi ye plan accha lag raha hai","language":"hinglish"},
-    {"text":"Keep the plan simple, we are not trying to see everything","language":"en"},
+    {"text":"Keep the plan simple, we are not trying to see everything","language":"en","reviewPhrases":["definitely","guarantee"]},
     {"text":"Do you remember who I'm travelling with and which city we're visiting?","language":"en","anchorGroups":[["Arjun"],["Jaipur"]]},
     {"text":"हम अब किस दिन सुबह निकल रहे हैं?","language":"hi","anchors":["रविवार"]},
     {"text":"Arjun ko kaisi jagah pasand nahi hai?","language":"hinglish","anchors":["bheed","crowd","bhid"]},
