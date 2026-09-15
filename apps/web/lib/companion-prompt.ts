@@ -73,11 +73,16 @@ export function detectCompanionLanguage(value: string): CompanionLanguage {
 }
 
 export function detectCompanionRequestLanguage(input: Pick<EdgeCompanionRequest, "messages">): CompanionLanguage {
-  const latest = input.messages.at(-1)?.content.trim() ?? "";
-  const detected = detectCompanionLanguage(latest);
-  if (detected !== "en" || !/^(?:ok(?:ay)?|yes|no|right|sure|fine|hmm+|uh huh|go on)[.!?\s]*$/i.test(latest)) return detected;
-  const previousUserMessage = input.messages.slice(0, -1).reverse().find((message) => message.role === "user")?.content ?? "";
-  return previousUserMessage ? detectCompanionLanguage(previousUserMessage) : detected;
+  // A chain of neutral acknowledgements must not silently reset Hindi/Hinglish
+  // to English. Only user speech sets the language, never a model's reply.
+  for (let index = input.messages.length - 1; index >= 0; index--) {
+    const message = input.messages[index]!;
+    if (message.role !== "user") continue;
+    const content = message.content.trim();
+    if (!content || /^(?:ok(?:ay)?|yes|no|right|sure|fine|hmm+|uh huh|go on)[.!?\s]*$/i.test(content)) continue;
+    return detectCompanionLanguage(content);
+  }
+  return "en";
 }
 
 export function requestsListeningOnly(value: string) {

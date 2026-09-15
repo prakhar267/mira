@@ -6,6 +6,13 @@ export class MockAI extends WorkerEntrypoint {
     if(model.includes("whisper"))return {text:"Aaj chai peene ka mann hai.",language:"hi"};
     const last=input.messages?.at(-1)?.content??"";
     const visible = text => model.includes("gemma-4") ? {choices:[{delta:{content:text}}]} : {response:text};
+    if(input.stream&&input.messages?.some(message=>message.role==="user"&&message.content.includes("[synthetic-language-chain]"))) {
+      // Follow only the application's final language setting. The production
+      // route still performs its real consent, capacity and language checks.
+      const language=last.match(/\[Application reply setting: ([^.]+)\./)?.[1];
+      const reply=language==="Hindi in Devanagari"?"बारिश में चाय अच्छी लगती है।":language==="Hinglish in Roman letters"?"Baarish mein chai acchi lagti hai.":"Tea is nice when it rains.";
+      return new Response(`data: ${JSON.stringify(visible(reply))}\n\ndata: [DONE]\n\n`).body;
+    }
     if(input.stream&&last.includes("[synthetic-model-stop]")) {
       let cleanup;
       return new ReadableStream({start(controller){

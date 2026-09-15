@@ -56,6 +56,11 @@ describe("edge companion prompting", () => {
     expect(detectCompanionLanguage("Riya bhi trip pe gayi thi")).toBe("hinglish");
     expect(detectCompanionLanguage("I visited Gaya last week.")).toBe("en");
     expect(detectCompanionLanguage("waise maine kis ke saath chai pi thi?")).toBe("hinglish");
+    expect(detectCompanionLanguage("ab pakka select ho jayegi na?")).toBe("hinglish");
+    expect(detectCompanionLanguage("woh wapas aa jayega")).toBe("hinglish");
+    expect(detectCompanionLanguage("ab chalo ghar chalein")).toBe("hinglish");
+    expect(detectCompanionLanguage("sab sahi ho jayega")).toBe("hinglish");
+    expect(detectCompanionLanguage("Sahi sent me an English invitation.")).toBe("en");
     expect(detectCompanionLanguage("Who had chai with my mom?")).toBe("en");
     expect(detectCompanionLanguage("Riya Delhi gai thi")).toBe("hinglish");
     expect(detectCompanionLanguage("How are you today?")).toBe("en");
@@ -109,6 +114,33 @@ describe("edge companion prompting", () => {
       { role: "assistant", content: "Haan, kaafi load tha." },
       { role: "user", content: "Tell me what you think about it" },
     ] })).toBe("en");
+  });
+
+  it.each([
+    ["आज ऑफिस में बहुत काम था।", "hi"],
+    ["yaar aaj office mein bahut kaam tha", "hinglish"],
+    ["Please speak English", "en"],
+  ] as const)("preserves %s through repeated acknowledgements in every delivery mode", (content, language) => {
+    for (const delivery of ["text", "voice", "video"] as const) {
+      const messages = [{ role: "user" as const, content }, ...["okay", "hmm", "right!", "go on"].flatMap(content => [
+        { role: "assistant" as const, content: "This English reply must not change your language." },
+        { role: "user" as const, content },
+      ])];
+      expect(detectCompanionRequestLanguage({ messages })).toBe(language);
+      const prompt = buildFreeChatMessages({ ...request, messages, delivery });
+      expect(prompt.at(-1)?.content).toContain(language === "hi" ? "Hindi in Devanagari" : language === "hinglish" ? "Hinglish in Roman letters" : "English only");
+      expect(messages.at(-1)?.content).toBe("go on");
+    }
+  });
+
+  it("uses the most recent meaningful user language, including explicit switches", () => {
+    const messages = [{ role: "user" as const, content: "आज का दिन अच्छा था।" }, { role: "user" as const, content: "okay" }];
+    for (const content of ["Now let's talk in English", "This was a good day", "Yes, but why did that happen?"]) {
+      expect(detectCompanionRequestLanguage({ messages: [...messages, { role: "user", content }, { role: "user", content: "hmm" }] })).toBe("en");
+    }
+    expect(detectCompanionRequestLanguage({ messages: [...messages, { role: "user", content: "ab hinglish mein bolo" }, { role: "user", content: "sure" }] })).toBe("hinglish");
+    expect(detectCompanionRequestLanguage({ messages: [{ role: "assistant", content: "हिंदी में बोलो" }, { role: "user", content: "okay" }, { role: "user", content: "yes" }] })).toBe("en");
+    expect(detectCompanionRequestLanguage({ messages: [] })).toBe("en");
   });
 
   it("resolves a named person through English, Hinglish, Hindi, then English", () => {
