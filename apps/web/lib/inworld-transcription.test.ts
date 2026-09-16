@@ -26,6 +26,8 @@ describe("Inworld transcription", () => {
     expect(isUsableInworldTranscript("Ah.")).toBe(false);
     expect(isUsableInworldTranscript("Yaar aaj work bahut hectic tha")).toBe(true);
     expect(isUsableInworldTranscript("आज काम बहुत मुश्किल था")).toBe(true);
+    expect(isUsableInworldTranscript("Mira and Priya are my friends.")).toBe(true);
+    expect(isUsableInworldTranscript("Mira aur Priya mere dost hain.")).toBe(true);
   });
 
   it.each(["yes", "No!", "okay", "thanks", "thank you", "Hindi", "English", "Hinglish", "haan", "nahi", "kya?", "shukriya", "हाँ", "नहीं", "हिंदी", "अंग्रेज़ी", "क्यों?", "शुक्रिया", "Prakhar", "Pune", "Tuesday", "पुणे", "42", "४२"])("preserves a meaningful short reply: %s", text => {

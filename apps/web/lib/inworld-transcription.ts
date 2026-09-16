@@ -66,7 +66,9 @@ export function isUsableInworldTranscript(value: string) {
   if (/^(?:thanks for watching|please subscribe)$/.test(normalized)) return false;
   const leakedHints = ["natural indian hinglish conversation", "hindi and english code switching", "mira", "priya"]
     .filter((hint) => normalized.includes(hint));
-  return leakedHints.length < 2;
+  // Two people's names are ordinary speech, not evidence of leaked prompts.
+  const hasPromptHint = leakedHints.some(hint => hint !== "mira" && hint !== "priya");
+  return !hasPromptHint || leakedHints.length < 2;
 }
 
 export function readInworldTranscript(result: unknown) {

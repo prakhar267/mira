@@ -9,7 +9,8 @@ PR promotion record must identify the exact main artifact and live version.
   locations, numbers, agreement, rejection and spoken language choices. Those
   are now kept, with Unicode combining marks preserved. Empty audio/filler and
   known leaked-hint/boilerplate filtering remains; a genuine "I'm not sure what
-  you're talking about" is no longer discarded as a hallucination.
+  you're talking about" is no longer discarded as a hallucination. Simply
+  mentioning both Mira and Priya is no longer treated as leaked prompt hints.
 - The fallback transcriber now applies the same content filter as the primary.
 - The browser's en-IN recognizer could displace a still-pending multilingual
   transcript after 1.6 seconds, even when the confident English guess was
