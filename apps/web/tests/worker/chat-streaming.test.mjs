@@ -18,6 +18,17 @@ function chat(cookie, content, delivery = "text") {
 }
 
 describe("text stream response body inside Workers with synthetic provider binding", () => {
+  it.each(["yes", "nahi", "Hindi", "thank you"])("keeps meaningful short transcription through the actual route: %s", async text => {
+    const cookie = await session();
+    const response = await SELF.fetch(`${origin}/api/companion-transcribe`, {method:"POST", headers:{origin,cookie,"content-type":"application/json"},body:JSON.stringify({audioBase64:btoa(`synthetic-stt-short:${text}`.padEnd(80," ")),contentType:"audio/webm"})});
+    expect(response.status).toBe(200); expect(await response.json()).toMatchObject({text});
+  });
+  it.each([["short",200,"yes"],["silence",422,null]])("applies the same transcript filter to the fallback: %s", async (fixture,status,text) => {
+    const cookie = await session();
+    const response = await SELF.fetch(`${origin}/api/companion-transcribe`, {method:"POST",headers:{origin,cookie,"content-type":"application/json"},body:JSON.stringify({audioBase64:btoa(`synthetic-stt-fallback-${fixture}`.padEnd(80," ")),contentType:"audio/webm"})});
+    expect(response.status).toBe(status); const body = await response.json();
+    if (text) expect(body.text).toBe(text); else expect(body).not.toHaveProperty("text");
+  });
   it.each(["text","voice","video"])("preserves language through acknowledgement chains and switches explicitly in %s", async delivery=>{
     const cookie=await session();
     for(const [content,expected] of [["हिंदी में बात करो।","बारिश में चाय अच्छी लगती है।"],["ab hinglish mein bolo","Baarish mein chai acchi lagti hai."],["Now speak English","Tea is nice when it rains."]]) {

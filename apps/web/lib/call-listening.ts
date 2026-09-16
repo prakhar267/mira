@@ -60,7 +60,7 @@ export function preferredCallTranscript(browserTranscript: string, serverTranscr
   return server;
 }
 
-/** Browser recognition is useful as a fast path only for a complete conversational phrase. */
+/** A last-resort browser transcript must be a complete, high-confidence phrase. */
 export function isConfidentBrowserTranscript(value: string, confidence = 0) {
   const clean = value.trim().replace(/\s+/g, " ");
   const words = clean.match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -73,6 +73,34 @@ export function isConfidentBrowserTranscript(value: string, confidence = 0) {
 
 export function isCallSilenceResponse(status: number) {
   return status === 422;
+}
+
+interface CallTranscriptionResult {
+  response: { status: number; ok: boolean };
+  body: { text?: string; error?: string } | null;
+}
+
+/** Never race an en-IN guess against a pending multilingual result. Fast server
+ * replies also must not wait for the independent browser recognizer to end.
+ * Consent/quota/silence responses are authoritative, not fallback opportunities. */
+export async function resolveCallTranscription(
+  server: Promise<CallTranscriptionResult | null>,
+  browserFallback: () => Promise<{ text: string; confidence: number }>,
+  signal: AbortSignal,
+): Promise<string | null> {
+  const result = await server;
+  signal.throwIfAborted();
+  if (result) {
+    const { response, body } = result;
+    if ([401, 403, 429].includes(response.status)) throw new Error(body?.error ?? "Voice processing is unavailable. Check consent or retry after the displayed limit resets.");
+    if (isCallSilenceResponse(response.status)) return null;
+    if (response.ok && body?.text?.trim()) return preferredCallTranscript("", body.text);
+    if (response.status >= 400 && response.status < 500) throw new Error(body?.error ?? "This voice recording could not be processed.");
+  }
+  const fallback = await browserFallback();
+  signal.throwIfAborted();
+  if (isConfidentBrowserTranscript(fallback.text, fallback.confidence)) return preferredCallTranscript(fallback.text);
+  throw new Error(result?.body?.error ?? "I couldn’t hear that clearly.");
 }
 
 function recorderMimeType() {
@@ -159,9 +187,10 @@ export async function startCallListening(options: CallListeningOptions): Promise
     recognition.interimResults = true;
     recognition.lang = "en-IN";
     recognition.onresult = (event) => {
-      const alternatives = Array.from(event.results).map((result) => result[0]);
-      browserConfidence = Math.min(...alternatives.map((result) => result?.confidence ?? 0));
-      browserTranscript = Array.from(event.results)
+      const finalResults = Array.from(event.results).filter(result => result.isFinal === true);
+      const alternatives = finalResults.map((result) => result[0]);
+      browserConfidence = alternatives.length ? Math.min(...alternatives.map((result) => result?.confidence ?? 0)) : 0;
+      browserTranscript = finalResults
         .map((result) => result[0]?.transcript ?? "")
         .join(" ")
         .replace(/\s+/g, " ")
@@ -248,42 +277,12 @@ export async function startCallListening(options: CallListeningOptions): Promise
           response,
           body: await response.json().catch(() => null) as { text?: string; error?: string } | null,
         })).catch(() => null);
-        const nativeTranscript = await finishBrowserRecognition(260);
-        let serverResult: Awaited<typeof responsePromise> | "pending" = "pending";
-        if (isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) {
-          serverResult = await Promise.race([
-            responsePromise,
-            new Promise<"pending">((resolve) => window.setTimeout(() => resolve("pending"), 1_600)),
-          ]);
-          if (serverResult === "pending") {
-            transcriptionController.abort();
-            if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
-            return;
-          }
-        }
-        if (serverResult === "pending") serverResult = await responsePromise;
-        if (!serverResult) {
-          if (isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) {
-            if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
-            return;
-          }
-          throw new Error("I couldn’t hear that clearly.");
-        }
-        const { response, body } = serverResult;
-        if ([401, 403, 429].includes(response.status)) throw new Error(body?.error ?? "Voice processing is unavailable. Check consent or retry after the displayed limit resets.");
-        if (isCallSilenceResponse(response.status)) {
-          if (!canceled && isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) options.onTranscript(preferredCallTranscript(nativeTranscript));
-          else if (!canceled) options.onSilence();
-          return;
-        }
-        if (!response.ok || !body?.text?.trim()) {
-          if (isConfidentBrowserTranscript(nativeTranscript, browserConfidence)) {
-            if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript));
-            return;
-          }
-          throw new Error(body?.error ?? "I couldn’t hear that clearly.");
-        }
-        if (!canceled) options.onTranscript(preferredCallTranscript(nativeTranscript, body.text));
+        const transcript = await resolveCallTranscription(responsePromise, async () => ({
+          text: await finishBrowserRecognition(260), confidence: browserConfidence,
+        }), options.signal ? AbortSignal.any([options.signal, transcriptionController.signal]) : transcriptionController.signal);
+        if (canceled) return;
+        if (transcript) options.onTranscript(transcript);
+        else options.onSilence();
       })
       .catch((cause) => {
         if (!canceled) options.onError(cause instanceof Error ? cause.message : "Voice transcription is temporarily unavailable.");

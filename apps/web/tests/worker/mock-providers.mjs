@@ -3,7 +3,12 @@ import { WorkerEntrypoint } from "cloudflare:workers";
 export class MockAI extends WorkerEntrypoint {
   async run(model,input) {
     if(model.includes("bge-reranker"))return {response:[]};
-    if(model.includes("whisper"))return {text:"Aaj chai peene ka mann hai.",language:"hi"};
+    if(model.includes("whisper")) {
+      const fixture = atob(input.audio ?? "").trim();
+      if(fixture === "synthetic-stt-fallback-silence") return {text:"thanks for watching"};
+      if(fixture === "synthetic-stt-fallback-short") return {text:"yes"};
+      return {text:"Aaj chai peene ka mann hai.",language:"hi"};
+    }
     const last=input.messages?.at(-1)?.content??"";
     const visible = text => model.includes("gemma-4") ? {choices:[{delta:{content:text}}]} : {response:text};
     if(input.stream&&input.messages?.some(message=>message.role==="user"&&message.content.includes("[synthetic-language-chain]"))) {
@@ -32,7 +37,12 @@ export class MockAI extends WorkerEntrypoint {
 export class MockProviders extends WorkerEntrypoint {
   async fetch(request) {
     const path=new URL(request.url).pathname;
-    if(path.includes("stt")||path.includes("transcri"))return Response.json({text:"Aaj chai peene ka mann hai.",transcription:"Aaj chai peene ka mann hai.",language:"hi"});
+    if(path.includes("stt")||path.includes("transcri")) {
+      const body = await request.json(), fixture = atob(body.audioData?.content ?? "").trim();
+      if(fixture.startsWith("synthetic-stt-fallback-")) return new Response("Synthetic primary unavailable", {status:503});
+      const transcript = fixture.startsWith("synthetic-stt-short:") ? fixture.slice("synthetic-stt-short:".length) : "Aaj chai peene ka mann hai.";
+      return Response.json({transcription:{transcript}});
+    }
     // Satisfies the adapter format boundary only; NOT playable/acoustic QA.
     if(path.endsWith("voice:stream"))return new Response(`${JSON.stringify({result:{audioContent:btoa("ID3synthetic-stream-not-acoustic-QA")}})}\n`,{headers:{"content-type":"application/x-ndjson"}});
     if(path.includes("tts")||path.includes("speech"))return Response.json({audioContent:btoa("ID3synthetic-audio-not-acoustic-QA")});
