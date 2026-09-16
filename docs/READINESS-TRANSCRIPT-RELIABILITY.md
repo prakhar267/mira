@@ -34,9 +34,11 @@ assets are unchanged. No new processor, paid plan or wider credential is added.
 Unit tests cover ready/delayed transcripts, all protected error statuses,
 fallback uncertainty, cancellation, Unicode short replies and language choices.
 Worker tests use the actual routes, consent/capacity/storage boundaries and
-synthetic primary/fallback provider bindings. Browser tests exercise real
-MediaRecorder and WebAudio with a synthetic oscillator and deliberately
-conflicting mocked recognizers; they are not human speech/acoustic acceptance.
+synthetic primary/fallback provider bindings. Chromium browser tests exercise
+real MediaRecorder and WebAudio with a synthetic oscillator. Firefox/WebKit
+exercise the same transcription/cancellation protocol with explicit synthetic
+recorder/analyser fixtures. All use deliberately conflicting mocked recognizers;
+they are not human speech/acoustic acceptance.
 The existing native streamed-playback checks remain required in all three
 browser engines. Use the PR record for final counts and live checks.
 
@@ -47,6 +49,14 @@ Its three WebKit scenarios then passed without relaxing assertions. A failed
 diagnostic also ran out of disk space while retaining traces; that is not a
 passing test. Only a task-created downloaded archive/header directory was
 removed to recover space. Existing user files/caches were not cleaned.
+
+The first full hosted-Linux run passed 108 browser checks but failed the six new
+Firefox/WebKit capture checks before transcription: Firefox's native audio
+context stayed suspended without an audio device, and that Linux WebKit build
+did not expose MediaRecorder. Their fixtures now explicitly model capture;
+Chromium retains real recorder/WebAudio coverage. No application support check,
+STT/cancellation assertion or release gate was bypassed. Native Firefox/WebKit
+capture on real devices remains a separate acceptance requirement.
 
 A finite 16-request actual-provider diagnostic compared the current prompt to
 one illustrative-example candidate on eight fictional scenarios. The candidate
