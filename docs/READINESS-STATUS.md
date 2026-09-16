@@ -1,8 +1,15 @@
 # Mira current readiness and acceptance status
 
-Updated 16 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
+Updated 17 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
 
 ## Latest follow-up
+
+The [short-turn and transcription follow-up](READINESS-TRANSCRIPT-RELIABILITY.md)
+fixes dropped one-word speech, premature English browser guesses, an avoidable
+recognition wait and additional spoken language-switch cases. A live prompt
+experiment was rejected because it still invented reassurance. The fresh
+configuration audit and missing owner inputs are recorded there. Use its PR
+promotion evidence for release status, not this source change alone.
 
 The [language continuity follow-up](READINESS-LANGUAGE-CONTINUITY.md) fixes
 acknowledgement chains resetting to English and additional common Hinglish

@@ -55,12 +55,15 @@ export function createInworldTranscriptionRequest(audioBase64: string, contentTy
 }
 
 export function isUsableInworldTranscript(value: string) {
-  const normalized = value.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
-  if (!normalized) return false;
-  if (normalized.split(" ").length < 2) return false;
+  const normalized = value.toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  if (!/[\p{L}\p{N}]/u.test(normalized)) return false;
+  // A brief answer still carries intent. Call VAD already checks for sustained
+  // speech; do not silently discard agreement, rejection or a language choice.
+  // Names, places, dates and numbers are also valid one-word answers. A fixed
+  // acknowledgement allowlist would still lose answers such as "Pune" or "42".
+  if (/^(?:ah+|uh+|um+|erm+|er+|आह|उम्म)$/iu.test(normalized)) return false;
   if (normalized.startsWith("expected terms")) return false;
-  if (/^i (?:m|am) not sure what you(?: re| are) talking about$/.test(normalized)) return false;
-  if (/^(?:thank you|thanks for watching|please subscribe)$/.test(normalized)) return false;
+  if (/^(?:thanks for watching|please subscribe)$/.test(normalized)) return false;
   const leakedHints = ["natural indian hinglish conversation", "hindi and english code switching", "mira", "priya"]
     .filter((hint) => normalized.includes(hint));
   return leakedHints.length < 2;

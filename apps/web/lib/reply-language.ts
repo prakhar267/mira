@@ -6,7 +6,7 @@ export const hasInflectedHindi = (value: string) => (value.match(/\b(?:bhi|dono|
   // (e.g. an English sentence mentioning both Gaya and Sahi).
   || (/\b(?:jayega|jayegi|jaayega|jaayegi|hoga|hogi|chalein)\b/i.test(value)
     && /\b(?:pakka|waapas|wapas|sahi|chalo|ab|ho|toh|na)\b/i.test(value));
-const naturalHinglish = /\b(?:aaj|abhi|accha|arey|aur|bas|haan|hai|hoon|kaafi|kar|karo|karti|kya|kyun|lekin|main|matlab|mera|meri|mujhe|nahi|par|sach|theek|thoda|toh|tum|tumhara|uske|yaar|bilkul|badhai|shukriya|saath|chahiye|pasand|bataya)\b/i;
+const naturalHinglish = /\b(?:aaj|abhi|accha|achha|achhi|achhe|arey|aur|bas|haan|hai|hoon|kaafi|kar|karo|karti|kya|kyun|lekin|main|matlab|mera|meri|mujhe|nahi|par|sach|theek|thoda|toh|tum|tumhara|uske|yaar|bilkul|badhai|shukriya|saath|chahiye|pasand|bataya)\b/i;
 // Short natural imperatives need not contain a filler such as "haan" or "yaar".
 // Match a Hindi verb phrase, not a lone token that may be an English name.
 const hindiImperative = /\b(?:(?:kar|bol|keh|bata|dikha|bhej|phod|fod)\s+(?:do|dena|dijiye)|dhya+an\s+rakhna|milte\s+hain)\b/i;

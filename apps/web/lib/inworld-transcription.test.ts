@@ -22,10 +22,18 @@ describe("Inworld transcription", () => {
   it("rejects leaked recognition hints while keeping real Hinglish", () => {
     expect(isUsableInworldTranscript("Expected terms: Natural Indian Hinglish conversation, Mira, Priya.")).toBe(false);
     expect(isUsableInworldTranscript("Hindi and English code switching, Mira")).toBe(false);
-    expect(isUsableInworldTranscript("I'm not sure what you're talking about.")).toBe(false);
+    expect(isUsableInworldTranscript("I'm not sure what you're talking about.")).toBe(true);
     expect(isUsableInworldTranscript("Ah.")).toBe(false);
     expect(isUsableInworldTranscript("Yaar aaj work bahut hectic tha")).toBe(true);
     expect(isUsableInworldTranscript("आज काम बहुत मुश्किल था")).toBe(true);
+  });
+
+  it.each(["yes", "No!", "okay", "thanks", "thank you", "Hindi", "English", "Hinglish", "haan", "nahi", "kya?", "shukriya", "हाँ", "नहीं", "हिंदी", "अंग्रेज़ी", "क्यों?", "शुक्रिया", "Prakhar", "Pune", "Tuesday", "पुणे", "42", "४२"])("preserves a meaningful short reply: %s", text => {
+    expect(isUsableInworldTranscript(text)).toBe(true);
+  });
+
+  it.each(["", "...", "Ah.", "uh", "thanks for watching", "please subscribe"])("keeps empty, filler and known hallucination rejection: %s", text => {
+    expect(isUsableInworldTranscript(text)).toBe(false);
   });
 
   it("keeps Hindi script but romanizes clearly code-mixed speech", () => {

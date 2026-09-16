@@ -30,7 +30,7 @@ const danglingReplyPattern = /\b(?:a|an|the|to|and|or|but|because|with|for|of|an
 const memoryRecallPattern = /\b(?:what do you remember|do you remember|remember about me|what did i (?:say|tell you)|told you earlier|recall|maine (?:pehle )?kya (?:bola|bataya)|yaad hai)\b/i;
 const devanagariMemoryRecallPattern = /(?:तुम्हें याद है|मैंने (?:पहले )?क्या (?:कहा|बताया)|मेरे बारे में क्या याद|क्या याद (?:है|हैं))/u;
 const identityPattern = /\b(?:what(?:'s| is) your name|who are you|what do you do|tum(?:hara)? naam kya hai|tum kaun ho|tum kya karti ho|tum kya karte ho)\b|(?:तुम्हारा नाम क्या है|तुम कौन हो|तुम क्या करती हो|तुम क्या करते हो)/iu;
-const hinglishPattern = /\b(?:aaj|abhi|acha|accha|arey|aur|bahut|bas|batao|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karun|karta|karti|kya|kyun|lekin|liye|matlab|mein|mera|meri|mere|mujhe|nahi|nhi|sakta|sakti|sach|samajh|shaam|theek|thik|thoda|tum|tumhara|uske|usko|yaar|yar|daant|sabke|samne)\b/i;
+const hinglishPattern = /\b(?:aaj|abhi|acha|accha|achha|achhi|achhe|arey|aur|bahut|bas|batao|bolo|chal|haan|hai|hoon|kaisa|kaisi|kaise|kar|karo|karun|karta|karti|kya|kyun|lekin|liye|matlab|mein|mera|meri|mere|mujhe|nahi|nhi|sakta|sakti|sach|samajh|shaam|theek|thik|thoda|tum|tumhara|uske|usko|yaar|yar|daant|sabke|samne)\b/i;
 const listenOnlyPattern = /\b(?:just listen|only listen|don['’]?t (?:advise|fix|ask)|no advice|no questions?|(?:bas|sirf)\s+(?:(?:meri|meri baat)\s+)?sun(?:o|na)|(?:advice|salah|salaah)\s+mat\s+(?:do|dena)|(?:sawal|question)\s+mat\s+(?:puch|pooch)\w*)\b|(?:बस सुनो|सिर्फ सुनो|मेरी बात सुनो|सलाह मत|सवाल मत)/iu;
 const providerClaimPattern = /\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b.{0,28}\b(?:made|built|created|designed|trained|model|basis)\b|\b(?:made|built|created|designed|trained)\b.{0,28}\b(?:meta|llama|openai|chatgpt|anthropic|claude)\b/i;
 const roboticSelfDescriptionPattern = /\b(?:large language model|language model|as an ai|i (?:do not|don['’]?t) have feelings|working properly|functioning (?:normally|properly|well)|ready to chat)\b/i;
@@ -42,6 +42,8 @@ function explicitlyRequestedLanguage(value: string): CompanionLanguage | null {
   // this anchored so mentioning a Hindi film/name is not a language switch.
   const shortChoice = value.trim().match(/^(?:please\s+)?(?:in\s+)?(english|hindi|hinglish)(?:\s+please)?[.!?\s]*$/i)?.[1]?.toLowerCase();
   if (shortChoice) return shortChoice === "hindi" ? "hi" : shortChoice === "hinglish" ? "hinglish" : "en";
+  const spokenChoice = value.trim().match(/^(?:प्लीज़?\s+)?(हिंदी|हिन्दी|अंग्रेज़ी|अंग्रेजी|इंग्लिश|हिंग्लिश)(?:\s+प्लीज़?)?[.!?।\s]*$/u)?.[1];
+  if (spokenChoice) return /^(?:हिंदी|हिन्दी)$/u.test(spokenChoice) ? "hi" : spokenChoice === "हिंग्लिश" ? "hinglish" : "en";
   if (!/\b(?:speak|talk|reply|answer|chat|language|keep|say|switch|baat|bolo|mein)\b|(?:बात|बोल|जवाब|भाषा|में)/iu.test(value)) return null;
 
   const mentions = [
@@ -83,7 +85,7 @@ export function detectCompanionRequestLanguage(input: Pick<EdgeCompanionRequest,
     const message = input.messages[index]!;
     if (message.role !== "user") continue;
     const content = message.content.trim();
-    if (!content || /^(?:ok(?:ay)?|yes|no|right|sure|fine|hmm+|uh huh|go on)[.!?\s]*$/i.test(content)) continue;
+    if (!content || /^(?:ok(?:ay)?|yes|yeah|yep|no|nope|right|sure|fine|thanks|thank you|sorry|hmm+|uh huh|go on)[.!?\s]*$/i.test(content)) continue;
     return detectCompanionLanguage(content);
   }
   return "en";

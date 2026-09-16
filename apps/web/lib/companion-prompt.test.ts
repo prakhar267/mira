@@ -117,9 +117,18 @@ describe("edge companion prompting", () => {
     ] })).toBe("en");
   });
 
-  it.each([["Hindi please", "hi"], ["please in Hindi", "hi"], ["Hinglish", "hinglish"], ["in Hinglish please!", "hinglish"], ["English please", "en"]] as const)("accepts the standalone language choice %s", (content, language) => {
+  it.each([["Hindi please", "hi"], ["please in Hindi", "hi"], ["Hinglish", "hinglish"], ["in Hinglish please!", "hinglish"], ["English please", "en"], ["हिंदी", "hi"], ["अंग्रेज़ी", "en"], ["इंग्लिश।", "en"], ["हिंग्लिश प्लीज़", "hinglish"]] as const)("accepts the standalone language choice %s", (content, language) => {
     expect(detectCompanionLanguage(content)).toBe(language);
     expect(detectCompanionRequestLanguage({messages:[{role:"user",content},{role:"user",content:"okay"},{role:"user",content:"hmm"}]})).toBe(language);
+  });
+
+  it.each(["thanks", "thank you", "yep", "nope", "sorry"])("keeps brief %s in the language of the conversation", content => {
+    expect(detectCompanionRequestLanguage({ messages: [{ role: "user", content: "आज बारिश हो रही है।" }, { role: "user", content }] })).toBe("hi");
+    expect(detectCompanionRequestLanguage({ messages: [{ role: "user", content: "aaj baarish ho rahi hai" }, { role: "user", content }] })).toBe("hinglish");
+  });
+
+  it.each(["haha ye achha tha", "achhi baat", "achhe lagte hain"])("recognizes colloquial Hinglish spelling: %s", content => {
+    expect(detectCompanionLanguage(content)).toBe("hinglish");
   });
 
   it.each(["I watched a Hindi film", "No Hindi please", "My friend speaks Hindi"])("does not treat a mere mention or negative short choice as a standalone command: %s", content=>{

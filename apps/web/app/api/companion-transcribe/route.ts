@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     await authorizeInference(request, "transcribe");
     request.signal.throwIfAborted();
     const text = preserveSpokenLanguage(readTranscript(result));
-    if (!text) return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "cloudflare", model: CLOUDFLARE_MODEL });
+    if (!isUsableInworldTranscript(text)) return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "cloudflare", model: CLOUDFLARE_MODEL });
     const language = detectCompanionLanguage(text);
     return respond({ text, language }, 200, { provider: "cloudflare", model: CLOUDFLARE_MODEL, language });
   } catch (cause) {
