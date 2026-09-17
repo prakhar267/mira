@@ -6,6 +6,25 @@ const rewritePattern=/\b(?:say (?:it|that)|translate|rewrite|make (?:it|that) (?
 const correctionPattern=/\b(?:actually|correct(?:ion|ed)?|changed|reschedul\w*|instead|nahi sorry)\b|(?:बदल|वजह|नहीं.{0,24}(?:भाई|बहन|दोस्त))/iu;
 const cancelDraftPattern=/\b(?:forget (?:it|that)|never ?mind|new topic|stop (?:drafting|writing)|chh?odo)\b|(?:छोड़ो|छोडो|विषय बदल)/iu;
 
+/** A standalone thank-you closes a turn; yes/no can answer an offer and must
+ * not be classified as closure. No substring matches or quoted instructions. */
+export function isClosingThanks(input: Pick<EdgeCompanionRequest,"messages">) {
+  const turn=input.messages.at(-1);
+  return turn?.role==="user" && /^(?:(?:thanks(?:\s+(?:a lot|so much|again))?|thank\s+you(?:\s+(?:so much|very much))?|shukriya|dhanyavaad|dhanyavad|शुक्रिया|धन्यवाद)(?:\s+(?:Mira|yaar|मिरा|यार))?)[.!।\s]*$/iu.test(turn.content.trim());
+}
+
+/** Turn-local grammatical agreement, not inferred identity or saved gender.
+ * Only the user's own unquoted progressive verb can supply the inflection. */
+function progressiveAgreement(latest: string) {
+  if (/["“”`]/u.test(latest) || !/^(?:main\s|मैं\s)/iu.test(latest)) return "";
+  const feminine=/\brahi\s+(?:hoon|hun)\b|रही\s+हूँ/u.test(latest.toLowerCase());
+  const masculine=/\braha\s+(?:hoon|hun)\b|रहा\s+हूँ/u.test(latest.toLowerCase());
+  if (feminine===masculine) return "";
+  return feminine
+    ? "Grammar for this turn only: the user said 'rahi hoon / रही हूँ'. If reflecting that ongoing action, use 'tum ... rahi ho / तुम ... रही हो', not 'rahe ho'. This is verb agreement, not a gender/profile inference."
+    : "Grammar for this turn only: the user said 'raha hoon / रहा हूँ'. If reflecting that ongoing action, use 'tum ... rahe ho / तुम ... रहे हो', not 'rahi ho'. This is verb agreement, not a gender/profile inference.";
+}
+
 export function isFactCorrection(input: Pick<EdgeCompanionRequest,"messages">) {
   const latest = input.messages.at(-1)?.content ?? "";
   return !isDraftingRequest(input) && correctionPattern.test(latest) && !rewritePattern.test(latest)
@@ -60,6 +79,11 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
   const cues=[draft
     ? "Current task: provide ONLY the user's ready-to-send wording addressed directly to the recipient, without a preface or quotation marks. The sender is the user, not Mira. Give the actual message, not advice about what to send, 'I think you should', or a factual recap."
     : "Perspective: the user's relatives and offline plans belong to the user. Address them as you/your, tum/tumhara, or तुम/तुम्हारा. Mira is not a participant in their offline trip or event."];
+  if(isClosingThanks(input))cues.push("A standalone thank-you closes this turn. Give ONE brief acknowledgement in the current language, with no question, new topic, advice, invitation or request to continue.");
+  if(!draft&&language!=="en") {
+    const agreement=progressiveAgreement(latest);
+    if(agreement)cues.push(agreement);
+  }
   if(draft&&language==="hinglish")cues.push("Message Roman Hinglish mein likho: Hindi ki boli aur English words mila ke, sirf English mein nahi. Seedha us insaan se baat karo; bhejne ki salah mat do.");
   if(rewrite)cues.push("Continue the existing task in the requested language/length. Preserve its meaning and addressee. Unless a first-person draft/quotation was explicitly requested, describe the user's plan as 'you and your companion', not 'my companion and I'. Do not copy first-person ownership from a prior assistant mistake.");
   if(ownExperience)cues.push(language==="hi"

@@ -1,10 +1,16 @@
 import type { EdgeCompanionRequest } from "./companion-prompt";
-import { isDraftingRequest, isFactCorrection } from "./conversation-focus";
+import { isClosingThanks, isDraftingRequest, isFactCorrection } from "./conversation-focus";
 
 /** A summary of the user's offline plans is not Mira joining those plans.
  * Only normalize explicit summary/translation tasks and concrete travel verbs;
  * ordinary in-character first-person conversation and authored drafts survive. */
 export function groundReplyPerspective(input: Pick<EdgeCompanionRequest, "messages">, reply: string) {
+  // Preserve the model's own acknowledgement, not a canned replacement. Never
+  // cut an open quotation or a first sentence that itself asks a question.
+  if (isClosingThanks(input) && !/["“”`]/u.test(reply)) {
+    const first=reply.match(/^[^.!?।]+[.!।](?=\s|$)/u)?.[0]?.trim();
+    if(first&&first.length>=3)reply=first;
+  }
   // A fact correction needs an acknowledgement, not a second invented benefit
   // or another question. Keep a substantive complete first sentence; never
   // cut a quote, a short acknowledgement, or an explicit additional request.

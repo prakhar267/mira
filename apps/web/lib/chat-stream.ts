@@ -1,5 +1,5 @@
 /** Consume Workers AI SSE without buffering an unnecessarily long spoken reply. */
-export async function readChatStream(stream: ReadableStream<Uint8Array>, signal: AbortSignal, spoken: boolean, onText?: (text: string) => Promise<void>) {
+export async function readChatStream(stream: ReadableStream<Uint8Array>, signal: AbortSignal, spoken: boolean, onText?: (text: string) => Promise<void>, spokenSentences: 1 | 2 = 2) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let pending = "", text = "";
@@ -41,12 +41,12 @@ export async function readChatStream(stream: ReadableStream<Uint8Array>, signal:
         if (part.choices?.[0]?.finish_reason === "stop") return text.trim();
         // Complete sentences only; do not cut at a token/word or inside reasoning.
         const sentences = text.match(/[^.!?।]+[.!?।]["”’]*(?=\s|$)/gu) ?? [];
-        const prefix = sentences.slice(0, 2).join("").trim();
+        const prefix = sentences.slice(0, spokenSentences).join("").trim();
         // A punctuation token may arrive before the closing quote. Do not cut
         // a ready-to-send draft mid-quotation, or drop its closing quote.
         const quoted = (prefix.match(/"/g)?.length ?? 0) % 2 !== 0
           || (prefix.match(/“/g)?.length ?? 0) !== (prefix.match(/”/g)?.length ?? 0);
-        if (spoken && !quoted && !/<(?:think|analysis)>/i.test(text) && sentences.length >= 2 && prefix.length >= 60) {
+        if (spoken && !quoted && !/<(?:think|analysis)>/i.test(text) && sentences.length >= spokenSentences && prefix.length >= (spokenSentences===1?3:60)) {
           return prefix;
         }
       }

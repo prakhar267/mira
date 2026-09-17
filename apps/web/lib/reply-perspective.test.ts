@@ -2,6 +2,15 @@ import {describe,expect,it} from "vitest";
 import {groundReplyPerspective} from "./reply-perspective";
 const input=(latest:string)=>({messages:[{role:"user" as const,content:"I am travelling with my cousin Arjun to Jaipur on Sunday."},{role:"user" as const,content:latest}]});
 describe("user-owned offline summaries",()=>{
+  it("keeps the model acknowledgement without a new question after thanks",()=>{
+    expect(groundReplyPerspective(input("thanks"),"You're welcome! What's on your mind?")).toBe("You're welcome!");
+    expect(groundReplyPerspective(input("shukriya"),"Koi baat nahi. Aaj kya plan hai?")).toBe("Koi baat nahi.");
+    expect(groundReplyPerspective(input("धन्यवाद।"),"कोई बात नहीं। आज क्या कर रहे हो?")).toBe("कोई बात नहीं।");
+    expect(groundReplyPerspective(input("thanks"),'"You are welcome. Happy to help."')).toBe('"You are welcome. Happy to help."');
+    expect(groundReplyPerspective(input("thanks"),"What for? You're welcome.")).toBe("What for? You're welcome.");
+    expect(groundReplyPerspective(input("thanks, what should I pack?"),"Bring water. Do you have a raincoat?")).toBe("Bring water. Do you have a raincoat?");
+    expect(groundReplyPerspective(input("yes"),"Let's practice. Tell me about yourself.")).toBe("Let's practice. Tell me about yourself.");
+  });
   it("finishes a plain fact correction before unsolicited consequences or questions",()=>{
     expect(groundReplyPerspective(input("Actually we leave Sunday, not Saturday"),"Sunday morning departure, got it. That gives you a free day!")).toBe("Sunday morning departure, got it.");
     expect(groundReplyPerspective(input("हाँ, काम की वजह से बदलना पड़ा।"),"काम की वजह से अब रविवार सुबह निकलोगे। अब कम समय मिलेगा।")).toBe("काम की वजह से अब रविवार सुबह निकलोगे।");

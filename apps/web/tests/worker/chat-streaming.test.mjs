@@ -13,11 +13,22 @@ async function session() {
   expect(response.status).toBe(201); await response.arrayBuffer();
   return response.headers.get("set-cookie").split(";")[0];
 }
-function chat(cookie, content, delivery = "text") {
-  return SELF.fetch(`${origin}/api/companion-chat`, { method: "POST", headers: { origin, cookie, "content-type": "application/json", accept: "application/x-ndjson" }, body: JSON.stringify({ messages: [{ role: "user", content }], companion: { name: "Mira" }, user: { name: "Synthetic adult" }, delivery }) });
+function chat(cookie, content, delivery = "text", history = []) {
+  return SELF.fetch(`${origin}/api/companion-chat`, { method: "POST", headers: { origin, cookie, "content-type": "application/json", accept: "application/x-ndjson" }, body: JSON.stringify({ messages: [...history, { role: "user", content }], companion: { name: "Mira" }, user: { name: "Synthetic adult" }, delivery }) });
 }
 
 describe("text stream response body inside Workers with synthetic provider binding", () => {
+  it.each(["text","voice","video"])("closes thanks without an unwanted question or hanging provider tail in %s",async delivery=>{
+    const cookie=await session();
+    for(const [text,reply] of [["thanks","You're welcome!"],["shukriya","Koi baat nahi."],["धन्यवाद","कोई बात नहीं।"]]){
+      const history=text==="shukriya"?[{role:"user",content:"Hinglish mein baat karo"}]:text==="धन्यवाद"?[{role:"user",content:"हिंदी में बात करो"}]:[];
+      const response=await chat(cookie,text,delivery,history);expect(response.status).toBe(200);
+      if(delivery==="text"){
+        const events=(await response.text()).trim().split("\n").map(JSON.parse);
+        expect(events.at(-1)).toMatchObject({type:"done",reply});
+      }else expect(await response.json()).toMatchObject({reply});
+    }
+  });
   it.each(["yes", "nahi", "Hindi", "thank you"])("keeps meaningful short transcription through the actual route: %s", async text => {
     const cookie = await session();
     const response = await SELF.fetch(`${origin}/api/companion-transcribe`, {method:"POST", headers:{origin,cookie,"content-type":"application/json"},body:JSON.stringify({audioBase64:btoa(`synthetic-stt-short:${text}`.padEnd(80," ")),contentType:"audio/webm"})});
