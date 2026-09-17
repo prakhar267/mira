@@ -3,10 +3,10 @@ import { createInworldTranscriptionRequest, hasUnsupportedSpeechScript, INWORLD_
 
 describe("Inworld transcription", () => {
   it("rejects unsupported-script misdetections without altering valid names or numbers", () => {
-    for(const text of ["คุณ", "混。", "Pune คุณ"]) {
+    for(const text of ["คุณ", "混。", "你好。", "คุณ คุณ Pune"]) {
       expect(hasUnsupportedSpeechScript(text)).toBe(true);expect(isUsableInworldTranscript(text)).toBe(false);
     }
-    for(const text of ["One.", "Honey.", "Pune", "पुणे", "José", "café", "हाँ 👍"]) expect(hasUnsupportedSpeechScript(text)).toBe(false);
+    for(const text of ["One.", "Honey.", "Pune", "पुणे", "José", "café", "हाँ 👍", "My friend Νίκος is here", "The symbol is α"]) expect(hasUnsupportedSpeechScript(text)).toBe(false);
     const config=JSON.parse(String(createInworldTranscriptionRequest("YWJj","audio/mpeg","secret",["पुणे"],"hi").body)).transcribeConfig;
     expect(config).toMatchObject({language:"hi",prompts:["पुणे"]});
   });

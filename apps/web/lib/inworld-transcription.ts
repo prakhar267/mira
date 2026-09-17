@@ -78,7 +78,11 @@ export function isUsableInworldTranscript(value: string) {
  * automatic detection must not be silently labelled English and sent to chat.
  * Accented Latin names, Devanagari and punctuation remain valid. */
 export function hasUnsupportedSpeechScript(value: string) {
-  return [...value].some(letter => /\p{L}/u.test(letter) && !/[\p{Script=Latin}\p{Script=Devanagari}]/u.test(letter));
+  const letters = [...value].filter(letter => /\p{L}/u.test(letter));
+  const unsupported = letters.filter(letter => !/[\p{Script=Latin}\p{Script=Devanagari}]/u.test(letter)).length;
+  // A foreign proper name or mathematical symbol inside otherwise supported
+  // speech is not proof that automatic language detection failed.
+  return unsupported > 0 && unsupported / letters.length >= .6;
 }
 
 export function readInworldTranscript(result: unknown) {
