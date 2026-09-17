@@ -43,6 +43,22 @@
     {"text":"हाँ, रविवार सुबह ही। काम की वजह से बदलना पड़ा।","language":"hi","reviewPhrases":["अतिरिक्त समय","ज़्यादा समय","ज्यादा समय"]},
     {"text":"मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।","language":"hi","reviewPhrases":["अर्जुन","Arjun","उसकी बैटरी","बैटरी खत्म"]}
   ]},
+  {"id":"brief-turn-language-closure","turns":[
+    {"text":"आज हम हिंदी में बात करते हैं। मुझे बारिश पसंद है।","language":"hi"},
+    {"text":"thanks a lot Mira","language":"hi","noQuestion":true},
+    {"text":"Hinglish please","language":"hinglish"},
+    {"text":"shukriya","language":"hinglish","noQuestion":true},
+    {"text":"English please","language":"en"},
+    {"text":"thanks","language":"en","noQuestion":true}
+  ]},
+  {"id":"explicit-agreement-and-group","turns":[
+    {"text":"Anika and I are visiting Kochi on Wednesday. Just one art gallery and two cafes, no packed schedule.","language":"en"},
+    {"text":"Main kiske saath ja rahi hoon aur kaunsi city?","language":"hinglish","anchorGroups":[["Anika"],["Kochi"]],"reviewPhrases":["ja rahe ho","ja raha ho"]},
+    {"text":"मैं किसके साथ और कहाँ जा रही हूँ?","language":"hi","anchorGroups":[["अनिका","Anika"],["कोच्चि","कोची","Kochi"]],"reviewPhrases":["जा रहे हो","जा रहा हो"]},
+    {"text":"Hum dono kahan ja rahe hain?","language":"hinglish","anchors":["Kochi"]},
+    {"text":"Thanks, but suggest one thing to pack for rain.","language":"en","anchors":["umbrella","raincoat","rain jacket","poncho"]},
+    {"text":"Recap our exact plan in English without adding anything.","language":"en","anchorGroups":[["Anika"],["Kochi"],["Wednesday"],["one art gallery","one gallery","1 art gallery","1 gallery"],["two cafes","two cafés","2 cafes","2 cafés"]]}
+  ]},
   {"id":"long-conversation-24-turns","turns":[
     {"text":"I'm planning a weekend trip to Jaipur with my cousin Arjun. We leave Saturday morning.","language":"en"},
     {"text":"hume museums pasand hain lekin shopping bilkul nahi","language":"hinglish"},
