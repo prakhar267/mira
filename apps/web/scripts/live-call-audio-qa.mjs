@@ -21,7 +21,7 @@ const directory = await mkdtemp(join(tmpdir(), "mira-live-call-audio-"));
 const report = { at: new Date().toISOString(), expectedSha: sha,
   variant: shortNames ? "contextual place name then negative-control number" : "English Hindi Hinglish clean/noise",
   method: "Actual production call UI, native Chromium MediaRecorder/WebAudio/HTMLAudio, real STT/chat/Priya TTS. Synthetic prerecorded input and muted speaker. NOT physical microphone, accent diversity, echo, subjective voice or phone acceptance.",
-  caps: { "companion-chat": shortNames ? 8 : 6, "companion-transcribe": shortNames ? 8 : 6, "companion-speech": shortNames ? 10 : 8 }, requests: {}, turns: [], errors: [], passed: false, sessionRevoked: false };
+  caps: { "companion-chat": shortNames ? 8 : 6, "companion-transcribe": shortNames ? 8 : 6, "companion-speech": shortNames ? 10 : 8 }, requests: {}, turns: [], errors: [], semanticFailures: [], passed: false, sessionRevoked: false };
 const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--autoplay-policy=no-user-gesture-required"] });
 const context = await browser.newContext({ serviceWorkers: "block", viewport: { width: 1280, height: 850 } });
 const page = await context.newPage(); page.setDefaultTimeout(20_000);
@@ -143,7 +143,11 @@ try {
       turn.inputAnchorsMatch = shortNames && language !== "hindi"
         ? groups[0].includes(turn.transcript.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu,""))
         : groups.every(group => group.some(word => turn.transcript.toLowerCase().includes(word)));
-      assert.ok(turn.languageMatches && turn.inputAnchorsMatch, "Language or transcript anchors need review");
+      turn.passed = turn.languageMatches && turn.inputAnchorsMatch;
+      // Complete the already-budgeted voice AND video matrix even when a
+      // transcript is wrong. Preserve every semantic failure in the result;
+      // provider errors/quotas still stop immediately, never retry or renew.
+      if (!turn.passed) report.semanticFailures.push({ kind, fixture: turn.fixture, languageMatches: turn.languageMatches, inputAnchorsMatch: turn.inputAnchorsMatch });
       assert.ok(turn.endOfClipToPlaybackMs >= 0, "Reply started before the input clip ended");
       assert.equal(turn.responses.filter(item => item.service === "companion-chat").length, 1);
       await page.screenshot({ path: join(directory, `${kind}-${language}.png`) });
@@ -154,7 +158,8 @@ try {
     await expect.poll(() => page.evaluate(() => window.__miraAudioQa.active)).toBe(0);
   }
   report.media = await page.evaluate(() => { const s = window.__miraAudioQa; return { requested: s.requested, stopped: s.stopped, active: s.active, events: s.events }; });
-  report.finalRelease = await health(); report.passed = report.turns.length === (shortNames ? 8 : 6) && report.errors.length === 0;
+  report.finalRelease = await health(); report.passed = report.turns.length === (shortNames ? 8 : 6) && report.errors.length === 0 && report.semanticFailures.length === 0;
+  if (!report.passed) process.exitCode = 1;
 } catch { report.errors.push("Live call acceptance failed; inspect bounded turn evidence/screenshots"); process.exitCode = 1; }
 finally {
   await Promise.all(pending);
@@ -164,5 +169,5 @@ finally {
   }
   await context.close(); await browser.close();
   await writeFile(join(directory, "live-call-audio.json"), JSON.stringify(report, null, 2), { flag: "wx", mode: 0o600 });
-  console.log(JSON.stringify({ directory, passed: report.passed, turns: report.turns.length, errors: report.errors, requests: report.requests, sessionRevoked: report.sessionRevoked }));
+  console.log(JSON.stringify({ directory, passed: report.passed, turns: report.turns.length, errors: report.errors, semanticFailures: report.semanticFailures, requests: report.requests, sessionRevoked: report.sessionRevoked }));
 }
