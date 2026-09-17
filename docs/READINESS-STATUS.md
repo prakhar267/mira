@@ -1,8 +1,14 @@
 # Mira current readiness and acceptance status
 
-Updated 17 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
+Updated 18 September 2026. This is the current handoff; dated implementation reports remain historical evidence. Payments and paid infrastructure remain excluded. Passing synthetic tests is not permission to certify human conversation, live delivery or independent disaster recovery.
 
 ## Latest follow-up
+
+The [brief-turn quality follow-through](READINESS-TURN-QUALITY.md) removes
+follow-up questions after standalone thanks, adds turn-local Hindi agreement
+cues, and fixes two more Hinglish routing gaps. Its retained short-word audio
+diagnostic still exposes a place-name failure; no provider swap is claimed to
+fix it. Use the corresponding PR promotion record for deployed status.
 
 The [short-turn and transcription follow-up](READINESS-TRANSCRIPT-RELIABILITY.md)
 fixes dropped one-word speech, premature English browser guesses, an avoidable

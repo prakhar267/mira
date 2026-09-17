@@ -122,7 +122,14 @@ describe("edge companion prompting", () => {
     expect(detectCompanionRequestLanguage({messages:[{role:"user",content},{role:"user",content:"okay"},{role:"user",content:"hmm"}]})).toBe(language);
   });
 
-  it.each(["thanks", "thank you", "yep", "nope", "sorry"])("keeps brief %s in the language of the conversation", content => {
+  it.each(["shukriya", "dhanyavaad", "dhanyavad"])("recognizes a standalone Roman-Hindi acknowledgement: %s", content => {
+    expect(detectCompanionLanguage(content)).toBe("hinglish");
+    expect(detectCompanionLanguage(`The title is ${content}.`)).toBe("en");
+  });
+  it.each(["Hum dono kahan ja rahe hain?", "Hum saath aa rahe hain", "Pune ja rahe hain"])("recognizes a complete Roman-Hindi progressive phrase: %s",content=>{
+    expect(detectCompanionLanguage(content)).toBe("hinglish");
+  });
+  it.each(["thanks", "thank you", "thanks a lot Mira", "thank you so much", "yep", "nope", "sorry"])("keeps brief %s in the language of the conversation", content => {
     expect(detectCompanionRequestLanguage({ messages: [{ role: "user", content: "आज बारिश हो रही है।" }, { role: "user", content }] })).toBe("hi");
     expect(detectCompanionRequestLanguage({ messages: [{ role: "user", content: "aaj baarish ho rahi hai" }, { role: "user", content }] })).toBe("hinglish");
   });

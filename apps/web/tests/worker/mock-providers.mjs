@@ -11,6 +11,15 @@ export class MockAI extends WorkerEntrypoint {
     }
     const last=input.messages?.at(-1)?.content??"";
     const visible = text => model.includes("gemma-4") ? {choices:[{delta:{content:text}}]} : {response:text};
+    if(input.stream&&/^(?:thanks|shukriya|धन्यवाद)[.!।\s]*\n/u.test(last)) {
+      const language=last.match(/\[Application reply setting: ([^.]+)\./)?.[1];
+      const reply=language==="Hindi in Devanagari"?"कोई बात नहीं।":language==="Hinglish in Roman letters"?"Koi baat nahi.":"You're welcome!";
+      if(input.messages[0].content.includes("Prefer one short sentence")) {
+        let cleanup;
+        return new ReadableStream({start(c){c.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(visible(reply))}\n\n`));cleanup=setTimeout(()=>c.close(),15_000);},cancel(){clearTimeout(cleanup);}});
+      }
+      return new Response(`data: ${JSON.stringify(visible(`${reply} What's on your mind?`))}\n\ndata: [DONE]\n\n`).body;
+    }
     if(input.stream&&input.messages?.some(message=>message.role==="user"&&message.content.includes("[synthetic-language-chain]"))) {
       // Follow only the application's final language setting. The production
       // route still performs its real consent, capacity and language checks.

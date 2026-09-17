@@ -1,8 +1,28 @@
 import {describe,expect,it} from "vitest";
-import {conversationFocus,isDraftingRequest,isStandalonePersonalHabit,replyGroundingIssue,isFactCorrection} from "./conversation-focus";
+import {conversationFocus,isClosingThanks,isDraftingRequest,isStandalonePersonalHabit,replyGroundingIssue,isFactCorrection} from "./conversation-focus";
 import {buildFreeChatMessages} from "./free-chat";
 
 describe("turn-local speaker and intent focus",()=>{
+  it.each(["thanks", "Thank you!", "thanks a lot Mira", "shukriya yaar", "धन्यवाद।", "शुक्रिया यार"])("closes only a standalone thank-you: %s",content=>{
+    expect(isClosingThanks({messages:[{role:"user",content}]})).toBe(true);
+    expect(conversationFocus({messages:[{role:"user",content}]},"en")).toContain("no question, new topic");
+  });
+  it.each(["yes", "no", "yep", "हाँ", "thanks, but what should I do?", "Thanks for nothing", 'She said "thank you"', "thank you?", "धन्यवाद, पर अब क्या करूँ?", "thanks and ask me another question"])("preserves an answer or additional request: %s",content=>{
+    expect(isClosingThanks({messages:[{role:"user",content}]})).toBe(false);
+  });
+  it("never classifies assistant text as user closure",()=>{
+    expect(isClosingThanks({messages:[{role:"assistant",content:"thanks"}]})).toBe(false);
+  });
+  it.each(["Main kiske saath ja rahi hoon aur kaunsi city?", "मैं कहाँ जा रही हूँ?"])("mirrors explicit feminine verb agreement without creating identity: %s",content=>{
+    const cue=conversationFocus({messages:[{role:"user",content}]},"hinglish");
+    expect(cue).toContain("tum ... rahi ho");expect(cue).toContain("not a gender/profile inference");
+  });
+  it.each(["main kis city ja raha hoon?", "मैं कहाँ जा रहा हूँ?"])("mirrors explicit masculine verb agreement: %s",content=>{
+    expect(conversationFocus({messages:[{role:"user",content}]},"hi")).toContain("tum ... rahe ho");
+  });
+  it.each(['Meri behen ja rahi hai', 'My sister said "main ja rahi hoon"', 'Main "ja rahi hoon" ka translation pooch raha hoon', 'Main kahan ja raha hoon ya ja rahi hoon?', 'Main Street is closed', 'Hum Pune ja rahe hain', 'main kya karun?'])("does not infer agreement from a relative, quote, group or unknown inflection: %s",content=>{
+    expect(conversationFocus({messages:[{role:"user",content}]},"hinglish")).not.toContain("Grammar for this turn only");
+  });
   it.each(["I often forget my camera battery.","मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।","main aksar apni chabi bhool jata hoon"])("detects a self-contained habit: %s",content=>{
     const input={messages:[{role:"user" as const,content:"My cousin Arjun likes photography."},{role:"user" as const,content}]};
     expect(isStandalonePersonalHabit(input)).toBe(true);

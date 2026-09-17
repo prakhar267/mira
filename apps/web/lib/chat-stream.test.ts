@@ -2,6 +2,21 @@ import {describe,expect,it} from "vitest";
 import {readChatStream} from "./chat-stream";
 function bytes(text:string){const data=new TextEncoder().encode(text);return new ReadableStream<Uint8Array>({start(c){for(let i=0;i<data.length;i+=3)c.enqueue(data.slice(i,i+3));c.close();}});}
 describe("spoken inference streaming",()=>{
+  it.each(["You're welcome!", "Koi baat nahi.", "कोई बात नहीं।"])("finishes an explicitly one-sentence call turn without waiting for more tokens: %s",reply=>{
+    let canceled=false;
+    const stream=new ReadableStream<Uint8Array>({start(c){c.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({response:reply})}\n\n`));},cancel(){canceled=true;return new Promise(()=>{});}});
+    return readChatStream(stream,AbortSignal.timeout(300),true,undefined,1).then(result=>{expect(result).toBe(reply);expect(canceled).toBe(true);});
+  });
+  it("keeps general call answers and typed messages complete",async()=>{
+    const full="You're welcome! Here's the next practice question.";
+    const s=()=>bytes(`data: ${JSON.stringify({response:full})}\n\ndata: [DONE]\n\n`);
+    expect(await readChatStream(s(),new AbortController().signal,true)).toBe(full);
+    expect(await readChatStream(s(),new AbortController().signal,false,undefined,1)).toBe(full);
+  });
+  it("does not early-cut a quoted or unfinished acknowledgement",async()=>{
+    expect(await readChatStream(bytes('data: {"response":"\\\"Koi baat nahi."}\n\ndata: {"response":"\\\""}\n\ndata: [DONE]\n\n'),new AbortController().signal,true,undefined,1)).toBe('"Koi baat nahi."');
+    expect(await readChatStream(bytes('data: {"response":"You are"}\n\ndata: {"response":" welcome!"}\n\ndata: [DONE]\n\n'),new AbortController().signal,true,undefined,1)).toBe('You are welcome!');
+  });
   it("reads visible OpenAI-shaped deltas without exposing reasoning or tools",async()=>{
     const frames=[{choices:[{delta:{role:"assistant",reasoning_content:"private reasoning"}}]},{choices:[{delta:{content:"Kal ke liye "}}]},{choices:[{delta:{content:"all the best!"}}]}];
     const received:string[]=[];

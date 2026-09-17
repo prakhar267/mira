@@ -12,7 +12,7 @@ import { chatDeliveryStream } from "@/lib/chat-delivery-stream";
 import { CHAT_STREAM_TYPE } from "@/lib/chat-stream-protocol";
 import { discardUnusedRequestBody } from "@/lib/unused-request-body";
 import { groundReplyPerspective } from "@/lib/reply-perspective";
-import { isFactCorrection, replyGroundingIssue } from "@/lib/conversation-focus";
+import { isClosingThanks, isFactCorrection, replyGroundingIssue } from "@/lib/conversation-focus";
 
 const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
@@ -75,7 +75,8 @@ export async function POST(request: Request) {
       return safeReply(buildMemoryRecallReply(input), "memory");
     }
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
-    const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage) || isFactCorrection(input);
+    const closingThanks = isClosingThanks(input);
+    const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage) || isFactCorrection(input) || closingThanks;
     const dayReply = buildDayCheckInReply(latestUserMessage, expectedLanguage);
     if (dayReply && !suppressQuestions) return deliver(dayReply,"day-check-in",{model:"day-check-in",language:expectedLanguage});
     const messages = buildFreeChatMessages(input);
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
         top_p: 0.86,
         chat_template_kwargs: { enable_thinking: false },
       } as never);
-      return generated instanceof ReadableStream ? readChatStream(generated, signal, input.delivery !== "text", checkPartial ? raw => checkPartial(raw, signal) : undefined) : generated;
+      return generated instanceof ReadableStream ? readChatStream(generated, signal, input.delivery !== "text", checkPartial ? raw => checkPartial(raw, signal) : undefined, closingThanks ? 1 : 2) : generated;
     }, Math.max(500, Math.min(8_000, 8_500 - (Date.now() - startedAt))), deliverySignal)));
     let raw = await runCloudflare(messages);
     await recheckContext(deliverySignal);

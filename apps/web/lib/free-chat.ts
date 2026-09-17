@@ -1,6 +1,6 @@
 import { detectCompanionRequestLanguage, isInvalidCompanionReply, requestsListeningOnly, sanitizeCompanionReplyForDelivery, type EdgeCompanionRequest } from "./companion-prompt";
 import { CHAT_STREAM_TYPE, CompanionRequestError, readCompanionReplyStream } from "./chat-stream-protocol";
-import { conversationFocus, isDraftingRequest, isFactCorrection } from "./conversation-focus";
+import { conversationFocus, isClosingThanks, isDraftingRequest, isFactCorrection } from "./conversation-focus";
 export { CompanionRequestError } from "./chat-stream-protocol";
 
 export const FREE_CHAT_ENDPOINT = "https://api.llm7.io/v1/chat/completions";
@@ -45,7 +45,7 @@ export function buildFreeChatSystemPrompt(input: EdgeCompanionRequest) {
   const deliveryRule = input.delivery === "text"
     ? input.responsePreferences?.responseLength === "deep" ? "Use 4-6 focused sentences when the topic warrants depth; still answer directly." : input.responsePreferences?.responseLength === "short" ? "Use 1-2 compact sentences." : "Use 1-3 compact sentences."
     : "Prefer one short sentence, at most two (about 35 words total). Sound natural aloud; no markdown, emoji, or stage directions.";
-  const questionRule = drafting || isFactCorrection(input) || recentQuestions || input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(input.messages.at(-1)?.content ?? "")
+  const questionRule = drafting || isClosingThanks(input) || isFactCorrection(input) || recentQuestions || input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(input.messages.at(-1)?.content ?? "")
     ? "Do not ask a question."
     : "Let ordinary statements land without a question. Ask at most one brief question only to advance the topic; never ask again about a feeling, reason or fact the user just explained.";
 
@@ -72,7 +72,7 @@ export function buildFreeChatSystemPrompt(input: EdgeCompanionRequest) {
       : "Speech may have rough grammar or phonetic spellings. Infer its ordinary meaning in context. Answer short turns normally. Never say you heard it wrong just because it is informal; clarify only materially ambiguous or cut-off speech.",
     languageRule,
     language === "hi" ? "Write Hindi words completely in Devanagari, not hybrid words mixing Latin letters into a Hindi word. Familiar English names or terms can stay in English as separate words." : "",
-    language === "hi" || language === "hinglish" ? "Use feminine first-person grammar only for Mira (karti/करती, rahi/रही), not for the user or a message's sender. Never guess their gender; use impersonal phrasing instead of gendered second-person verbs. Use consistent तुम/हो agreement. Keep Hindi colloquial, not literal translated English." : "",
+    language === "hi" || language === "hinglish" ? "Mira uses feminine first-person grammar (karti/करती, rahi/रही). For the user, mirror their explicitly used verb inflection when reflecting the same action; otherwise use impersonal wording without guessing gender. Keep तुम/हो agreement and colloquial Hindi." : "",
     deliveryRule,
     questionRule,
     "Answer practical requests directly (for interview practice, ask a practice question). Otherwise react to the actual topic without unsolicited advice. When asked to just talk, stay on the topic; don't announce 'I'm here/listening' or ask permission to advise.",
@@ -123,7 +123,7 @@ export function readFreeChatResponse(result: unknown) {
 export async function requestFreeCompanionReply(input: EdgeCompanionRequest, signal?: AbortSignal, onDelta?: (delta: string) => void) {
   const latestUserMessage = input.messages.at(-1)?.content ?? "";
   const expectedLanguage = detectCompanionRequestLanguage(input);
-  const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage) || isFactCorrection(input);
+  const suppressQuestions = input.responsePreferences?.questionFrequency === "rare" || requestsListeningOnly(latestUserMessage) || isFactCorrection(input) || isClosingThanks(input);
   const deliverySignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(12_000)]) : AbortSignal.timeout(12_000);
   const response = await fetch("/api/companion-chat", {
     method: "POST",

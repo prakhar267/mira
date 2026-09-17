@@ -1,7 +1,12 @@
 // Shared by production validation and the standalone Node evaluation runner.
 // These are script/style checks, not a semantic language detector.
 export type ReplyLanguage = "en" | "hi" | "hinglish";
+const progressiveHindi = /\b(?:ja|aa|kar|bol|kha|dekh|soch|padh|reh|chal|sun|pi|pee)\s+(?:rahe|rahi|raha)\s+(?:hain|hai|ho|hoon|hun)\b/iu;
+const romanThanks = /^(?:shukriya|dhanyavaad|dhanyavad)[.!\s]*$/iu;
 export const hasInflectedHindi = (value: string) => (value.match(/\b(?:bhi|dono|rahega|rahegi|karoge|karogi|gaya|gayi|gai|tha|thi|raha|rahi|aap|nahin|waapas|wapas|waise|maine|kis|saath)\b/gi)?.length ?? 0) >= 2
+  // A complete progressive verb phrase is stronger evidence than an isolated
+  // word/place name. In particular, plural "ja rahe hain" must not become English.
+  || progressiveHindi.test(value)
   // New colloquial markers need a compatible verb, not just another name/place
   // (e.g. an English sentence mentioning both Gaya and Sahi).
   || (/\b(?:jayega|jayegi|jaayega|jaayegi|hoga|hogi|chalein)\b/i.test(value)
@@ -21,6 +26,6 @@ export function matchesReplyLanguage(reply: string, language: ReplyLanguage) {
     return devanagari && romanGrammar < 3 && (reply.match(romanHindiWords)?.length ?? 0) < 2;
   }
   if (devanagari) return false;
-  if (language === "hinglish") return naturalHinglish.test(reply) || hasInflectedHindi(reply) || hindiImperative.test(reply);
-  return !hindiImperative.test(reply) && (reply.match(romanHindiWords)?.length ?? 0) < 2;
+  if (language === "hinglish") return naturalHinglish.test(reply) || hasInflectedHindi(reply) || hindiImperative.test(reply) || romanThanks.test(reply.trim());
+  return !hindiImperative.test(reply) && !progressiveHindi.test(reply) && !romanThanks.test(reply.trim()) && (reply.match(romanHindiWords)?.length ?? 0) < 2;
 }

@@ -1,4 +1,5 @@
 import { hasInflectedHindi, matchesReplyLanguage } from "./reply-language";
+import { isClosingThanks } from "./conversation-focus";
 
 export interface EdgeCompanionMessage {
   role: "user" | "assistant";
@@ -70,6 +71,9 @@ export function detectCompanionLanguage(value: string): CompanionLanguage {
   if (/\b(?:reply|answer|speak|talk) in hindi\b|\bhindi (?:mein|me)\b/i.test(value) || /हिंदी में/u.test(value)) return "hi";
   if (/\b(?:reply|answer|speak|talk) in english\b/i.test(value) || /अंग्रेज़ी में/u.test(value)) return "en";
   if (/\p{Script=Devanagari}|\p{Script=Arabic}/u.test(value)) return "hi";
+  // These Roman-Hindi acknowledgements are not English by default. Keep this
+  // anchored: an English sentence discussing a title/name isn't a switch.
+  if (/^(?:shukriya|dhanyavaad|dhanyavad)[.!\s]*$/iu.test(value.trim())) return "hinglish";
   if (hinglishPattern.test(value)) return "hinglish";
   // Short natural updates often contain inflected verbs, not dictionary forms.
   // Require two of these extra markers so an English mention of Gaya alone is
@@ -85,7 +89,8 @@ export function detectCompanionRequestLanguage(input: Pick<EdgeCompanionRequest,
     const message = input.messages[index]!;
     if (message.role !== "user") continue;
     const content = message.content.trim();
-    if (!content || /^(?:ok(?:ay)?|yes|yeah|yep|no|nope|right|sure|fine|thanks|thank you|sorry|hmm+|uh huh|go on)[.!?\s]*$/i.test(content)) continue;
+    if (!content || /^(?:ok(?:ay)?|yes|yeah|yep|no|nope|right|sure|fine|thanks|thank you|sorry|hmm+|uh huh|go on)[.!?\s]*$/i.test(content)
+      || (/^(?:thanks|thank you)\b/i.test(content) && isClosingThanks({messages:[message]}))) continue;
     return detectCompanionLanguage(content);
   }
   return "en";
