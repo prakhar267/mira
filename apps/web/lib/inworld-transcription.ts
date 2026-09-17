@@ -4,6 +4,7 @@ export const INWORLD_STT_ENDPOINT = "https://api.inworld.ai/stt/v1/transcribe";
 export const INWORLD_STT_MODEL = "inworld/inworld-stt-1";
 
 const devanagariCodeMixPattern = /(?:ऑफिस|वर्क|जॉब|बॉस|मैनेजर|मीटिंग|इंटरव्यू|डिनर|मैसेज|टेक्स्ट|कॉल|वीडियो|ब्लेम|मूड|वीकेंड|प्रोजेक्ट|डेडलाइन|प्रेज़ेंटेशन|ईमेल|रिप्लाई|कॉन्टेक्स्ट)/u;
+const latinCodeMixPattern = /\b(?:office|work|job|boss|manager|meeting|interview|dinner|message|text|call|video|blame|mood|weekend|project|deadline|presentation|email|reply|context|stress)\b/iu;
 const spokenHinglishCorrections: Record<string, string> = {
   apanee: "apni",
   apane: "apne",
@@ -96,6 +97,10 @@ export function readInworldTranscript(result: unknown) {
 /** Speech has no script; romanize auto-detected Hindi only when the transcript contains clear English code-mixing. */
 export function preserveSpokenLanguage(value: string) {
   const clean = value.replace(/\s+/g, " ").trim();
-  if (/\p{Script=Devanagari}/u.test(clean) && devanagariCodeMixPattern.test(clean)) return normalizeSpokenHinglish(romanizeHindiForEnglishTts(clean));
+  if (/\p{Script=Devanagari}/u.test(clean) && (devanagariCodeMixPattern.test(clean) || latinCodeMixPattern.test(clean))) {
+    // STT may spell the English words in either script. Convert only Hindi
+    // spans, so Latin names such as Neha are not altered by schwa removal.
+    return normalizeSpokenHinglish(clean.replace(/[\p{Script=Devanagari}\p{M}।॥]+/gu, word=>romanizeHindiForEnglishTts(word)));
+  }
   return clean;
 }

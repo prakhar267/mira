@@ -45,6 +45,20 @@ describe("turn-local speaker and intent focus",()=>{
   it.each(['I often help him pack.', 'I often lend Arjun my camera.', 'My sister said "I often forget my keys".', 'What should I text him?'])("preserves contextual people and quoted speakers: %s",content=>{
     expect(replyGroundingIssue({messages:[{role:"user",content:"My cousin Arjun likes photography."},{role:"user",content}]},"Arjun can bring his camera.")).toBeNull();
   });
+  it("matches user-supplied names across Hindi and English without rewriting them",()=>{
+    const history=[{role:"user" as const,content:"My cousin Arjun likes photography."}];
+    expect(replyGroundingIssue({messages:[...history,{role:"user",content:"मैं कैमरे की बैटरी अक्सर भूल जाता हूँ।"}]},"कैमरे की बैटरी का ध्यान रखना बहुत ज़रूरी है वरना अर्जुन फोटोग्राफी नहीं कर पाएगा।")).toBe("habit-owner");
+    expect(replyGroundingIssue({messages:[...history,{role:"user",content:"मैं अक्सर अर्जुन को अपना कैमरा देता हूँ।"}]},"Arjun can use your camera.")).toBeNull();
+    expect(replyGroundingIssue({messages:[{role:"user",content:"मेरी दोस्त नेहा फोटोग्राफी करती है।"},{role:"user",content:"I often forget my battery."}]},"Neha needs that battery.")).toBe("habit-owner");
+    expect(replyGroundingIssue({messages:[{role:"assistant",content:"My cousin Arjun likes photography."},{role:"user",content:"I often forget my battery."}]},"Arjun needs that battery.")).toBeNull();
+  });
+  it("places bounded user quantities near a recap without importing assistant guesses",()=>{
+    const messages=[{role:"user" as const,content:"aaj socha bas ek museum kaafi hai"},{role:"assistant" as const,content:"You will visit three museums."},{role:"user" as const,content:"In English, sum up our plan"}];
+    const cue=conversationFocus({messages},"en");
+    expect(cue).toContain("bas ek museum");
+    expect(cue).not.toContain("three museums");
+    expect(conversationFocus({messages:[messages[0]!,{role:"user",content:"How are you?"}]},"en")).not.toContain("quoted user statements");
+  });
   it("does not turn corrections into another question or apply that rule inside a draft",()=>{
     expect(isFactCorrection({messages:[{role:"user",content:"Actually we leave Sunday, not Saturday."}]})).toBe(true);
     expect(isFactCorrection({messages:[{role:"user",content:"Write a message to my brother"},{role:"user",content:"Actually he starts Sunday"}]})).toBe(false);

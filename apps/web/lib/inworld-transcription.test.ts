@@ -58,4 +58,12 @@ describe("Inworld transcription", () => {
     expect(preserveSpokenLanguage("यार मेरी मैनेजर ने अपनी मिस्टेक के लिए मुझे ब्लेम कर दिया।")).toBe("yaar meri manager ne apni mistake ke liye mujhe blame kar diya.");
     expect(normalizeSpokenHinglish("kyaa main usane yah boloon")).toBe("kya main usne yah bolun");
   });
+  it("recognizes Latin English words inside Hindi speech without changing Latin names", () => {
+    const mixed=preserveSpokenLanguage("यार, आज office में काफी stress था. Boss ने meeting में डाद दिया.");
+    expect(mixed).not.toMatch(/\p{Script=Devanagari}/u);
+    expect(mixed).toContain("office");expect(mixed).toContain("Boss");
+    expect(preserveSpokenLanguage("Neha ने office में काम किया।")).toContain("Neha ");
+    expect(preserveSpokenLanguage("मेरी दोस्त Neha कल Pune आ रही है।")).toBe("मेरी दोस्त Neha कल Pune आ रही है।");
+    expect(preserveSpokenLanguage("I work with Neha.")).toBe("I work with Neha.");
+  });
 });
