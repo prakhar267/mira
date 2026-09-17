@@ -15,8 +15,11 @@ assert.equal(process.env.MIRA_LIVE_CALL_QA, "true", "Explicit owner-approved inf
 const base = process.env.COMPANARO_URL, sha = process.env.MIRA_EXPECTED_SHA;
 assert.equal(base, "https://luma-companion.prakhargupta267.workers.dev");
 assert.match(sha ?? "", /^[a-f0-9]{40}$/);
+assert.ok(process.argv.slice(2).every(arg => arg === "--short-names"), "Unknown live call diagnostic option");
+const shortNames = process.argv.includes("--short-names");
 const directory = await mkdtemp(join(tmpdir(), "mira-live-call-audio-"));
 const report = { at: new Date().toISOString(), expectedSha: sha,
+  variant: shortNames ? "contextual place name then negative-control number" : "English Hindi Hinglish clean/noise",
   method: "Actual production call UI, native Chromium MediaRecorder/WebAudio/HTMLAudio, real STT/chat/Priya TTS. Synthetic prerecorded input and muted speaker. NOT physical microphone, accent diversity, echo, subjective voice or phone acceptance.",
   caps: { "companion-chat": 6, "companion-transcribe": 6, "companion-speech": 8 }, requests: {}, turns: [], errors: [], passed: false, sessionRevoked: false };
 const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--autoplay-policy=no-user-gesture-required"] });
@@ -36,6 +39,7 @@ try {
     if (service in report.caps) {
       report.requests[service] = (report.requests[service] ?? 0) + 1;
       if (report.requests[service] > report.caps[service]) { report.errors.push("Finite request budget exceeded"); return route.abort(); }
+      if (service === "companion-transcribe" && currentTurn) currentTurn.vocabulary = route.request().postDataJSON().vocabulary ?? [];
     }
     return route.continue();
   });
@@ -110,11 +114,13 @@ try {
     const dialog = page.getByRole("dialog", { name: `${kind === "voice" ? "Voice" : "Video"} call with Mira`, exact: true });
     await expect(dialog).toBeVisible();
     if (kind === "video") await expect(page.locator(".live-avatar-3d--ready")).toBeVisible({ timeout: 35_000 });
-    for (const language of ["english", "hindi", "hinglish"]) {
+    for (const language of (shortNames ? ["hindi", "city-roman", "number-one"] : ["english", "hindi", "hinglish"])) {
       assert.equal(report.errors.length, 0);
       await expect(dialog.getByRole("button", { name: "Listening automatically", exact: true })).toBeVisible({ timeout: 35_000 });
-      const fixture = new URL(`../../../audit/2026-09-12-followup/final/audio/${language}${kind === "video" ? "-noise.wav" : ".mp3"}`, import.meta.url);
-      const turn = { kind, fixture: `${language}-${kind === "video" ? "synthetic-noise" : "clean"}`, responses: [] };
+      const fixture = new URL(shortNames && language !== "hindi"
+        ? `../../../audit/2026-09-18-call-reliability/audio/${language}.mp3`
+        : `../../../audit/2026-09-12-followup/final/audio/${language}${kind === "video" ? "-noise.wav" : ".mp3"}`, import.meta.url);
+      const turn = { kind, fixture: `${language}-${shortNames && language !== "hindi" ? "isolated" : kind === "video" ? "synthetic-noise" : "clean"}`, responses: [] };
       report.turns.push(turn); currentTurn = turn;
       const input = await page.evaluate(bytes => window.__miraFeedAudio(bytes), (await readFile(fixture)).toString("base64"));
       await expect.poll(() => page.evaluate(() => window.__miraAudioQa.played), { timeout: 35_000 }).toBeGreaterThan(input.previousPlays);
@@ -130,11 +136,13 @@ try {
       turn.playbackSeconds = ended.time;
       assert.equal(report.errors.length, 0); assert.ok(turn.transcript?.trim()); assert.ok(turn.reply?.trim());
       turn.expectedLanguage = { english: "en", hindi: "hi", hinglish: "hinglish" }[language];
-      turn.languageMatches = turn.language === turn.expectedLanguage && matchesReplyLanguage(turn.reply, turn.expectedLanguage);
-      const groups = language === "english" ? [["kabir"], ["interview"], ["brother"]]
+      turn.languageMatches = !turn.expectedLanguage || turn.language === turn.expectedLanguage && matchesReplyLanguage(turn.reply, turn.expectedLanguage);
+      const groups = language === "city-roman" ? [["pune", "पुणे"]] : language === "number-one" ? [["one", "1", "एक", "वन"]] : language === "english" ? [["kabir"], ["interview"], ["brother"]]
         : language === "hindi" ? [["नेहा", "neha"], ["पुणे", "pune"], ["दोस्त", "friend"]]
         : [["boss", "bos", "बॉस"], ["meeting", "मीटिंग"], ["daant", "डांट", "डाँट"]];
-      turn.inputAnchorsMatch = groups.every(group => group.some(word => turn.transcript.toLowerCase().includes(word)));
+      turn.inputAnchorsMatch = shortNames && language !== "hindi"
+        ? groups[0].includes(turn.transcript.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu,""))
+        : groups.every(group => group.some(word => turn.transcript.toLowerCase().includes(word)));
       assert.ok(turn.languageMatches && turn.inputAnchorsMatch, "Language or transcript anchors need review");
       assert.ok(turn.endOfClipToPlaybackMs >= 0, "Reply started before the input clip ended");
       assert.equal(turn.responses.filter(item => item.service === "companion-chat").length, 1);

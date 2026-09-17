@@ -114,18 +114,20 @@ export async function buildAvatarDelivery(source, { fast = false, meshProfile = 
   let mesh, wire;
   if (meshProfile) {
     const decoded = decodeGlb(glb);
-    const packed = await packAvatarMesh(glb, decoded.model, glb.length - decoded.binary.length);
+    const packed = await packAvatarMesh(glb, decoded.model, glb.length - decoded.binary.length, { adaptive: pruneMorphs });
     mesh = gzipSync(packed, { level: 9 }); mesh[9] = 255;
     assert.ok(mesh.length < 900_000, `Mesh delivery budget exceeded: ${mesh.length}`);
-    Object.assign(manifest, { meshPath: `/assets/mira/avatar/mira-anime-${profile}.mesh.gz`, meshBytes: mesh.length,
+    const meshProfileName = pruneMorphs ? "call-v5" : profile;
+    Object.assign(manifest, { meshPath: `/assets/mira/avatar/mira-anime-${meshProfileName}.mesh.gz`, meshBytes: mesh.length,
       meshSha256: digest(mesh), meshPackedBytes: packed.length });
     // Native DecompressionStream Brotli changes no model bytes. Engines without
     // that format retain the previous gzip transport; no extra decoder download.
     wire = brotliCompressSync(packed, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } });
     assert.ok(brotliDecompressSync(wire).equals(packed));
     assert.ok(wire.length < 820_000);
-    Object.assign(manifest, { meshWirePath: `/assets/mira/avatar/mira-anime-${profile}.mesh.br`, meshWireBytes: wire.length,
+    Object.assign(manifest, { meshWirePath: `/assets/mira/avatar/mira-anime-${meshProfileName}.mesh.br`, meshWireBytes: wire.length,
       meshWireSha256: digest(wire), meshPackedSha256: digest(packed) });
+    if (pruneMorphs) Object.assign(manifest, { meshHttpPath: `/assets/mira/avatar/mira-anime-${meshProfileName}.mesh` });
   }
   return { gzip, glb, portrait, manifest, mesh, wire };
 }
@@ -140,6 +142,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     ...(fast ? [["../public" + result.manifest.rawPath, result.glb]] : []),
     ...(meshProfile ? [["../public" + result.manifest.meshPath, result.mesh]] : []),
     ...(meshProfile ? [["../public" + result.manifest.meshWirePath, result.wire]] : []),
+    ...(pruneMorphs ? [["../public" + result.manifest.meshHttpPath, gunzipSync(result.mesh)]] : []),
   ];
   for (const [path, bytes] of files) {
     const url = new URL(path, import.meta.url);

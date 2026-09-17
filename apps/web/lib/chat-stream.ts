@@ -1,5 +1,5 @@
 /** Consume Workers AI SSE without buffering an unnecessarily long spoken reply. */
-export async function readChatStream(stream: ReadableStream<Uint8Array>, signal: AbortSignal, spoken: boolean, onText?: (text: string) => Promise<void>, spokenSentences: 1 | 2 = 2) {
+export async function readChatStream(stream: ReadableStream<Uint8Array>, signal: AbortSignal, spoken: boolean, onText?: (text: string) => Promise<void>, spokenSentences: 1 | 2 = 2, onFirstText?: () => void) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let pending = "", text = "";
@@ -31,6 +31,7 @@ export async function readChatStream(stream: ReadableStream<Uint8Array>, signal:
         // must never reach captions, speech or the safety-prefix callback.
         const delta = part.response ?? part.choices?.[0]?.delta?.content;
         if (delta != null && typeof delta !== "string") throw new Error("Invalid inference text frame");
+        if (!text.trim() && typeof delta === "string" && delta.trim()) onFirstText?.();
         text += delta ?? "";
         if (text.length > 4000) throw new Error("Inference reply exceeded the limit");
         if (onText) await onText(text);

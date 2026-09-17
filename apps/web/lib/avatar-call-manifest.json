@@ -205,12 +205,13 @@
       "textures"
     ]
   },
-  "meshPath": "/assets/mira/avatar/mira-anime-call-v4.mesh.gz",
-  "meshBytes": 792437,
-  "meshSha256": "8f7cccafa8f9f9717ac1155fb92abced7c31b2b6a38a15a8392fc6deb0f047c8",
-  "meshPackedBytes": 1107936,
-  "meshWirePath": "/assets/mira/avatar/mira-anime-call-v4.mesh.br",
-  "meshWireBytes": 747746,
-  "meshWireSha256": "2754ee2209bcac4b04e85dfd56b3899875213926ab1d90e54d636be3c61fc5e5",
-  "meshPackedSha256": "fafcbf28cbce0914d063371d2e453245e438e077f131f7c3281d667c49a4e37b"
+  "meshPath": "/assets/mira/avatar/mira-anime-call-v5.mesh.gz",
+  "meshBytes": 757456,
+  "meshSha256": "6a7833cedf977ccc8bd719de679b638d750e0989041f3da91f1d9965dcc01cee",
+  "meshPackedBytes": 1454535,
+  "meshWirePath": "/assets/mira/avatar/mira-anime-call-v5.mesh.br",
+  "meshWireBytes": 698754,
+  "meshWireSha256": "0837a7e9a55c1c98601999da8c632574c38345e300e0176cf066b163b5b9bc1e",
+  "meshPackedSha256": "7e88be2a247057e0b7f5f8c205632a9fc8f3e293c07648fec3e6c57ee980802b",
+  "meshHttpPath": "/assets/mira/avatar/mira-anime-call-v5.mesh"
 }

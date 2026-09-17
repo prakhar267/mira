@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { MeshoptEncoder, MeshoptDecoder } from "meshoptimizer";
 import { decodeAvatarMesh } from "../lib/avatar-mesh-codec.ts";
+import { gzipSync } from "node:zlib";
 
 /** Only aligned geometry views use lossless meshoptimizer v0. Other bytes are
  * copied verbatim. No quantization, permutation or visual change. */
-export async function packAvatarMesh(glb, model, binaryOffset) {
+export async function packAvatarMesh(glb, model, binaryOffset, { adaptive = false } = {}) {
   await Promise.all([MeshoptEncoder.ready, MeshoptDecoder.ready]);
   const images = new Set(model.images.map(image => image.bufferView)), seen = new Set(), regions = [];
   const dimensions = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
@@ -23,7 +24,22 @@ export async function packAvatarMesh(glb, model, binaryOffset) {
   regions.sort((a, b) => a.offset - b.offset);
   const chunks = []; let cursor = 0;
   const block = (raw, stride) => {
-    const encoded = stride === 2 ? MeshoptEncoder.encodeIndexSequence(raw, raw.length / stride, stride) : stride ? MeshoptEncoder.encodeVertexBufferLevel(raw, raw.length / stride, stride, 3, 0) : raw;
+    let encoded = stride === 2 ? MeshoptEncoder.encodeIndexSequence(raw, raw.length / stride, stride) : stride ? MeshoptEncoder.encodeVertexBufferLevel(raw, raw.length / stride, stride, 3, 0) : raw;
+    if (adaptive && stride) {
+      // Select a lossless layout by its actual wire cost, not the accessor's
+      // render layout. Version is embedded in Meshopt's header; the existing
+      // bounded decoder supports both. No floats, skin weights or UVs change.
+      let cost = gzipSync(encoded, { level: 9 }).length;
+      const consider = (candidate, candidateStride) => {
+        const bytes = gzipSync(candidate, { level: 9 }).length;
+        if (bytes < cost) { cost = bytes; encoded = candidate; stride = candidateStride; }
+      };
+      consider(raw, 0);
+      for (const size of [4, 8, 12, 16, 32, 64, 128, 256]) {
+        if (raw.length % size) continue;
+        for (const version of [0, 1]) consider(MeshoptEncoder.encodeVertexBufferLevel(raw, raw.length / size, size, 3, version), size);
+      }
+    }
     const header = Buffer.alloc(12);
     header.writeUInt32LE(raw.length, 0); header.writeUInt32LE(encoded.length, 4); header.writeUInt32LE(stride, 8);
     chunks.push(header, encoded);

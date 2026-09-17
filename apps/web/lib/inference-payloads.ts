@@ -70,14 +70,19 @@ export function parseSpeechPayload(value: unknown) {
   return text(object(value, ["text"]).text, "Speech text", 500);
 }
 export function parseTranscriptionPayload(value: unknown) {
-  const raw = object(value, ["audioBase64", "contentType", "durationMs"]);
+  const raw = object(value, ["audioBase64", "contentType", "durationMs", "vocabulary"]);
   const audioBase64 = text(raw.audioBase64, "Recording", 4_000_000, 80);
   const contentType = raw.contentType === undefined ? "audio/webm" : text(raw.contentType, "Recording format", 80);
   if (!/^audio\/(?:webm|wav|mpeg|mp4|ogg)(?:;\s*codecs=[a-z0-9.,_-]+)?$/i.test(contentType) || audioBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(audioBase64)) throw new EdgeRequestError("A supported voice recording is required.");
   // Byte limits are authoritative; duration supplied by a browser is only a
   // bounded hint, never proof of actual decoded audio length.
   const durationMs = raw.durationMs === undefined ? undefined : number(raw.durationMs, "Recording duration", 1, 60000);
-  return { audioBase64, contentType, durationMs };
+  const vocabulary = raw.vocabulary === undefined ? [] : array(raw.vocabulary, "Speech vocabulary", 12).map(value => {
+    const term = text(value, "Speech term", 40);
+    if (!/^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}'’ -]*$/u.test(term)) throw new EdgeRequestError("Speech terms must be plain words.");
+    return term;
+  });
+  return { audioBase64, contentType, durationMs, vocabulary: [...new Set(vocabulary)] };
 }
 export function parseMemoryPayload(value: unknown, principal: InferencePrincipal) {
   const raw = object(value, ["query", "memories", "limit"]);

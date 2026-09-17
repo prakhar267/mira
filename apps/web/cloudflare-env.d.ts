@@ -37,7 +37,7 @@ declare module "cloudflare:workers" {
     LUMA_ACCOUNTS?: KVNamespace;
     CF_VERSION_METADATA?: { id?: string; tag?: string; timestamp?: string };
     AI: {
-      run(model: string, input: unknown): Promise<unknown>;
+      run(model: string, input: unknown, options?: { rejectIfBusy?: boolean }): Promise<unknown>;
     };
   };
 }

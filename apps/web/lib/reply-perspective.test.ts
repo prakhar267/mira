@@ -2,6 +2,12 @@ import {describe,expect,it} from "vitest";
 import {groundReplyPerspective} from "./reply-perspective";
 const input=(latest:string)=>({messages:[{role:"user" as const,content:"I am travelling with my cousin Arjun to Jaipur on Sunday."},{role:"user" as const,content:latest}]});
 describe("user-owned offline summaries",()=>{
+  it("does not ask whether an already-confirmed anecdote happened or invent a current task",()=>{
+    expect(groundReplyPerspective(input("haha yaar ye toh mere saath ho chuka hai"),"Haha, suitcase wala joke toh relatable hai. Tumhare saath bhi aisa hi hua tha kya?")).toBe("Haha, suitcase wala joke toh relatable hai.");
+    const original="That sounds familiar. What happened next?";
+    expect(groundReplyPerspective(input("That has never happened to me"),original)).toBe(original);
+    expect(groundReplyPerspective(input("It happened to me. How do I prevent it?"),original)).toBe(original);
+  });
   it("keeps the model acknowledgement without a new question after thanks",()=>{
     expect(groundReplyPerspective(input("thanks"),"You're welcome! What's on your mind?")).toBe("You're welcome!");
     expect(groundReplyPerspective(input("shukriya"),"Koi baat nahi. Aaj kya plan hai?")).toBe("Koi baat nahi.");

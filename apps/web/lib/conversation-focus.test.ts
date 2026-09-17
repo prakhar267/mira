@@ -1,8 +1,21 @@
 import {describe,expect,it} from "vitest";
-import {conversationFocus,isClosingThanks,isDraftingRequest,isStandalonePersonalHabit,replyGroundingIssue,isFactCorrection} from "./conversation-focus";
+import {conversationFocus,isClosingThanks,isDraftingRequest,isStandalonePersonalHabit,replyGroundingIssue,isFactCorrection,isPastExperienceStatement} from "./conversation-focus";
 import {buildFreeChatMessages} from "./free-chat";
 
 describe("turn-local speaker and intent focus",()=>{
+  it.each(["haha yaar ye toh mere saath ho chuka hai", "That happened to me last week.", "मेरे साथ भी ऐसा हुआ था।"])("accepts an explicitly reported past event: %s",content=>{
+    expect(isPastExperienceStatement({messages:[{role:"user",content}]})).toBe(true);
+  });
+  it.each(["mere saath nahi hua tha", "That never happened to me", 'She said "that happened to me"', "Has that happened to me?", "It happened to me, please help"])("does not suppress a negation, quote or request: %s",content=>{
+    expect(isPastExperienceStatement({messages:[{role:"user",content}]})).toBe(false);
+  });
+  it("flags invented benefits inside the first correction sentence without removing real stated reasons",()=>{
+    const input={messages:[{role:"user" as const,content:"Actually we changed the departure to Sunday morning, not Saturday"}]};
+    expect(replyGroundingIssue(input,"Since you're leaving on Sunday morning instead, you'll have a bit more time to relax before your trip.")).toBe("invented-benefit");
+    expect(replyGroundingIssue(input,"Got it, Sunday morning instead of Saturday.")).toBeNull();
+    expect(replyGroundingIssue({messages:[{role:"user",content:"Actually we changed it to Sunday to have more time to pack."}]},"Sunday gives you more time to pack.")).toBeNull();
+    expect(replyGroundingIssue({messages:[{role:"user",content:"What can I do with my extra time?"}]},"You have more time to relax.")).toBeNull();
+  });
   it.each(["thanks", "Thank you!", "thanks a lot Mira", "shukriya yaar", "धन्यवाद।", "शुक्रिया यार"])("closes only a standalone thank-you: %s",content=>{
     expect(isClosingThanks({messages:[{role:"user",content}]})).toBe(true);
     expect(conversationFocus({messages:[{role:"user",content}]},"en")).toContain("no question, new topic");

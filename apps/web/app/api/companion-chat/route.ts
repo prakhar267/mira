@@ -102,6 +102,9 @@ export async function POST(request: Request) {
     } : undefined;
     const runCloudflare = async (promptMessages: typeof messages) => readModelText(await withInferenceCapacity("chat", principal, promptMessages.reduce((count, message) => count + Math.ceil(message.content.length / 4), responseTokenLimit), () => withProviderDeadline("cloudflare-chat", async (signal) => {
       await recheckContext(signal);
+      const providerStartedAt = Date.now();
+      let phase = "waiting-for-headers", firstTextMs: number | undefined;
+      try {
       const generated: unknown = await env.AI.run(MODEL as never, {
         messages: promptMessages,
         stream: true,
@@ -109,8 +112,18 @@ export async function POST(request: Request) {
         temperature: 0.45,
         top_p: 0.86,
         chat_template_kwargs: { enable_thinking: false },
-      } as never);
-      return generated instanceof ReadableStream ? readChatStream(generated, signal, input.delivery !== "text", checkPartial ? raw => checkPartial(raw, signal) : undefined, closingThanks ? 1 : 2) : generated;
+      } as never, { rejectIfBusy: true });
+      phase = "reading-response";
+      return generated instanceof ReadableStream ? await readChatStream(generated, signal, input.delivery !== "text", checkPartial ? raw => checkPartial(raw, signal) : undefined, closingThanks ? 1 : 2,
+        () => { firstTextMs = Date.now() - providerStartedAt; phase = "generating-text"; }) : generated;
+      } catch (cause) {
+        // Exact documented capacity code only; a general 429 could instead be
+        // an account quota. Do not retry or dispatch to an unapproved provider.
+        if (cause instanceof Error && /\b3040\b/.test(cause.message)) throw new EdgeRequestError("Mira's AI provider is busy. Please retry in a moment.", 503, "PROVIDER_BUSY", 2);
+        throw cause;
+      } finally {
+        console.log(JSON.stringify({event:"chat_provider_timing",requestId,phase,firstTextMs,elapsedMs:Date.now()-providerStartedAt,aborted:signal.aborted}));
+      }
     }, Math.max(500, Math.min(8_000, 8_500 - (Date.now() - startedAt))), deliverySignal)));
     let raw = await runCloudflare(messages);
     await recheckContext(deliverySignal);
@@ -127,10 +140,10 @@ export async function POST(request: Request) {
       // It uses the same approved provider and counts against the upstream cap.
       const language = expectedLanguage === "hi" ? "Hindi in Devanagari" : expectedLanguage === "hinglish" ? "Hindi mixed with English, using Roman letters ONLY" : "English ONLY";
       const scriptRule=expectedLanguage==="hi"?"पूरा जवाब देवनागरी में लिखो। हिंदी के शब्द रोमन में मत लिखो। English technical terms and names may remain separate words.":"";
-      raw = await runCloudflare(groundingIssue ? buildFreeChatMessages({ ...input, messages: [input.messages.at(-1)!] }) : [
+      raw = await runCloudflare(groundingIssue === "habit-owner" ? buildFreeChatMessages({ ...input, messages: [input.messages.at(-1)!] }) : [
         ...messages,
         {role:"assistant",content:reply},
-        {role:"user",content:`Rewrite your last reply in ${language}. ${scriptRule} Preserve its concrete meaning and the people from our conversation. Use feminine first-person grammar for Mira. ${suppressQuestions ? "No questions or requests for more information." : "One or two short sentences."} Only the rewritten reply, no explanation.`},
+        {role:"user",content:`Rewrite your last reply in ${language}. ${scriptRule} ${groundingIssue === "invented-benefit" ? "Remove the invented benefit. Acknowledge only the corrected fact from my actual message, without assuming extra time or relaxation." : "Preserve its concrete meaning and the people from our conversation."} Use feminine first-person grammar for Mira. ${suppressQuestions ? "No questions or requests for more information." : "One or two short sentences."} Only the rewritten reply, no explanation.`},
       ]);
       await recheckContext(deliverySignal);
       reply = groundReplyPerspective(input, sanitizeCompanionReplyForDelivery(raw, input.delivery));
