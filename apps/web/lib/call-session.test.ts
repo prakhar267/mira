@@ -18,6 +18,16 @@ function setup() {
 beforeEach(()=>vi.useFakeTimers());
 afterEach(()=>{vi.restoreAllMocks();vi.useRealTimers();});
 describe.each(["voice","video"])("%s shared call lifecycle",()=>{
+  it("carries only accepted user vocabulary into the next listening turn",async()=>{
+    const x=setup();x.call.listen();await tick();const old=x.listening;
+    expect(old.vocabulary).toEqual([]);
+    old.onTranscript("My friend Anika lives in Pune.");await tick();
+    old.onTranscript("Old stale transcript mentioning Mumbai");
+    x.speech.onStart?.();x.speech.onEnd?.();await vi.advanceTimersByTimeAsync(200);
+    expect(x.listening.vocabulary).toEqual(["Anika","Pune"]);
+    expect(x.listening.vocabulary).not.toContain("Sunday");
+    x.call.close();const y=setup();y.call.listen();await tick();expect(y.listening.vocabulary).toEqual([]);y.call.close();
+  });
   it("automatically opens the mic after playback, not during preparation",async()=>{
     const x=setup();x.call.start();expect(x.call.state.phase).toBe("preparing");
     x.call.setMuted(true);x.call.setMuted(false);await vi.advanceTimersByTimeAsync(200);expect(x.adapters.listen).not.toHaveBeenCalled();

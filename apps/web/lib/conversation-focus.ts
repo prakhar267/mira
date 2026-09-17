@@ -6,6 +6,16 @@ const rewritePattern=/\b(?:say (?:it|that)|translate|rewrite|make (?:it|that) (?
 const correctionPattern=/\b(?:actually|correct(?:ion|ed)?|changed|reschedul\w*|instead|nahi sorry)\b|(?:बदल|वजह|नहीं.{0,24}(?:भाई|बहन|दोस्त))/iu;
 const cancelDraftPattern=/\b(?:forget (?:it|that)|never ?mind|new topic|stop (?:drafting|writing)|chh?odo)\b|(?:छोड़ो|छोडो|विषय बदल)/iu;
 
+/** A short, explicit past anecdote is not an invitation to ask whether it
+ * happened or assume the same activity is happening now. */
+export function isPastExperienceStatement(input: Pick<EdgeCompanionRequest,"messages">) {
+  const turn = input.messages.at(-1);
+  const value = turn?.content ?? "";
+  return turn?.role === "user" && value.length <= 240 && !/[?？"“”`]/u.test(value) && !isDraftingRequest(input)
+    && !/\b(?:not|never|nahi|nahin|tell|why|how|what|help|now|today|currently|abhi|aaj|kya)\b|(?:नहीं|क्यों|कैसे|क्या|बताओ|मदद|अभी|आज)/iu.test(value)
+    && /\b(?:happened to me|I've (?:been|done) that|I have (?:been|done) that|mere saath.{0,25}(?:ho chuka|hua tha|hua hai))\b|मेरे साथ.{0,25}(?:हो चुका|हुआ था|हुआ है)/iu.test(value);
+}
+
 /** A standalone thank-you closes a turn; yes/no can answer an offer and must
  * not be classified as closure. No substring matches or quoted instructions. */
 export function isClosingThanks(input: Pick<EdgeCompanionRequest,"messages">) {
@@ -42,6 +52,13 @@ export function isStandalonePersonalHabit(input: Pick<EdgeCompanionRequest,"mess
 }
 
 export function replyGroundingIssue(input: Pick<EdgeCompanionRequest,"messages">, reply: string) {
+  if (isFactCorrection(input)) {
+    // A date correction does not imply extra leisure. Check only this narrow
+    // unsupported consequence, not every mention of time or a user's reason.
+    const benefit = /\b(?:more|extra|additional|plenty of)\s+(?:free\s+)?time\b|\btime\s+to\s+(?:relax|rest|unwind)\b|(?:ज़्यादा|ज्यादा|अतिरिक्त)\s+(?:समय|वक़्त|वक्त)|\b(?:zyada|zyaada|extra)\s+(?:time|waqt)\b/iu;
+    const supplied = input.messages.filter(turn => turn.role === "user").some(turn => benefit.test(turn.content));
+    if (!supplied && benefit.test(reply)) return "invented-benefit";
+  }
   if (!isStandalonePersonalHabit(input)) return null;
   const latest = input.messages.at(-1)!.content.toLocaleLowerCase();
   const people = input.messages.filter(turn => turn.role === "user").flatMap(turn =>
@@ -80,6 +97,7 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
     ? "Current task: provide ONLY the user's ready-to-send wording addressed directly to the recipient, without a preface or quotation marks. The sender is the user, not Mira. Give the actual message, not advice about what to send, 'I think you should', or a factual recap."
     : "Perspective: the user's relatives and offline plans belong to the user. Address them as you/your, tum/tumhara, or तुम/तुम्हारा. Mira is not a participant in their offline trip or event."];
   if(isClosingThanks(input))cues.push("A standalone thank-you closes this turn. Give ONE brief acknowledgement in the current language, with no question, new topic, advice, invitation or request to continue.");
+  if(isPastExperienceStatement(input))cues.push("The user has ALREADY confirmed this happened to them in the past. React briefly to that shared anecdote. Do not ask if it happened, ask for a current progress report, or assume they are doing that activity now.");
   if(!draft&&language!=="en") {
     const agreement=progressiveAgreement(latest);
     if(agreement)cues.push(agreement);
@@ -93,6 +111,6 @@ export function conversationFocus(input: Pick<EdgeCompanionRequest,"messages">, 
     ? "Apply the corrected fact/relationship inside the same draft. Return the revised message to the recipient, not an acknowledgement to the user."
     : language==="hi"
     ? "बताया गया बदलाव और उसकी बताई हुई वजह ही स्वीकार करें। भविष्य की योजना को घट चुकी घटना मत बनाओ। सही काल रखो, नया फायदा/परिस्थिति/सवाल मत जोड़ो।"
-    : "Current task: acknowledge the corrected fact/timing and retain any stated reason in ONE short sentence, without a follow-up question. Replace the old fact; infer no additional circumstance or consequence. Continue the user's existing task.");
+    : "Current task: acknowledge the corrected fact/timing and retain any stated reason in ONE short sentence, without a follow-up question. Replace the old fact; infer no additional circumstance or consequence. An acknowledgement states the new fact, not what it might allow or lead to. Continue the user's existing task.");
   return cues.join(" ");
 }

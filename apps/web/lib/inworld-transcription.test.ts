@@ -1,7 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { createInworldTranscriptionRequest, INWORLD_STT_MODEL, isUsableInworldTranscript, normalizeSpokenHinglish, preserveSpokenLanguage, readInworldTranscript } from "./inworld-transcription";
+import { createInworldTranscriptionRequest, hasUnsupportedSpeechScript, INWORLD_STT_MODEL, isUsableInworldTranscript, normalizeSpokenHinglish, preserveSpokenLanguage, readInworldTranscript } from "./inworld-transcription";
 
 describe("Inworld transcription", () => {
+  it("rejects unsupported-script misdetections without altering valid names or numbers", () => {
+    for(const text of ["คุณ", "混。", "你好。", "คุณ คุณ คุณ Pune"]) {
+      expect(hasUnsupportedSpeechScript(text)).toBe(true);expect(isUsableInworldTranscript(text)).toBe(false);
+    }
+    for(const text of ["One.", "Honey.", "Pune", "पुणे", "José", "café", "हाँ 👍", "My friend Νίκος is here", "The symbol is α", "คุณ คุณ Pune"]) expect(hasUnsupportedSpeechScript(text)).toBe(false);
+    const config=JSON.parse(String(createInworldTranscriptionRequest("YWJj","audio/mpeg","secret",["पुणे"],"hi").body)).transcribeConfig;
+    expect(config).toMatchObject({language:"hi",prompts:["पुणे"]});
+  });
+  it("sends bounded caller vocabulary as soft terms without forcing language or replacing the result", () => {
+    const request = createInworldTranscriptionRequest("YWJj", "audio/mpeg", "secret", ["Pune", "पुणे", "Anika"]);
+    const config = JSON.parse(String(request.body)).transcribeConfig;
+    expect(config.prompts).toEqual(["Pune", "पुणे", "Anika"]);
+    expect(config).not.toHaveProperty("language");
+    expect(preserveSpokenLanguage("One.")).toBe("One.");
+  });
   it("lets the model auto-detect English, Hindi, or Hinglish", () => {
     const request = createInworldTranscriptionRequest("YWJj", "audio/webm;codecs=opus", "Basic secret");
     expect(request.headers).toEqual({ authorization: "Basic secret", "content-type": "application/json" });

@@ -29,23 +29,24 @@ export async function fetchAvatarDelivery(signal: AbortSignal) {
   signal.throwIfAborted();
   const gzip = typeof DecompressionStream === "function";
   const mesh = gzip && typeof WebAssembly === "object";
-  let brotli: DecompressionStream | null = null;
-  if (mesh) { try { brotli = new DecompressionStream("brotli" as CompressionFormat); } catch { /* Older engines keep the verified gzip path. */ } }
   const decoder = mesh ? import("meshoptimizer/decoder").then(async ({ MeshoptDecoder }) => {
     await MeshoptDecoder.ready; return MeshoptDecoder;
   }) : undefined;
   // A failed/aborted download must not leave an unhandled dynamic-import error.
   void decoder?.catch(() => undefined);
-  const path = brotli ? manifest.meshWirePath : mesh ? manifest.meshPath : gzip ? manifest.path : manifest.rawPath;
-  const hash = brotli ? manifest.meshWireSha256 : mesh ? manifest.meshSha256 : gzip ? manifest.sha256 : manifest.decodedSha256;
+  // Content-Encoding: br lets the browser's HTTP stack decode the smaller
+  // transfer even where DecompressionStream('brotli') is not implemented.
+  // Hash the bounded decompressed MMP bytes, then the reconstructed GLB.
+  const path = mesh ? manifest.meshHttpPath : gzip ? manifest.path : manifest.rawPath;
+  const hash = mesh ? manifest.meshPackedSha256 : gzip ? manifest.sha256 : manifest.decodedSha256;
   const response = await fetch(`${path}?v=${hash.slice(0, 16)}`, { signal, credentials: "omit", redirect: "error" });
   if (!response.ok || !response.body) throw new Error("Avatar download unavailable");
-  const compressed = await boundedBytes(response.body, brotli ? manifest.meshWireBytes : mesh ? manifest.meshBytes : gzip ? manifest.bytes : manifest.decodedBytes);
+  const compressed = await boundedBytes(response.body, mesh ? manifest.meshPackedBytes : gzip ? manifest.bytes : manifest.decodedBytes);
   signal.throwIfAborted();
   await verify(compressed, hash);
   signal.throwIfAborted();
   if (!gzip) return compressed.buffer;
-  const packed = await boundedBytes(new Blob([compressed]).stream().pipeThrough(brotli ?? new DecompressionStream("gzip")), mesh ? manifest.meshPackedBytes : manifest.decodedBytes);
+  const packed = mesh ? compressed : await boundedBytes(new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip")), manifest.decodedBytes);
   const bytes = mesh ? decodeAvatarMesh(packed, manifest.decodedBytes, (await decoder)!, signal) : packed;
   signal.throwIfAborted();
   await verify(bytes, manifest.decodedSha256);

@@ -10,5 +10,11 @@
 /assets/mira/avatar/*
   Cache-Control: public, max-age=31536000, immutable
 
+# HTTP Brotli is decoded by the browser network stack, including engines which
+# do not expose Brotli through JavaScript DecompressionStream.
+/assets/mira/avatar/mira-anime-call-v5.mesh
+  Content-Encoding: br
+  Content-Type: application/octet-stream
+
 /_next/static/chunks/*
   Cache-Control: public, max-age=31536000, immutable

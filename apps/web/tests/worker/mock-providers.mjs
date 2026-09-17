@@ -48,6 +48,7 @@ export class MockProviders extends WorkerEntrypoint {
     const path=new URL(request.url).pathname;
     if(path.includes("stt")||path.includes("transcri")) {
       const body = await request.json(), fixture = atob(body.audioData?.content ?? "").trim();
+      if(fixture === "synthetic-stt-script-recovery") return Response.json({transcription:{transcript:body.transcribeConfig?.language === "hi" && body.transcribeConfig?.prompts?.includes("Pune") ? "पुणे।" : "คุณ"}});
       if(fixture.startsWith("synthetic-stt-fallback-")) return new Response("Synthetic primary unavailable", {status:503});
       const transcript = fixture.startsWith("synthetic-stt-short:") ? fixture.slice("synthetic-stt-short:".length) : "Aaj chai peene ka mann hai.";
       return Response.json({transcription:{transcript}});

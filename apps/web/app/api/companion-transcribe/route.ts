@@ -1,6 +1,6 @@
 import { detectCompanionLanguage } from "@/lib/companion-prompt";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson } from "@/lib/edge-security";
-import { createInworldTranscriptionRequest, INWORLD_STT_ENDPOINT, INWORLD_STT_MODEL, isUsableInworldTranscript, preserveSpokenLanguage, readInworldTranscript } from "@/lib/inworld-transcription";
+import { createInworldTranscriptionRequest, hasUnsupportedSpeechScript, INWORLD_STT_ENDPOINT, INWORLD_STT_MODEL, isUsableInworldTranscript, preserveSpokenLanguage, readInworldTranscript } from "@/lib/inworld-transcription";
 import { withProviderDeadline } from "@/lib/provider-resilience";
 import { withInferenceCapacity } from "@/lib/capacity";
 import { authorizeInference } from "@/lib/inference-policy";
@@ -34,23 +34,33 @@ export async function POST(request: Request) {
     assertEdgeSameOrigin(request);
     const principal = await authorizeInference(request, "transcribe");
     if (await edgeRateLimited(request, "companion-transcribe", 30)) return respond({ error: "Voice input thoda cool down kar raha hai. Ek moment mein try karo." }, 429, { limited: true });
-    const { audioBase64, contentType } = parseTranscriptionPayload(await readEdgeJson(request, 4_005_000));
+    const { audioBase64, contentType, vocabulary } = parseTranscriptionPayload(await readEdgeJson(request, 4_005_000));
     const estimatedSeconds = Math.max(1, Math.ceil(audioBase64.length * .75 / 12000));
 
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const apiKey = (env as typeof env & { INWORLD_API_KEY?: string }).INWORLD_API_KEY?.trim();
     if (apiKey) {
+      let scriptRecoveryAttempted = false;
       try {
-        const text = await withInferenceCapacity("transcribe", principal, estimatedSeconds, () => withProviderDeadline("inworld-transcribe",async signal=>{
+        const transcribe = (language?: "hi") => withInferenceCapacity("transcribe", principal, estimatedSeconds, () => withProviderDeadline("inworld-transcribe",async signal=>{
         await authorizeInference(request, "transcribe");
         signal.throwIfAborted();
         const response = await providerFetch(INWORLD_STT_ENDPOINT, {
-          ...createInworldTranscriptionRequest(audioBase64, contentType, apiKey),
+          ...createInworldTranscriptionRequest(audioBase64, contentType, apiKey, vocabulary, language),
           signal,
         });
         if (!response.ok) throw new Error(`Inworld transcription returned ${response.status}.`);
         return preserveSpokenLanguage(readInworldTranscript(await response.json()));
-        },4000,request.signal));
+        },language ? Math.max(250, Math.min(2200, 6500 - (Date.now()-startedAt))) : 4000,request.signal));
+        let text = await transcribe();
+        // One charged re-detection only for an unsupported script. Never
+        // overwrite valid English, a different supported name or a number.
+        // This is an acoustic re-decode, not a guessed "One -> Pune" rewrite.
+        if (hasUnsupportedSpeechScript(text)) {
+          scriptRecoveryAttempted = true;
+          text = await transcribe("hi");
+          if (hasUnsupportedSpeechScript(text)) throw new EdgeRequestError("Voice recognition could not identify this turn clearly. Please try again.", 503, "TRANSCRIPTION_UNAVAILABLE");
+        }
         await authorizeInference(request, "transcribe");
         request.signal.throwIfAborted();
         if (isUsableInworldTranscript(text)) {
@@ -60,6 +70,7 @@ export async function POST(request: Request) {
         return respond({ error: "Main clearly sun nahi paayi. Please ek baar phir bolo." }, 422, { provider: "inworld", model: INWORLD_STT_MODEL, filtered: text ? "hallucination" : "no-speech" });
       } catch (cause) {
         if (cause instanceof EdgeRequestError || request.signal.aborted) throw cause;
+        if (scriptRecoveryAttempted) throw new EdgeRequestError("Voice recognition could not finish clearly. Please try again.", 503, "TRANSCRIPTION_UNAVAILABLE");
         console.warn(JSON.stringify({ event: "provider_fallback", requestId, route: "companion-transcribe" }));
       }
     }
@@ -72,7 +83,7 @@ export async function POST(request: Request) {
       vad_filter: true,
       condition_on_previous_text: false,
       no_speech_threshold: .62,
-      initial_prompt: "Natural Indian conversation that may switch between English, Hindi in Devanagari, and Roman-script Hinglish. Preserve the speaker's actual language, English words, and names.",
+      initial_prompt: "Natural Indian conversation that may switch between English, Hindi in Devanagari, and Roman-script Hinglish. Preserve the speaker's actual language, English words, and names." + (vocabulary.length ? ` Vocabulary: ${vocabulary.join(", ")}.` : ""),
     } as never); },2500,request.signal));
     await authorizeInference(request, "transcribe");
     request.signal.throwIfAborted();

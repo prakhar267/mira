@@ -18,6 +18,11 @@ function chat(cookie, content, delivery = "text", history = []) {
 }
 
 describe("text stream response body inside Workers with synthetic provider binding", () => {
+  it("charges and rechecks consent for script recovery while passing vocabulary to real route adapters",async()=>{
+    const cookie=await session();
+    const response=await SELF.fetch(`${origin}/api/companion-transcribe`,{method:"POST",headers:{origin,cookie,"content-type":"application/json"},body:JSON.stringify({audioBase64:btoa("synthetic-stt-script-recovery".padEnd(80," ")),contentType:"audio/webm",vocabulary:["Pune"]})});
+    expect(response.status).toBe(200);expect(await response.json()).toMatchObject({text:"पुणे।",language:"hi"});
+  });
   it.each(["text","voice","video"])("closes thanks without an unwanted question or hanging provider tail in %s",async delivery=>{
     const cookie=await session();
     for(const [text,reply] of [["thanks","You're welcome!"],["shukriya","Koi baat nahi."],["धन्यवाद","कोई बात नहीं।"]]){

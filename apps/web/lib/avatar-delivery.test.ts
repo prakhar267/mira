@@ -96,12 +96,12 @@ describe("verified avatar delivery profiles", () => {
       expect(mock).toHaveBeenCalledOnce();
     }
   });
-  it("keeps the existing gzip transport when the browser cannot decode Brotli",async()=>{
+  it("uses HTTP Brotli even when JavaScript DecompressionStream does not support it",async()=>{
     const Original=DecompressionStream;
     vi.stubGlobal("DecompressionStream",class{constructor(format:CompressionFormat){if(String(format)==="brotli")throw Error("unsupported");return new Original(format);}});
-    const mock=vi.fn().mockResolvedValue(new Response(await asset(avatarDelivery.meshPath)));vi.stubGlobal("fetch",mock);
+    const mock=vi.fn().mockResolvedValue(new Response(brotliDecompressSync(await asset(avatarDelivery.meshWirePath))));vi.stubGlobal("fetch",mock);
     expect(Buffer.from(await fetchAvatarDelivery(new AbortController().signal)).equals(await asset(avatarDelivery.rawPath))).toBe(true);
-    expect(mock.mock.calls[0]?.[0]).toContain(avatarDelivery.meshPath);
+    expect(mock.mock.calls[0]?.[0]).toContain(avatarDelivery.meshHttpPath);
     expect(brotliDecompressSync(await asset(avatarDelivery.meshWirePath)).equals(gunzipSync(await asset(avatarDelivery.meshPath)))).toBe(true);
   });
   it("retains verified gzip compatibility without WebAssembly", async () => {
@@ -194,7 +194,10 @@ describe("verified avatar delivery profiles", () => {
     }
     const extensions = structuredClone(after.model.extensions); extensions.VRMC_vrm.expressions = before.model.extensions.VRMC_vrm.expressions;
     expect(extensions).toEqual(before.model.extensions);
-    expect(avatarDelivery.meshBytes).toBeLessThan(800_000);
+    expect(avatarDelivery.meshBytes).toBeLessThan(760_000);
+    // Adaptive transport restores the exact previous call-v4 geometry, texture,
+    // skin weights and rig. No new quantization or character redesign.
+    expect(avatarDelivery.decodedSha256).toBe("063b3fe2ca59185e2bc734e0c884e912abbcab8b65a116a89c6d70cb5b1af6b4");
   });
   it("does not decode an abandoned call", async () => {
     const controller = new AbortController(); controller.abort();

@@ -37,7 +37,7 @@ function audioEncoding(contentType: string) {
   return "AUTO_DETECT";
 }
 
-export function createInworldTranscriptionRequest(audioBase64: string, contentType: string, apiKey: string): RequestInit {
+export function createInworldTranscriptionRequest(audioBase64: string, contentType: string, apiKey: string, vocabulary: string[] = [], language?: "hi"): RequestInit {
   return {
     method: "POST",
     headers: {
@@ -48,6 +48,8 @@ export function createInworldTranscriptionRequest(audioBase64: string, contentTy
       transcribeConfig: {
         modelId: INWORLD_STT_MODEL,
         audioEncoding: audioEncoding(contentType),
+        ...(vocabulary.length ? { prompts: vocabulary } : {}),
+        ...(language ? { language } : {}),
       },
       audioData: { content: audioBase64 },
     }),
@@ -55,6 +57,7 @@ export function createInworldTranscriptionRequest(audioBase64: string, contentTy
 }
 
 export function isUsableInworldTranscript(value: string) {
+  if (hasUnsupportedSpeechScript(value)) return false;
   const normalized = value.toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
   if (!/[\p{L}\p{N}]/u.test(normalized)) return false;
   // A brief answer still carries intent. Call VAD already checks for sustained
@@ -69,6 +72,17 @@ export function isUsableInworldTranscript(value: string) {
   // Two people's names are ordinary speech, not evidence of leaked prompts.
   const hasPromptHint = leakedHints.some(hint => hint !== "mira" && hint !== "priya");
   return !hasPromptHint || leakedHints.length < 2;
+}
+
+/** Product languages are English/Hindi/Hinglish. An unrelated script from
+ * automatic detection must not be silently labelled English and sent to chat.
+ * Accented Latin names, Devanagari and punctuation remain valid. */
+export function hasUnsupportedSpeechScript(value: string) {
+  const letters = [...value].filter(letter => /\p{L}/u.test(letter));
+  const unsupported = letters.filter(letter => !/[\p{Script=Latin}\p{Script=Devanagari}]/u.test(letter)).length;
+  // A foreign proper name or mathematical symbol inside otherwise supported
+  // speech is not proof that automatic language detection failed.
+  return unsupported > 0 && unsupported / letters.length >= .6;
 }
 
 export function readInworldTranscript(result: unknown) {

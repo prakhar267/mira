@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { coldMobilePage, enterDemo, observeAvatar, observeInteractions, recordInteraction, sampleAvatarCadence, syntheticCallMedia } from "./lab-fixtures.mjs";
 
+const avatarManifest = JSON.parse(readFileSync(new URL("../../lib/avatar-call-manifest.json", import.meta.url), "utf8"));
 const conditions = "Local compiled Worker, fresh Chromium context, 393x851, DPR 1, mobile/touch emulation, cold HTTP cache, 4x CPU throttle, unshaped loopback network; not physical hardware, production transport, field INP, or provider latency.";
 const measuredAssets = () => performance.getEntriesByType("resource").filter(entry => new URL(entry.name).origin === location.origin).map(entry => ({
   path: new URL(entry.name).pathname, initiatorType: entry.initiatorType, transferBytes: entry.transferSize,
@@ -30,19 +32,19 @@ test("closing during avatar download aborts it without a late mount or retry", a
   const errors = []; page.on("pageerror", error => errors.push(error.message));
   try {
     await syntheticCallMedia(page);
-    await page.addInitScript(() => {
+    await page.addInitScript(modelPath => {
       const original = window.fetch;
       window.__miraAvatarDownloads = [];
       window.fetch = (input, init) => {
-        if (String(input).includes("/mira-anime-call-v4.mesh")) {
+        if (new URL(String(input), location.origin).pathname === modelPath) {
           const item = { aborted: init.signal.aborted };
           window.__miraAvatarDownloads.push(item);
           init.signal.addEventListener("abort", () => { item.aborted = true; }, { once: true });
         }
         return original(input, init);
       };
-    });
-    await page.route("**/mira-anime-call-v4.mesh.gz*", async route => { await blocked; await route.abort().catch(() => undefined); });
+    }, avatarManifest.meshHttpPath);
+    await page.route(url => url.pathname === avatarManifest.meshHttpPath, async route => { await blocked; await route.abort().catch(() => undefined); });
     await enterDemo(page);
     expect(await page.evaluate(() => window.__miraAvatarDownloads)).toEqual([]);
     await page.getByRole("button", { name: "Chat", exact: true }).tap();
@@ -209,9 +211,9 @@ test("cold video avatar records load, real WebGL activity and frame-timing proxi
       activeTracks: window.__miraLabMedia.activeTracks, cameraRequested: window.__miraLabMedia.cameraRequested,
     }, interactions: window.__miraInteractionLab.actions }));
     evidence.requests = requests;
-    const model = evidence.assets.filter(asset => asset.path.endsWith("/mira-anime-call-v4.mesh.gz"));
+    const model = evidence.assets.filter(asset => asset.path === avatarManifest.meshHttpPath);
     expect(model).toHaveLength(1);
-    expect(model[0].decodedBytes).toBeGreaterThan(0);
+    expect(model[0].decodedBytes).toBe(avatarManifest.meshPackedBytes);
     expect(evidence.load.callStartToReadyMs).toBeGreaterThan(0);
     expect(evidence.load.webglVersion).toContain("WebGL");
     expect(evidence.final.avatar.contextLost).toBe(0);

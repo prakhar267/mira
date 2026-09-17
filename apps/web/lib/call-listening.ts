@@ -4,6 +4,7 @@ export interface CallListeningSession {
 
 export interface CallListeningOptions {
   signal?: AbortSignal;
+  vocabulary?: string[];
   /** Headphones-only experimental talk-over. Never enabled by default. */
   interruption?: boolean;
   onSpeechStart?: () => void;
@@ -271,7 +272,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
         const responsePromise = fetch("/api/companion-transcribe", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ audioBase64, contentType: blob.type, durationMs: Math.min(60_000, Math.round(performance.now() - startedAt)) }),
+          body: JSON.stringify({ audioBase64, contentType: blob.type, durationMs: Math.min(60_000, Math.round(performance.now() - startedAt)), ...(options.vocabulary?.length ? { vocabulary: options.vocabulary } : {}) }),
           signal: AbortSignal.any([transcriptionController.signal, AbortSignal.timeout(7_000)]),
         }).then(async (response) => ({
           response,

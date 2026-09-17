@@ -37,6 +37,24 @@ describe("active inference route boundaries (mock providers)", () => {
     const response = await chat(request({ ...input, messages: [{ role: "user", content: "a".repeat(8001) }] }));
     expect(response.status).toBe(413); expect(mocks.provider).not.toHaveBeenCalled();
   });
+  it("re-decodes an unsupported-script STT result once with a charged Hindi hint",async()=>{
+    mocks.provider.mockResolvedValueOnce(Response.json({transcription:{transcript:"คุณ"}})).mockResolvedValueOnce(Response.json({transcription:{transcript:"पुणे।"}}));
+    const response=await transcribe(request({audioBase64:"x".repeat(80),contentType:"audio/webm",vocabulary:["पुणे"]}));
+    expect(response.status).toBe(200);expect(await response.json()).toMatchObject({text:"पुणे।",language:"hi"});
+    expect(mocks.provider).toHaveBeenCalledTimes(2);expect(mocks.capacity).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(mocks.provider.mock.calls[0]?.[1].body).transcribeConfig).not.toHaveProperty("language");
+    expect(JSON.parse(mocks.provider.mock.calls[1]?.[1].body).transcribeConfig).toMatchObject({language:"hi",prompts:["पुणे"]});
+  });
+  it.each(["One.","Honey.","Delhi", "आज दिन अच्छा था।"])("never rewrites or re-decodes valid supported speech to match vocabulary: %s",async text=>{
+    mocks.provider.mockResolvedValue(Response.json({transcription:{transcript:text}}));
+    const response=await transcribe(request({audioBase64:"x".repeat(80),vocabulary:["Pune"]}));
+    expect(response.status).toBe(200);expect(await response.json()).toMatchObject({text});expect(mocks.provider).toHaveBeenCalledOnce();
+  });
+  it("does not cascade to a third STT provider after script recovery fails",async()=>{
+    mocks.provider.mockResolvedValueOnce(Response.json({transcription:{transcript:"คุณ"}})).mockRejectedValueOnce(new Error("upstream failure"));
+    const response=await transcribe(request({audioBase64:"x".repeat(80)}));
+    expect(response.status).toBe(503);expect(await response.json()).toMatchObject({code:"TRANSCRIPTION_UNAVAILABLE"});expect(mocks.provider).toHaveBeenCalledTimes(2);
+  });
   it.each(["voice","video"])("delivers concise Hinglish facts without a repair roundtrip in %s", async delivery => {
     mocks.provider.mockResolvedValue({response:"Riya Delhi gayi thi."});
     const response=await chat(request({...input,delivery,messages:[{role:"user",content:"Meri behen Riya kal Delhi gayi thi."},{role:"assistant",content:"Uska safar kaisa tha?"},{role:"user",content:"Riya kahan gayi thi? Keep it short in Hinglish."}]}));
@@ -71,6 +89,21 @@ describe("active inference route boundaries (mock providers)", () => {
     const response=await chat(request(input));
     const result=await response.json();expect(response.status).toBe(503);expect(result.code).toBe("PROVIDER_TIMEOUT");
     expect(JSON.stringify(result)).not.toContain("sensitive");expect(mocks.provider).toHaveBeenCalledOnce();
+  });
+  it("opts out of the provider capacity queue and returns an honest bounded busy error",async()=>{
+    mocks.provider.mockRejectedValue(new Error("3040: Capacity temporarily exceeded"));
+    const response=await chat(request(input));
+    expect(response.status).toBe(503);expect(await response.json()).toMatchObject({code:"PROVIDER_BUSY",retryAfterSeconds:2});
+    expect(response.headers.get("retry-after")).toBe("2");
+    expect(mocks.provider).toHaveBeenCalledOnce();
+    expect(mocks.provider.mock.calls[0]?.[2]).toEqual({rejectIfBusy:true});
+  });
+  it("repairs an invented correction benefit once while retaining the factual history",async()=>{
+    mocks.provider.mockResolvedValueOnce({response:"Since you're leaving Sunday, you'll have more time to relax."}).mockResolvedValueOnce({response:"You and Arjun leave for Jaipur on Sunday morning instead."});
+    const response=await chat(request({...input,delivery:"voice",messages:[{role:"user",content:"Arjun and I leave for Jaipur Saturday."},{role:"user",content:"Actually we changed the departure to Sunday morning, not Saturday"}]}));
+    expect(response.status).toBe(200);expect(mocks.provider).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(mocks.provider.mock.calls[1])).toContain("Remove the invented benefit");
+    expect(JSON.stringify(mocks.provider.mock.calls[1])).toContain("Arjun and I leave for Jaipur Saturday");
   });
   it("returns category-specific Hindi support without spending provider capacity", async () => {
     const response = await chat(request({ ...input, messages: [{ role: "user", content: "मुझे जीना नहीं है" }] }));

@@ -1,0 +1,110 @@
+{
+  "at": "2026-09-17T20:35:55.134Z",
+  "expectedSha": "2ebc877ef6eac626c70bfe14b8f626fce191c259",
+  "variant": "contextual place name then negative-control number",
+  "method": "Actual production call UI, native Chromium MediaRecorder/WebAudio/HTMLAudio, real STT/chat/Priya TTS. Synthetic prerecorded input and muted speaker. NOT physical microphone, accent diversity, echo, subjective voice or phone acceptance.",
+  "caps": {
+    "companion-chat": 6,
+    "companion-transcribe": 6,
+    "companion-speech": 8
+  },
+  "requests": {
+    "companion-speech": 3,
+    "companion-transcribe": 2,
+    "companion-chat": 2
+  },
+  "turns": [
+    {
+      "kind": "voice",
+      "fixture": "hindi-clean",
+      "responses": [
+        {
+          "service": "companion-transcribe",
+          "status": 200,
+          "requestId": "9acaab69-6438-4b8e-9860-6587e6c06299",
+          "streaming": false,
+          "timingSource": "browser-request-responseEnd",
+          "headersMs": 1425,
+          "completeMs": 1430
+        },
+        {
+          "service": "companion-chat",
+          "status": 200,
+          "requestId": "3b321aed-6d51-425c-824a-3c97abb82549",
+          "streaming": false,
+          "timingSource": "browser-request-responseEnd",
+          "headersMs": 1632,
+          "completeMs": 1635
+        },
+        {
+          "service": "companion-speech",
+          "status": 200,
+          "requestId": "16bae68d-30cc-4740-9cdd-7c2941b9a159",
+          "streaming": true,
+          "timingSource": "browser-request-responseEnd",
+          "headersMs": 232,
+          "completeMs": 1290
+        }
+      ],
+      "transcript": "आज मेरा दिन अच्छा था। मेरी दोस्त नेहा कल पुणे आ रही है।",
+      "language": "hi",
+      "reply": "यह तो बहुत अच्छी बात है। नेहा के आने पर तुम दोनों का क्या प्लान है?",
+      "endOfClipToPlaybackMs": 4073,
+      "streamingAtStart": true,
+      "playbackSeconds": 4.728,
+      "expectedLanguage": "hi",
+      "languageMatches": true,
+      "inputAnchorsMatch": true
+    },
+    {
+      "kind": "voice",
+      "fixture": "city-roman-clean",
+      "responses": [
+        {
+          "service": "companion-transcribe",
+          "status": 200,
+          "requestId": "f2682a02-021d-41de-b06e-b8589497838b",
+          "streaming": false,
+          "timingSource": "browser-request-responseEnd",
+          "headersMs": 960,
+          "completeMs": 962
+        },
+        {
+          "service": "companion-chat",
+          "status": 200,
+          "requestId": "275b58ee-211d-4f73-bfea-9fac65a96595",
+          "streaming": false,
+          "timingSource": "browser-request-responseEnd",
+          "headersMs": 1015,
+          "completeMs": 1016
+        },
+        {
+          "service": "companion-speech",
+          "status": 200,
+          "requestId": "327753e6-902b-44aa-8110-af0041be5994",
+          "streaming": true,
+          "timingSource": "browser-request-responseEnd",
+          "headersMs": 225,
+          "completeMs": 1418
+        }
+      ],
+      "transcript": "คุณ",
+      "language": "en",
+      "reply": "That sounds like a lovely day. You must be excited to have Neha visiting you in Pune tomorrow.",
+      "endOfClipToPlaybackMs": 2803,
+      "streamingAtStart": true,
+      "playbackSeconds": 6.024,
+      "languageMatches": true,
+      "inputAnchorsMatch": false
+    }
+  ],
+  "errors": [
+    "Live call acceptance failed; inspect bounded turn evidence/screenshots"
+  ],
+  "passed": false,
+  "sessionRevoked": true,
+  "release": {
+    "commitSha": "2ebc877ef6eac626c70bfe14b8f626fce191c259",
+    "versionId": "658b96bb-3653-4195-9701-61e96a77f264"
+  }
+}

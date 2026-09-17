@@ -1,6 +1,7 @@
 import type { CallListeningOptions, CallListeningSession } from "./call-listening";
 import type { playCompanionSpeech, CompanionSpeechPlayback } from "./speech";
 import type { TurnContext } from "./conversation-turn";
+import { speechVocabulary } from "./speech-vocabulary";
 
 export type CallPhase = "idle" | "opening-mic" | "listening" | "transcribing" | "thinking" | "preparing" | "speaking" | "error" | "closed";
 export interface CallSnapshot {
@@ -40,6 +41,7 @@ export class CallSession {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private speechEndedAt = 0;
   private transcriptionStartedAt = 0;
+  private vocabulary: string[] = [];
   constructor(private adapters: CallAdapters, greeting: string) {
     this.state = { phase: "idle", userLine: "", companionLine: greeting, error: "", muted: false, speaker: true, talkOver: false };
   }
@@ -125,6 +127,7 @@ export class CallSession {
     if (!interruption) this.patch({ phase: "opening-mic", userLine: "" });
     void this.adapters.listen({
       signal: this.listenAbort.signal,
+      vocabulary: [...this.vocabulary],
       interruption,
       onSpeechStart: () => {
         if (!current()) return;
@@ -140,6 +143,7 @@ export class CallSession {
       },
       onTranscript: text => {
         if (!current()) return;
+        this.vocabulary = [...new Set([...this.vocabulary, ...speechVocabulary(text)])].slice(-12);
         if (this.transcriptionStartedAt) this.adapters.onTiming?.("call_transcribe_ms", performance.now() - this.transcriptionStartedAt);
         complete();
         void this.submit(text);
@@ -237,6 +241,7 @@ export class CallSession {
   }
   close() {
     if (this.closed) return;
+    this.vocabulary = [];
     this.closed = true;
     this.turnId++;
     this.turnAbort?.abort();
