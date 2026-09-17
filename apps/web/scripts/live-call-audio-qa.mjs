@@ -21,7 +21,7 @@ const directory = await mkdtemp(join(tmpdir(), "mira-live-call-audio-"));
 const report = { at: new Date().toISOString(), expectedSha: sha,
   variant: shortNames ? "contextual place name then negative-control number" : "English Hindi Hinglish clean/noise",
   method: "Actual production call UI, native Chromium MediaRecorder/WebAudio/HTMLAudio, real STT/chat/Priya TTS. Synthetic prerecorded input and muted speaker. NOT physical microphone, accent diversity, echo, subjective voice or phone acceptance.",
-  caps: { "companion-chat": 6, "companion-transcribe": 6, "companion-speech": 8 }, requests: {}, turns: [], errors: [], passed: false, sessionRevoked: false };
+  caps: { "companion-chat": shortNames ? 8 : 6, "companion-transcribe": shortNames ? 8 : 6, "companion-speech": shortNames ? 10 : 8 }, requests: {}, turns: [], errors: [], passed: false, sessionRevoked: false };
 const browser = await chromium.launch({ headless: true, args: ["--use-angle=metal", "--autoplay-policy=no-user-gesture-required"] });
 const context = await browser.newContext({ serviceWorkers: "block", viewport: { width: 1280, height: 850 } });
 const page = await context.newPage(); page.setDefaultTimeout(20_000);
@@ -114,7 +114,7 @@ try {
     const dialog = page.getByRole("dialog", { name: `${kind === "voice" ? "Voice" : "Video"} call with Mira`, exact: true });
     await expect(dialog).toBeVisible();
     if (kind === "video") await expect(page.locator(".live-avatar-3d--ready")).toBeVisible({ timeout: 35_000 });
-    for (const language of (shortNames ? ["hindi", "city-roman", "number-one"] : ["english", "hindi", "hinglish"])) {
+    for (const language of (shortNames ? ["hindi", "city-roman", "city-devanagari", "number-one"] : ["english", "hindi", "hinglish"])) {
       assert.equal(report.errors.length, 0);
       await expect(dialog.getByRole("button", { name: "Listening automatically", exact: true })).toBeVisible({ timeout: 35_000 });
       const fixture = new URL(shortNames && language !== "hindi"
@@ -137,7 +137,7 @@ try {
       assert.equal(report.errors.length, 0); assert.ok(turn.transcript?.trim()); assert.ok(turn.reply?.trim());
       turn.expectedLanguage = { english: "en", hindi: "hi", hinglish: "hinglish" }[language];
       turn.languageMatches = !turn.expectedLanguage || turn.language === turn.expectedLanguage && matchesReplyLanguage(turn.reply, turn.expectedLanguage);
-      const groups = language === "city-roman" ? [["pune", "पुणे"]] : language === "number-one" ? [["one", "1", "एक", "वन"]] : language === "english" ? [["kabir"], ["interview"], ["brother"]]
+      const groups = language.startsWith("city-") ? [["pune", "पुणे"]] : language === "number-one" ? [["one", "1", "एक", "वन"]] : language === "english" ? [["kabir"], ["interview"], ["brother"]]
         : language === "hindi" ? [["नेहा", "neha"], ["पुणे", "pune"], ["दोस्त", "friend"]]
         : [["boss", "bos", "बॉस"], ["meeting", "मीटिंग"], ["daant", "डांट", "डाँट"]];
       turn.inputAnchorsMatch = shortNames && language !== "hindi"
@@ -154,7 +154,7 @@ try {
     await expect.poll(() => page.evaluate(() => window.__miraAudioQa.active)).toBe(0);
   }
   report.media = await page.evaluate(() => { const s = window.__miraAudioQa; return { requested: s.requested, stopped: s.stopped, active: s.active, events: s.events }; });
-  report.finalRelease = await health(); report.passed = report.turns.length === 6 && report.errors.length === 0;
+  report.finalRelease = await health(); report.passed = report.turns.length === (shortNames ? 8 : 6) && report.errors.length === 0;
 } catch { report.errors.push("Live call acceptance failed; inspect bounded turn evidence/screenshots"); process.exitCode = 1; }
 finally {
   await Promise.all(pending);

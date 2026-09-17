@@ -13,6 +13,6 @@ Scope: reported weak replies, an 8.3-second provider timeout, isolated place-nam
 
 `baseline-short-calls.json` reproduces the problem on production commit `2ebc877ef6eac626c70bfe14b8f626fce191c259`: the native voice UI correctly transcribed a full Hindi sentence containing Pune, then transcribed the isolated city clip as Thai `คุณ`. It stopped at that semantic failure (1 of 2 completed turns passed; video and negative control were not run). The owned demo session was revoked.
 
-The two MP3 fixtures in `audio/` are prior synthetic Priya outputs (“Pune” and “one”), not recordings of a human. `live-call-audio-qa.mjs --short-names` feeds them through native MediaRecorder after a full contextual Hindi clip in voice and video calls, with an exact-match negative control. The normal mode separately covers English/Hindi/Hinglish and synthetic noise.
+The three MP3 fixtures in `audio/` are prior synthetic Priya outputs (“Pune”, “पुणे” and “one”), not recordings of a human. `live-call-audio-qa.mjs --short-names` feeds them through native MediaRecorder after a full contextual Hindi clip in voice and video calls, with an exact-match negative control (eight planned turns). The normal mode separately covers English/Hindi/Hinglish and synthetic noise.
 
 These tests do not establish physical microphone/accent diversity, subjective sound quality, lip-sync acceptance or phone performance. No review or availability guarantee is implied. Final CI/deployment/live evidence is linked on the release PR after verification.
