@@ -11,8 +11,8 @@ const cancelDraftPattern=/\b(?:forget (?:it|that)|never ?mind|new topic|stop (?:
 export function isPastExperienceStatement(input: Pick<EdgeCompanionRequest,"messages">) {
   const turn = input.messages.at(-1);
   const value = turn?.content ?? "";
-  return turn?.role === "user" && !/[?？"“”`]/u.test(value) && !isDraftingRequest(input)
-    && !/\b(?:not|never|nahi|nahin|tell|why|how|help)\b|(?:नहीं|क्यों|कैसे|बताओ|मदद)/iu.test(value)
+  return turn?.role === "user" && value.length <= 240 && !/[?？"“”`]/u.test(value) && !isDraftingRequest(input)
+    && !/\b(?:not|never|nahi|nahin|tell|why|how|what|help|now|today|currently|abhi|aaj|kya)\b|(?:नहीं|क्यों|कैसे|क्या|बताओ|मदद|अभी|आज)/iu.test(value)
     && /\b(?:happened to me|I've (?:been|done) that|I have (?:been|done) that|mere saath.{0,25}(?:ho chuka|hua tha|hua hai))\b|मेरे साथ.{0,25}(?:हो चुका|हुआ था|हुआ है)/iu.test(value);
 }
 

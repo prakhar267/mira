@@ -6,7 +6,7 @@ describe("turn-local speaker and intent focus",()=>{
   it.each(["haha yaar ye toh mere saath ho chuka hai", "That happened to me last week.", "मेरे साथ भी ऐसा हुआ था।"])("accepts an explicitly reported past event: %s",content=>{
     expect(isPastExperienceStatement({messages:[{role:"user",content}]})).toBe(true);
   });
-  it.each(["mere saath nahi hua tha", "That never happened to me", 'She said "that happened to me"', "Has that happened to me?", "It happened to me, please help"])("does not suppress a negation, quote or request: %s",content=>{
+  it.each(["mere saath nahi hua tha", "That never happened to me", 'She said "that happened to me"', "Has that happened to me?", "It happened to me, please help", "What happened to me", "That happened to me and now I am packing again"])("does not suppress a negation, quote or request: %s",content=>{
     expect(isPastExperienceStatement({messages:[{role:"user",content}]})).toBe(false);
   });
   it("flags invented benefits inside the first correction sentence without removing real stated reasons",()=>{
