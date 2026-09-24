@@ -1,13 +1,13 @@
 # Mira: active architecture and configuration
 
-Updated 14 September 2026. This guide describes the active implementation. The [current acceptance status](READINESS-STATUS.md) distinguishes the verified deployed commit from later test/documentation changes. See [inference contract](INFERENCE-BOUNDARY.md), [storage/recovery](STORAGE-RECOVERY.md), and [protected recovery v2](PROTECTED-RECOVERY-V2.md).
+Updated 24 September 2026. This guide describes the active implementation. The [current acceptance status](READINESS-STATUS.md) distinguishes the verified deployed commit from later test/documentation changes. See [inference contract](INFERENCE-BOUNDARY.md), [storage/recovery](STORAGE-RECOVERY.md), and [protected recovery v2](PROTECTED-RECOVERY-V2.md).
 
 ## Serving path and trust boundaries
 
 `apps/web` is the active React/vinext Cloudflare Worker. `/demo` stores optional browser history; `/app` uses an authenticated cloud account. Both call the same `/api/companion-*` routes. The optional `apps/api` Fastify/PostgreSQL stack, `apps/worker`, Expo shell and archived `app/` do not serve the public website.
 
 - Server-issued HttpOnly demo/account cookies select the identity. Current, server-recorded AI consent and an 18+ **self-declaration** gate inference. Revoked account cookies never fall through to demo authority. Old accounts explicitly reconfirm the current disclosure.
-- Cloudflare Workers AI handles Llama chat/reranking and Whisper fallback. Inworld handles primary STT and Priya TTS. No new voice, model, paid fallback or processor was introduced. Anonymous LLM7 is not used.
+- Cloudflare Workers AI handles Gemma chat/reflections, reranking and Whisper fallback. Inworld handles primary STT and TTS, with Priya as the default and additional provider system voices available by selection. Anonymous LLM7 is not used.
 - `MiraStore`, addressed as `mira-production-v1`, remains one SQLite Durable Object. Accounts, hashed sessions, revisioned bounded state, paginated transcripts, policy evidence, content-free suppression, budgets, metrics, support and durable mail jobs live there. Legacy `LUMA_ACCOUNTS` KV is migration input/deletion cleanup, never the new write authority.
 - A user-controlled camera is a local preview. The companion is a client-rendered animated avatar, not a human feed or camera understanding. Physical playback/lip-sync quality remains a separate acceptance gate.
 - React account synchronization and conversation-turn adapters serialize/coalesce saves, expose conflicts and fence late results after cancellation. Service errors remain typed failures with an explicit retry; they are not saved as companion replies.
@@ -20,13 +20,17 @@ Updated 14 September 2026. This guide describes the active implementation. The [
 | Conversation persistence | Browser, optional | Revisioned server state + paginated transcripts, optional | Separate repository |
 | Memory | Explicit browser records; server retrieval needs consent | Owner-scoped create/edit/forget; rechecks before returning context | Separate service |
 | Journal / future events | Personal records | Personal records | Optional background services |
-| Delivered reminders / generated reflections | Unavailable | Unavailable | Not deployed |
+| Reminders | Requires an account | Explicit Web Push opt-in, daily check-ins and saved plans; quiet hours | Separate service |
+| Weekly reflections | Selected browser entries, demo consent and capacity | Explicitly selected canonical journal entries, consent and capacity | Separate service |
+| Conversation search | Browser-saved messages | All retained owner-scoped transcripts, paginated results and surrounding context | Separate implementation |
 | Upload / generated images / vision | Unavailable; existing artwork labeled | Unavailable; no data-URL state injection | Optional providers, not enabled here |
 | Personality / relationship / reply preferences | Supported subset affects prompt | Canonical saved preferences affect prompt | Separate implementation |
-| Voice choice / mood sliders | Fixed Priya; unsupported controls removed/disabled | Same | Not relevant to active voice |
+| Voice choices | Provider system voices with previews; Priya default | Same, account-persisted preference | Separate implementation |
 | Payments | Disabled | Disabled | Excluded from this work |
 
-`GET /api/capabilities` is the authoritative configured-capability contract. Configured does not mean quota is available. Text chat negotiates genuine incremental NDJSON delivery, releasing checked complete-sentence prefixes while the upstream response is still in progress. A valid terminal `done` is required before saving the assistant reply; cancellation/error removes the transient draft. One-sentence replies may still wait until completion. Voice/video use complete JSON replies and Priya playback, not raw token streaming. See [streaming boundaries and runtime evidence](INFERENCE-BOUNDARY.md#incremental-text-delivery); this is not a measured production time-to-first-token claim.
+`GET /api/capabilities` is the authoritative configured-capability contract. Configured does not mean quota is available. Text chat negotiates genuine incremental NDJSON delivery, releasing checked complete-sentence prefixes while the upstream response is still in progress. A valid terminal `done` is required before saving the assistant reply; cancellation/error removes the transient draft. One-sentence replies may still wait until completion. Voice/video use complete JSON replies and selected-voice playback, not raw token streaming. See [streaming boundaries and runtime evidence](INFERENCE-BOUNDARY.md#incremental-text-delivery); this is not a measured production time-to-first-token claim.
+
+The new source capabilities and their deployment/testing boundaries are documented in [Companion tools](COMPANION-TOOLS.md).
 
 ## Isolated developer setup
 
@@ -63,7 +67,7 @@ The active web unit, Worker and browser suites fail if no tests are found. The o
 | `SITE_ORIGIN` | Canonical HTTPS origin and mail links; local fixture overrides only locally |
 | `NEXT_PUBLIC_SITE_URL` | Public build-time canonical URLs, no secret |
 | `AI`, `MIRA_STORE`, `MIRA_RECOVERY_TEST`, `LUMA_ACCOUNTS`, `ASSETS` | Bindings in existing `wrangler.jsonc`; names/migrations preserved |
-| `INWORLD_API_KEY` | Server-only STT/Priya key; free provider quota is external |
+| `INWORLD_API_KEY` | Server-only STT/TTS/catalog/preview key; free provider quota is external |
 | `CHAT_DAILY_LIMIT`, `TRANSCRIBE_DAILY_LIMIT`, `SPEECH_DAILY_LIMIT` | Default 600 attempts/service/day, further demo/account/unit/lease limits apply |
 | `MIRA_BETA_ACCOUNT_LIMIT` | Default 250 known active accounts; finite admission cap, not a scaling claim |
 | `MIRA_ADMIN_KEY` | Operator bearer secret; never in query parameters/localStorage |

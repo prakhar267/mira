@@ -17,7 +17,7 @@ export function fitInworldSpeechPrompt(value: string) {
   return clipped.slice(0, end).replace(/[,:;\s]+$/, "").trim();
 }
 
-export function createInworldSpeechRequest(text: string, apiKey: string): RequestInit {
+export function createInworldSpeechRequest(text: string, apiKey: string, voiceId = "Priya"): RequestInit {
   return {
     method: "POST",
     headers: {
@@ -26,7 +26,7 @@ export function createInworldSpeechRequest(text: string, apiKey: string): Reques
     },
     body: JSON.stringify({
       text: `${PRIYA_DIRECTION} ${text}`,
-      voiceId: "Priya",
+      voiceId,
       modelId: "inworld-tts-2-flash",
       audioConfig: {
         audioEncoding: "MP3",

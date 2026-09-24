@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   BellRing,
   BookHeart,
@@ -51,7 +51,13 @@ export function ActivitiesView({
   onDeleteJournal,
   onReflect,
   onAddEvent,
+  reflectionPanel,
+  reminderPanel,
+  accountMode = false,
 }: {
+  reflectionPanel?: ReactNode;
+  reminderPanel?: ReactNode;
+  accountMode?: boolean;
   activities: ActivityDefinition[];
   completedIds: string[];
   wallet: WalletState;
@@ -71,9 +77,15 @@ export function ActivitiesView({
   onReflect: (entry: JournalEntryRecord) => void;
   onAddEvent: (event: { description: string; eventDate: string }) => void;
 }) {
-  const [tab, setTab] = useState<"activities" | "journal" | "plans">(
+  const [tab, setTab] = useState<"activities" | "journal" | "plans" | "reflection" | "reminders">(
     "activities",
   );
+  useEffect(() => {
+    const open = () => { setTab("reminders"); const url=new URL(window.location.href); url.searchParams.delete("tab"); url.searchParams.delete("view"); window.history.replaceState(null,"",url.pathname+url.search); };
+    if (new URLSearchParams(window.location.search).get("tab") === "reminders") open();
+    window.addEventListener("mira-open-reminders",open);
+    return () => window.removeEventListener("mira-open-reminders",open);
+  }, []);
   const [journal, setJournal] = useState({
     title: "",
     content: "",
@@ -144,6 +156,8 @@ export function ActivitiesView({
         >
           <CalendarPlus aria-hidden="true" /> Future plans
         </button>
+        <button type="button" role="tab" aria-selected={tab === "reflection"} onClick={() => setTab("reflection")}><Sparkles aria-hidden="true" /> Weekly reflection</button>
+        <button type="button" role="tab" aria-selected={tab === "reminders"} onClick={() => setTab("reminders")}><BellRing aria-hidden="true" /> Reminders</button>
       </div>
 
       {tab === "activities" ? (
@@ -222,6 +236,8 @@ export function ActivitiesView({
         </>
       ) : null}
 
+      {tab === "reflection" ? reflectionPanel : null}
+      {tab === "reminders" ? reminderPanel : null}
       {tab === "journal" ? (
         <div className="journal-layout">
           <form
@@ -282,6 +298,7 @@ export function ActivitiesView({
               <textarea
                 required
                 rows={7}
+                maxLength={12000}
                 value={journal.content}
                 onChange={(changeEvent) =>
                   setJournal({ ...journal, content: changeEvent.target.value })
@@ -311,7 +328,7 @@ export function ActivitiesView({
                 <p>{entry.content}</p>
                 <footer>
                   <time>{new Date(entry.createdAt).toLocaleDateString()}</time>
-                  <button type="button" disabled={!reflectionEnabled} onClick={() => onReflect(entry)}>
+                  <button type="button" disabled={!reflectionEnabled} onClick={() => { if (reflectionPanel) setTab("reflection"); else onReflect(entry); }}>
                     <Sparkles aria-hidden="true" /> {reflectionEnabled ? `Reflect with ${companionName}` : "AI reflection unavailable"}
                   </button>
                   <button
@@ -342,7 +359,7 @@ export function ActivitiesView({
               <div>
                 <h2>Remember a future moment</h2>
                 <p>
-                  Keep the date here. Automatic reminders and outgoing notifications are unavailable in this beta.
+                  Save the date, then choose whether to add a notification in Reminders.
                 </p>
               </div>
             </div>
@@ -379,7 +396,7 @@ export function ActivitiesView({
             <div className="section-heading">
               <div>
                 <h2>Saved plans</h2>
-                <p>No notifications will be sent.</p>
+                <p>{accountMode ? "Reminders are optional. Choose them in the Reminders tab." : "Sign in to schedule notifications for your plans."}</p>
               </div>
             </div>
             {futureEvents.map((future) => (
@@ -389,9 +406,7 @@ export function ActivitiesView({
                 <p>{new Date(future.eventDate).toLocaleString()}</p>
                 <footer>
                   <small>
-                    {nudges.some((nudge) => nudge.eventId === future.id)
-                      ? "A quiet-hours-aware nudge is planned"
-                      : "No nudge planned"}
+                    {accountMode ? <button type="button" className="button button--ghost" onClick={() => setTab("reminders")}>Manage reminder</button> : nudges.some((nudge) => nudge.eventId === future.id) ? "Saved plan" : "No notification scheduled"}
                   </small>
                 </footer>
               </article>

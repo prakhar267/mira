@@ -25,7 +25,7 @@ const memory = z.object({id,userId:id,companionId:id,type:memoryType,content:tex
 const schema = z.object({
   onboardingComplete:z.boolean(),firstMeetingComplete:z.boolean(),
   user:z.object({id,name:text(80),birthday:text(10),pronouns,interests:z.array(text(80)).max(30),timezone:text(80),adultConfirmed:z.boolean()}),
-  companion:z.object({id,name:text(40),pronouns,presentation:text(300),voiceId:text(80),relationshipMode:z.enum(["friend","mentor","sibling","romantic","organic"]),mood,createdAt:date,personality:z.object({warmth:unit,humor:unit,curiosity:unit,assertiveness:unit,optimism:unit,energy:unit,verbosity:unit,playfulness:unit,empathy:unit})}),
+  companion:z.object({id,name:text(40),pronouns,presentation:text(300),voiceId:z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),relationshipMode:z.enum(["friend","mentor","sibling","romantic","organic"]),mood,createdAt:date,personality:z.object({warmth:unit,humor:unit,curiosity:unit,assertiveness:unit,optimism:unit,energy:unit,verbosity:unit,playfulness:unit,empathy:unit})}),
   relationship:z.object({stage:z.enum(["New","Getting to know you","Close","Very close","Special","Partner"]),level:count,progress:score,nickname:text(80),friendliness:score,affection:score,flirtiness:score,playfulness:score,romance:score,sensuality:score,humor:score,initiative:score,romanticOptIn:z.boolean(),sensualOptIn:z.boolean()}),
   activeConversationId:id,messages:z.array(accountMessageSchema).max(MAX_ACCOUNT_MESSAGES),memories:z.array(memory).max(300),
   moments:z.array(z.object({id,title:text(120),description:text(),date,imageUrl:asset,kind:z.enum(["milestone","call","date","memory"]),detail:text(300).optional()})).max(100),
@@ -40,6 +40,7 @@ const schema = z.object({
   ownedItems:z.array(z.object({itemId:id,purchasedAt:date,equipped:z.boolean()})).max(100),
   subscription:z.object({planId:z.enum(["free","plus","ultra","platinum"]),status:z.enum(["active","trialing","canceled"]),testMode:z.boolean(),renewsAt:date.optional()}),
   journalEntries:z.array(z.object({id,userId:id,title:text(120),content:text(12_000),mood,tags:z.array(text(40)).max(12),reflected:z.boolean(),createdAt:date,updatedAt:date})).max(100),
+  journalReflections:z.array(z.object({id,entryIds:z.array(id).min(1).max(14),summary:text(6000),language:z.enum(["English","Hindi","Hinglish"]),createdAt:date})).max(30).default([]),
   futureEvents:z.array(z.object({id,userId:id,companionId:id,description:text(500),eventDate:date,relatedMemoryId:id.optional(),status:z.enum(["candidate","confirmed","completed","dismissed"]),createdAt:date})).max(100),
   nudges:z.array(z.object({id,userId:id,eventId:id.optional(),content:text(500),scheduledFor:date,status:z.enum(["planned","sent","canceled"])})).max(100),
   responsePreferences:z.object({listeningFirst:z.boolean(),responseLength:z.enum(["short","balanced","deep"]),adviceStyle:z.enum(["gentle","direct","ask-first"]),questionFrequency:z.enum(["rare","balanced"])}),
@@ -82,7 +83,7 @@ export function ownAccountState(input: DemoState, userId: string, current?: Demo
   state.activeConversationId=current?.activeConversationId??crypto.randomUUID();
   state.user.adultConfirmed=current?.user.adultConfirmed??state.user.adultConfirmed;
   state.companion.createdAt=current?.companion.createdAt??new Date().toISOString();
-  state.companion.voiceId="Priya";
+  state.companion.voiceId=state.companion.voiceId === "mira-natural-01" ? "Priya" : state.companion.voiceId;
   state.activities=structuredClone(initialState.activities);state.storeItems=structuredClone(initialState.storeItems);
   state.wallet=current?.wallet??{xp:0,level:1,coins:0,gems:0};state.walletTransactions=current?.walletTransactions??[];state.ownedItems=current?.ownedItems??[];
   state.relationship.level=current?.relationship.level??1;state.relationship.progress=current?.relationship.progress??0;
@@ -92,6 +93,8 @@ export function ownAccountState(input: DemoState, userId: string, current?: Demo
   state.companionReflections=current?.companionReflections??[];
   if(!current)state.messages=state.messages.map(message=>({...message,conversationId:state.activeConversationId}));
   state.journalEntries=state.journalEntries.map(entry=>({...entry,userId}));
+  const journalIds=new Set(state.journalEntries.map(entry=>entry.id));
+  state.journalReflections=state.journalReflections.filter(reflection=>reflection.entryIds.every(id=>journalIds.has(id)));
   state.futureEvents=state.futureEvents.map(event=>({...event,userId,companionId:state.companion.id}));
   state.nudges=state.nudges.map(nudge=>({...nudge,userId}));
   if(!state.conversationStorageEnabled){state.messages=[];state.calls=[];state.feedbackSignals=[];state.companionReflections=[];}

@@ -23,6 +23,7 @@
     "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json"
   },
   "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0",
     "@companion/ai": "workspace:*",
     "@companion/config": "workspace:*",
     "@companion/shared": "workspace:*",

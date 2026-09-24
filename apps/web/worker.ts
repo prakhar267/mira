@@ -1,3 +1,8 @@
+import { providerFetch } from "./lib/provider-fetch";
+import { ReminderEngine, ReminderInputError } from "./lib/reminder-engine";
+import { createPushKeys, deliverReminders } from "./lib/reminder-delivery";
+import type { VapidKeys } from "@block65/webcrypto-web-push";
+import type { ReminderRule, PushDevice } from "./lib/reminders";
 import handler from "vinext/server/fetch-handler";
 import {withRequestBodyCleanup} from "./lib/unused-request-body";
 import { StoreEngine, type SqlStorage, type InferenceReservation } from "./lib/store-engine";
@@ -25,11 +30,14 @@ interface State {
 }
 export class MiraStore {
   private engine: StoreEngine;
+  private reminders: ReminderEngine;
+  private pushKeyPromise: Promise<VapidKeys> | undefined;
   private mail: MailOutboxEngine;
   private backup: BackupEngine;
   private replication: SourceSuppressionReplicator;
   constructor(private ctx: State, private env: LaunchEnvironment & BackupEnvironment & SuppressionEnvironment & ProtectedRecoveryEnvironment & RecoveryTransportEnvironment & { LUMA_ACCOUNTS?: LegacyKV;MIRA_STORE_OBJECT_NAME?:string }) {
     this.engine = new StoreEngine(ctx.storage.sql);
+    this.reminders = new ReminderEngine(ctx.storage.sql, this.engine);
     this.mail = new MailOutboxEngine(ctx.storage.sql);
     this.backup = new BackupEngine(ctx.storage.sql, this.engine);
     this.replication = new SourceSuppressionReplicator(ctx.storage.sql,work=>ctx.storage.transactionSync(work),this.backup.source(),()=>suppressionTransport(this.env));
@@ -67,6 +75,22 @@ export class MiraStore {
     });
   }
   private availableTransaction<T>(work: () => T) { return this.ctx.storage.transactionSync(() => { this.backup.assertAvailable(); return work(); }); }
+  private pushKeys() {
+    if (!this.pushKeyPromise) this.pushKeyPromise = (async () => {
+      const saved = this.engine.get("push:vapid:v1");
+      if (saved) return JSON.parse(saved) as VapidKeys;
+      const keys = await createPushKeys(this.env.SITE_ORIGIN ?? "https://mira.example");
+      this.availableTransaction(() => this.engine.put("push:vapid:v1", JSON.stringify(keys)));
+      return keys;
+    })().catch(cause => { this.pushKeyPromise = undefined; throw cause; });
+    return this.pushKeyPromise;
+  }
+  private async scheduleReminderAlarm() {
+    const due = this.reminders.nextAlarm();
+    if (due === null) return;
+    const next = Math.max(Date.now() + 1000, due), current = await this.ctx.storage.getAlarm();
+    if (current === null || current > next) await this.ctx.storage.setAlarm(next);
+  }
   async fetch(request: Request) {
     // This class is reachable only by the Worker binding, never a public route.
     const data = await request.json() as { action: string; key?: string; value?: string; ttl?: number; prefix?: string; cursor?: string; limit?: number; max?: number; seconds?: number; name?: string; failed?: boolean; duration?: number; hash?: string; salt?: string; account?: { id: string }; userId?: string; timestamp?: string; subscription?: Record<string, unknown>; emailKey?:string; keys?:string[];state?:unknown;revision?:number;sessionKey?:string;sessionValue?:string;command?:MemoryCommand;attemptId?:string };
@@ -91,6 +115,22 @@ export class MiraStore {
           const marker=`migration:${data.prefix}`;
           if(!this.engine.row(marker))this.engine.put(marker,JSON.stringify({prefix:data.prefix}));
         }
+        if (data.action.startsWith("reminders")) {
+          const input = data as unknown as {action:string;userId:string;id?:string;device:PushDevice;rule:ReminderRule};
+          const keys = await this.pushKeys();
+          let result;
+          try { result = this.availableTransaction(() => {
+            if (!this.engine.get(`account:${input.userId}`)) throw new ReminderInputError("Your account is unavailable.");
+            if (input.action === "remindersSubscribe") this.reminders.subscribe(input.userId,input.id!,input.device);
+            else if (input.action === "remindersUnsubscribe") this.reminders.unsubscribe(input.userId,input.id);
+            else if (input.action === "remindersSave") this.reminders.save(input.userId,input.rule);
+            else if (input.action === "remindersDelete") this.reminders.remove(input.userId,input.id!);
+            else if (input.action !== "remindersRead") throw new ReminderInputError("Unknown reminder action.");
+            return {...this.reminders.snapshot(input.userId),publicKey:keys.publicKey};
+          }); } catch(cause) { if(cause instanceof ReminderInputError)return Response.json({error:cause.message}); throw cause; }
+          await this.scheduleReminderAlarm();
+          return Response.json(result);
+        }
         const result = this.ctx.storage.transactionSync(() => {
           this.backup.assertAvailable();
           switch(data.action) {
@@ -100,6 +140,7 @@ export class MiraStore {
             case "eraseAccount": {
               const account = JSON.parse(this.engine.get(`account:${data.userId!}`) ?? "null") as {email?:string}|null;
               if(account?.email)this.mail.purgeByEmail(account.email);
+              this.reminders.erase(data.userId!);
               return {keys:this.engine.eraseAccount(data.userId!,data.emailKey!,data.keys??[])};
             }
             case "mailEnqueue": return this.mail.enqueue((data as unknown as {job:MailJob}).job);
@@ -118,11 +159,17 @@ export class MiraStore {
             case "claimEmail": return { created: this.engine.claimEmail(data.key!, data.account!) };
             case "bootstrap":return this.engine.bootstrap(data.key!,data.account!,data.state,data.sessionKey!,data.sessionValue!,data.ttl!,Number((this.env as unknown as Record<string,unknown>).MIRA_BETA_ACCOUNT_LIMIT??250));
             case "stateRead":return {envelope:this.engine.readAccountState(data.userId!)};
-            case "stateSave":return this.engine.saveAccountState(data.userId!,data.state,data.revision!);
+            case "stateSave": {
+              const result=this.engine.saveAccountState(data.userId!,data.state,data.revision!);
+              if("state" in result) this.reminders.syncEvents(data.userId!,result.state);
+              return result;
+            }
             case "acceptPolicy":return this.engine.acceptPolicy(data.userId!,(data as unknown as {policy:{aiProcessingConsent:boolean;memoryEnabled:boolean;conversationStorageEnabled:boolean}}).policy,data.revision!);
             case "stateExport":return {envelope:this.engine.exportAccountState(data.userId!)};
             case "memoryCommand":return this.engine.memoryCommand(data.userId!,data.command!,data.revision!);
             case "conversationCommand":return this.engine.conversationCommand(data.userId!,data.command as unknown as {action:"create"}|{action:"delete";id:string},data.revision!);
+            case "transcriptSearch": return this.engine.transcriptSearch(data.userId!, (data as unknown as {options: import("./lib/conversation-search").SearchOptions}).options);
+            case "transcriptContext": return this.engine.transcriptContext(data.userId!, (data as unknown as {messageId:string}).messageId);
             case "transcriptPage":return this.engine.transcriptPage(data.userId!,data.cursor,data.limit,(data as unknown as {conversationId?:string}).conversationId);
             case "inferenceReserve":return this.engine.inferenceReserve(data as unknown as InferenceReservation);
             case "inferenceRelease":this.engine.inferenceRelease(data.attemptId!);return {ok:true};
@@ -136,6 +183,7 @@ export class MiraStore {
           if(current===null||current>next)await this.ctx.storage.setAlarm(next);
         }
         await this.replication.flush();
+        await this.scheduleReminderAlarm();
         return Response.json(result);
       } catch(cause) { const code=cause instanceof Error&&(/^(?:BACKUP_|RESTORE_|CUTOVER_|SUPPRESSION_|RECOVERY_|SOURCE_ALREADY_RETIRED)/.test(cause.message)||["TRANSCRIPT_LIMIT","CONVERSATION_REMOVED","ACCOUNT_VERIFICATION_REQUIRED"].includes(cause.message))?cause.message:"STORAGE_UNAVAILABLE";return Response.json({ error:code==="ACCOUNT_VERIFICATION_REQUIRED"?"Verify your email after recovery before enabling AI processing.":"Storage operation unavailable",code }, { status:code==="ACCOUNT_VERIFICATION_REQUIRED"?403:code==="TRANSCRIPT_LIMIT"?413:code==="CONVERSATION_REMOVED"?409:503 }); }
   }
@@ -176,6 +224,11 @@ export class MiraStore {
     await this.migrateBatch().catch(()=>{/* Retry migration without delaying account operations. */});
     try { await this.replication.flush(); } catch { return; }
     try { this.availableTransaction(() => undefined); } catch { return; }
+    if(this.reminders.nextAlarm() !== null) {
+      try { await deliverReminders(this.reminders, await this.pushKeys(), work => this.availableTransaction(work), (url,init)=>providerFetch(String(url),init??{})); }
+      catch { /* The bounded leases expire; the next alarm retries. */ }
+      await this.scheduleReminderAlarm();
+    }
     this.mail.cleanup();
     await runMailOutbox(this.env, {
       get: async key => { await this.importLegacy(key); return this.engine.get(key); },
@@ -194,7 +247,8 @@ export class MiraStore {
       complete: async (id,status) => { this.availableTransaction(()=>this.mail.complete(id,status)); },
       metric: async (failed,duration) => { this.availableTransaction(() => this.engine.metric("api:mail-provider-acceptance",failed,duration)); },
     });
-    if(this.mail.status().pending)await this.ctx.storage.setAlarm(Date.now()+60_000);
+    if(this.mail.status().pending){const current=await this.ctx.storage.getAlarm(),next=Date.now()+60000;if(current===null||current>next)await this.ctx.storage.setAlarm(next);}
+    await this.scheduleReminderAlarm();
     try { this.availableTransaction(() => undefined); } catch { return; }
     // Direct adapter, not the MIRA_STORE binding: calling the same object's
     // public fetch from its alarm could deadlock. No user content is reported.

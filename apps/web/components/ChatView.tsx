@@ -2,11 +2,12 @@
 import { preloadVideoCall } from "@/lib/video-preload";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Camera, ImagePlus, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Send, Sparkles, ThumbsDown, ThumbsUp, Trash2, Video, Volume2 } from "lucide-react";
+import { ArrowLeft, Camera, ImagePlus, Mic, MoreHorizontal, Phone, Plus, RefreshCw, Search, Send, Sparkles, ThumbsDown, ThumbsUp, Trash2, Video, Volume2 } from "lucide-react";
 import type { ChatMessage } from "@companion/shared";
 import type { DemoState, FeedbackReason } from "@/lib/state";
 import { playCompanionSpeech } from "@/lib/speech";
 import { Modal } from "./Modal";
+import { ConversationSearch } from "./ConversationSearch";
 
 interface ChatSpeechRecognition {
   continuous: boolean;
@@ -25,12 +26,13 @@ type ChatSpeechWindow = Window & typeof globalThis & {
   webkitSpeechRecognition?: new () => ChatSpeechRecognition;
 };
 
-export function ChatView({ state, streaming, streamingText = "", processingEnabled, mediaEnabled = false, liveMode = false, onLoadOlder, loadingOlder = false, onSend, onNewConversation, onDeleteConversation, onBack, onCall, onVideoCall, onVoiceNote, onVoiceRecording, onSpeak, onImageUpload, onGenerateImage, onFeedback, onRegenerate, onCamera }: {
+export function ChatView({ state, streaming, streamingText = "", processingEnabled, mediaEnabled = false, liveMode = false, accountMode = false, onLoadOlder, loadingOlder = false, onSend, onNewConversation, onDeleteConversation, onBack, onCall, onVideoCall, onVoiceNote, onVoiceRecording, onSpeak, onImageUpload, onGenerateImage, onFeedback, onRegenerate, onCamera }: {
   state: DemoState;
   streaming: boolean;
   streamingText?: string;
   processingEnabled: boolean;
   liveMode?: boolean;
+  accountMode?: boolean;
   mediaEnabled?: boolean;
   onLoadOlder?: () => Promise<void>;
   loadingOlder?: boolean;
@@ -50,6 +52,7 @@ export function ChatView({ state, streaming, streamingText = "", processingEnabl
   onUpgrade: () => void;
   onCamera: () => void;
 }) {
+  const [searchOpen, setSearchOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [voiceActive, setVoiceActive] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -208,6 +211,7 @@ export function ChatView({ state, streaming, streamingText = "", processingEnabl
         <div className="chat__portrait"><img src="/assets/mira/portrait.png" alt="" /><i className={online ? "status-dot" : "status-dot status-dot--offline"} /></div>
         <div className="chat__identity"><span>Your companion</span><h1 id="chat-title">{state.companion.name}</h1><small>{online ? "Here with you" : "Offline · keep this page open for unsaved changes"}</small></div>
         <div className="chat__header-actions">
+          <button type="button" className="icon-button" aria-label="Search conversations" onClick={() => setSearchOpen(true)}><Search aria-hidden="true" /></button>
           <button type="button" className="chat__new-button" onClick={onNewConversation}><Plus aria-hidden="true" /><span>New chat</span></button>
           <button type="button" className="chat__call-button" aria-label={`Start voice call with ${state.companion.name}`} onClick={onCall}><Phone aria-hidden="true" /><span>Voice call</span></button>
           <button type="button" className="chat__call-button chat__call-button--video" aria-label={`Start video call with ${state.companion.name}`} onPointerEnter={preloadVideoCall} onFocus={preloadVideoCall} onPointerDown={preloadVideoCall} onClick={onVideoCall}><Video aria-hidden="true" /><span>Video call</span></button>
@@ -241,6 +245,7 @@ export function ChatView({ state, streaming, streamingText = "", processingEnabl
         {voiceError ? <div className="voice-note-error" role="status">{voiceError}</div> : null}
       </div>
 
+      {searchOpen ? <ConversationSearch messages={state.messages} conversationId={state.activeConversationId} accountMode={accountMode} companionName={state.companion.name} onClose={() => setSearchOpen(false)} /> : null}
       {whyMessage ? <Modal title={`About this response`} description="Only recorded response information is shown here, not the model’s private reasoning." onClose={() => setWhyMessage(null)}><ul className="reason-list">{(whyMessage.explanation?.length ? whyMessage.explanation : ["No per-response explanation was recorded. You can use feedback to flag an inaccurate or unhelpful answer."]).map((reason) => <li key={reason}>{reason}</li>)}</ul></Modal> : null}
       {imagePromptOpen ? <Modal title={`Create a moment with ${state.companion.name}`} description={liveMode ? "Create a private companion moment from your prompt. Generated media stays clearly labeled." : "This local demo uses a small set of approved companion artwork."} onClose={() => setImagePromptOpen(false)}><form onSubmit={(event) => { event.preventDefault(); const prompt = imagePrompt.trim(); if (!prompt) return; setImageError(""); void Promise.resolve(onGenerateImage(prompt)).then(() => { setImagePrompt(""); setImagePromptOpen(false); }).catch((cause) => setImageError(cause instanceof Error ? cause.message : "The image could not be created.")); }}><label className="field">Describe the scene<input autoFocus required maxLength={1_000} value={imagePrompt} onChange={(event) => setImagePrompt(event.target.value)} placeholder={`${state.companion.name} reading by a moonlit window`} /></label>{imageError ? <p className="form-error" role="alert">{imageError}</p> : null}<div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setImagePromptOpen(false)}>Cancel</button><button type="submit" className="button button--primary"><Sparkles aria-hidden="true" /> Create image</button></div></form></Modal> : null}
       {deleteConversationOpen ? <Modal title="Delete this conversation?" description="This removes the current transcript. Approved memories stay available separately until you delete them." onClose={() => setDeleteConversationOpen(false)}>{deleteConversationError ? <p className="form-error" role="alert">{deleteConversationError}</p> : null}<div className="modal-actions"><button type="button" className="button button--ghost" onClick={() => setDeleteConversationOpen(false)}>Cancel</button><button type="button" className="button button--danger" onClick={() => { setDeleteConversationError(""); void Promise.resolve(onDeleteConversation()).then(() => setDeleteConversationOpen(false)).catch((cause) => setDeleteConversationError(cause instanceof Error ? cause.message : "The conversation could not be deleted.")); }}><Trash2 aria-hidden="true" /> Delete conversation</button></div></Modal> : null}

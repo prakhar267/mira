@@ -1,3 +1,4 @@
+import { searchMessages, type SearchOptions } from "./conversation-search";
 import { ACCOUNT_POLICY_VERSION, decodeAccountState, MAX_ACCOUNT_MESSAGES, ownAccountState, STATE_MESSAGE_WINDOW, validateAccountState, type MemoryCommand, type StateEnvelope } from "./account-state-schema";
 import type { DemoState } from "./state";
 import { RecoveryJournal } from "./recovery-journal";
@@ -90,6 +91,22 @@ export class StoreEngine {
     const selected=rows.slice(0,limit);
     return {messages:selected.map(row=>JSON.parse(String(row.value))).reverse(),cursor:rows.length>limit?JSON.stringify([selected.at(-1)!.created_at,selected.at(-1)!.id]):undefined};
   }
+  transcriptSearch(userId: string, options: SearchOptions) {
+    if (!this.get(`account:${userId}`)) return { messages: [] };
+    // Each beta account is bounded to 2,000 rows / 8 MB. Normalize in JS so
+    // Unicode case folding works consistently for English, Hindi and Hinglish.
+    const messages = this.sql.exec("SELECT value FROM transcripts WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT ?", userId, MAX_ACCOUNT_MESSAGES).toArray().map(row => JSON.parse(String(row.value)));
+    return searchMessages(messages, options);
+  }
+  transcriptContext(userId: string, messageId: string) {
+    if (!this.get(`account:${userId}`)) return { messages: [] };
+    const row = this.sql.exec("SELECT value FROM transcripts WHERE user_id=? AND id=?", userId, messageId).toArray()[0];
+    if (!row) return { messages: [] };
+    const target = JSON.parse(String(row.value));
+    const messages = this.sql.exec("SELECT value FROM transcripts WHERE user_id=? AND json_extract(value,'$.conversationId')=? ORDER BY created_at,id LIMIT ?", userId, target.conversationId, MAX_ACCOUNT_MESSAGES).toArray().map(item => JSON.parse(String(item.value)));
+    const index = messages.findIndex(message => message.id === messageId);
+    return { messages: messages.slice(Math.max(0, index - 12), index + 13) };
+  }
   private stateWindow(userId:string){
     const messages=this.transcriptPage(userId).messages;let bytes=0;
     for(let index=messages.length-1;index>=0;index--){bytes+=new TextEncoder().encode(JSON.stringify(messages[index])).byteLength;if(bytes>600_000)return messages.slice(index+1);}
@@ -149,7 +166,7 @@ export class StoreEngine {
     const current=this.readAccountState(userId);if(!current)return {missing:true};
     if(current.revision!==revision)return {conflict:true,revision:current.revision};
     const state=ownAccountState(validateAccountState(input),userId,current.state);
-    if(current.state.conversationStorageEnabled&&!state.conversationStorageEnabled)this.eraseSnapshots(userId);
+    if(current.state.conversationStorageEnabled&&!state.conversationStorageEnabled || current.state.journalEntries.some(entry=>!state.journalEntries.some(next=>next.id===entry.id)) || current.state.journalReflections.some(entry=>!state.journalReflections.some(next=>next.id===entry.id)))this.eraseSnapshots(userId);
     this.persistMessages(userId,state);
     const next:StateEnvelope={schemaVersion:1,revision:revision+1,state};this.writeEnvelope(userId,next);
     return {...next,state:{...state,messages:this.stateWindow(userId)}};

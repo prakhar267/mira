@@ -10,6 +10,11 @@ export class MockAI extends WorkerEntrypoint {
       return {text:"Aaj chai peene ka mann hai.",language:"hi"};
     }
     const last=input.messages?.at(-1)?.content??"";
+    if(input.messages?.[0]?.content?.includes("journal entries they explicitly selected")) {
+      const selected=JSON.parse(last.slice(last.indexOf("\n")+1));
+      const reply=`A look back\n${selected.map(entry=>entry.title+": "+entry.content).join("\n")}\nOne optional next step\nChoose a small step that suits you.`;
+      return new Response(`data: ${JSON.stringify({choices:[{delta:{content:reply}}]})}\n\ndata: [DONE]\n\n`).body;
+    }
     const visible = text => model.includes("gemma-4") ? {choices:[{delta:{content:text}}]} : {response:text};
     if(input.stream&&/^(?:thanks|shukriya|धन्यवाद)[.!।\s]*\n/u.test(last)) {
       const language=last.match(/\[Application reply setting: ([^.]+)\./)?.[1];
@@ -46,6 +51,8 @@ export class MockAI extends WorkerEntrypoint {
 export class MockProviders extends WorkerEntrypoint {
   async fetch(request) {
     const path=new URL(request.url).pathname;
+    if(path === "/voices/v1/voices")return Response.json({voices:[{voiceId:"Priya",displayName:"Priya",source:"SYSTEM",languageCode:"hi-IN"},{voiceId:"Ashley",displayName:"Ashley",source:"SYSTEM",languageCode:"en-US"}]});
+    if(new URL(request.url).hostname === "fcm.googleapis.com"){await request.arrayBuffer();return new Response(null,{status:201});}
     if(path.includes("stt")||path.includes("transcri")) {
       const body = await request.json(), fixture = atob(body.audioData?.content ?? "").trim();
       if(fixture === "synthetic-stt-script-recovery") return Response.json({transcription:{transcript:body.transcribeConfig?.language === "hi" && body.transcribeConfig?.prompts?.includes("Pune") ? "पुणे।" : "คุณ"}});

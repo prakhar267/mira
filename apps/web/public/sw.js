@@ -44,3 +44,25 @@ self.addEventListener("fetch", (event) => {
     }
   })());
 });
+
+
+self.addEventListener("push", event => {
+  let data = {};
+  try { data = event.data?.json() ?? {}; } catch { /* Show the generic fallback. */ }
+  const title = data.title === "Your check-in reminder" ? data.title : "Your saved-plan reminder";
+  event.waitUntil(self.registration.showNotification(title, {
+    body: "Open Mira when it suits you.", icon: "/icon.png", badge: "/icon.png",
+    tag: typeof data.tag === "string" ? data.tag.slice(0,80) : "mira-reminder",
+    data: { url: "/app?view=activities&tab=reminders" },
+  }));
+});
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const url = new URL("/app?view=activities&tab=reminders", self.location.origin).href;
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const existing = windows.find(client => new URL(client.url).origin === self.location.origin && new URL(client.url).pathname === "/app");
+    if (existing) { existing.postMessage({ type: "mira-open-reminders" }); await existing.focus(); }
+    else await self.clients.openWindow(url);
+  })());
+});

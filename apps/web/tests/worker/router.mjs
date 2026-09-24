@@ -1,6 +1,11 @@
 export { MockAI, MockProviders } from "./mock-providers.mjs";
 export { MiraStore } from "../../worker.ts";
 export {SyntheticRecoveryAuthority} from "./synthetic-recovery-authority.mjs";
+import * as search from "../../app/api/account/search/route.ts";
+import * as reminders from "../../app/api/account/reminders/route.ts";
+import * as journalReflection from "../../app/api/journal-reflection/route.ts";
+import * as voices from "../../app/api/voices/route.ts";
+import * as voicePreview from "../../app/api/voices/preview/route.ts";
 import * as signup from "../../app/api/account/signup/route.ts";
 import * as login from "../../app/api/account/login/route.ts";
 import * as logout from "../../app/api/account/logout/route.ts";
@@ -25,7 +30,7 @@ import * as accountConversation from "../../app/api/account/conversation/route.t
 import * as backupAdmin from "../../app/api/admin/backup/route.ts";
 import {withResponseScope} from "./framework-shim.mjs";
 
-const routes={"/api/account/signup":signup,"/api/account/login":login,"/api/account/logout":logout,"/api/account/state":state,"/api/account/export":exportAccount,"/api/account/delete":deleteAccount,"/api/account/forgot-password":forgot,"/api/account/reset-password":reset,"/api/account/verify-email":verify,"/api/account/request-verification":requestVerification,"/api/demo/session":demo,"/api/capabilities":capabilities,"/api/companion-chat":chat,"/api/companion-speech":speech,"/api/companion-transcribe":transcription,"/api/companion-memory":memory};
+const routes={"/api/account/search":search,"/api/account/reminders":reminders,"/api/journal-reflection":journalReflection,"/api/voices":voices,"/api/voices/preview":voicePreview,"/api/account/signup":signup,"/api/account/login":login,"/api/account/logout":logout,"/api/account/state":state,"/api/account/export":exportAccount,"/api/account/delete":deleteAccount,"/api/account/forgot-password":forgot,"/api/account/reset-password":reset,"/api/account/verify-email":verify,"/api/account/request-verification":requestVerification,"/api/demo/session":demo,"/api/capabilities":capabilities,"/api/companion-chat":chat,"/api/companion-speech":speech,"/api/companion-transcribe":transcription,"/api/companion-memory":memory};
 const syntheticRouter = { async fetch(request, _environment, context) { return withResponseScope(context, async () => {
   const accountRoutes={"/api/account/memory":accountMemory,"/api/account/policy":accountPolicy,"/api/account/reauth":accountReauth,"/api/account/messages":accountMessages,"/api/account/conversation":accountConversation,"/api/admin/backup":backupAdmin};
   const route=(accountRoutes[new URL(request.url).pathname]??routes[new URL(request.url).pathname])?.[request.method];

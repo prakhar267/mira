@@ -67,7 +67,7 @@ export function parseChatPayload(value: unknown, principal?: InferencePrincipal)
   return input;
 }
 export function parseSpeechPayload(value: unknown) {
-  return text(object(value, ["text"]).text, "Speech text", 500);
+  return text(object(value, ["text", "voiceId"]).text, "Speech text", 500);
 }
 export function parseTranscriptionPayload(value: unknown) {
   const raw = object(value, ["audioBase64", "contentType", "durationMs", "vocabulary"]);

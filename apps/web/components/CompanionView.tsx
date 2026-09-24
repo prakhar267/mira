@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   BookOpen,
   Check,
@@ -8,17 +8,18 @@ import {
   Gem,
   Lock,
   Palette,
-  Play,
+
   SlidersHorizontal,
   Sparkles,
   Volume2,
 } from "lucide-react";
 import type { CompanionProfile, OwnedItemRecord, StoreItemRecord, SubscriptionState, WalletState } from "@companion/shared";
 import { canAccessItem } from "@/lib/product-rules";
-import { playCompanionSpeech, type CompanionSpeechPlayback } from "@/lib/speech";
+import { VoicePicker } from "./VoicePicker";
 
-export function CompanionView({ companion, backstory, storeItems, ownedItems, wallet, subscription, onChange, onBackstoryChange, onPurchase, onEquip, onUpgrade }: {
+export function CompanionView({ companion, backstory, storeItems, ownedItems, wallet, subscription, onChange, onBackstoryChange, onPurchase, onEquip, onUpgrade, processingEnabled = true }: {
   companion: CompanionProfile;
+  processingEnabled?: boolean;
   backstory: string;
   storeItems: StoreItemRecord[];
   ownedItems: OwnedItemRecord[];
@@ -32,17 +33,8 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
 }) {
   const [tab, setTab] = useState<"appearance" | "personality" | "backstory" | "voice">("appearance");
   const [notice, setNotice] = useState("");
-  const playbackRef = useRef<CompanionSpeechPlayback | null>(null);
   const equipped = ownedItems.find((item) => item.equipped && storeItems.find((candidate) => candidate.id === item.itemId)?.metadata.slot === "outfit");
   const preview = storeItems.find((item) => item.id === equipped?.itemId)?.assetUrl ?? "/assets/mira/loft-morning.png";
-
-  useEffect(() => () => playbackRef.current?.cancel(), []);
-
-  const previewVoice = () => {
-    playbackRef.current?.cancel();
-    playbackRef.current = playCompanionSpeech("Hey, aa gaye. Tumse baat karne ka wait tha.");
-    setNotice("Mira · natural Hinglish voice");
-  };
 
   return (
     <section className="luma-workspace companion-view companion-studio" aria-labelledby="companion-title">
@@ -99,10 +91,7 @@ export function CompanionView({ companion, backstory, storeItems, ownedItems, wa
             <div className="backstory-notes"><strong>Used naturally</strong><p>Backstory influences tone and banter. It will not be repeated verbatim or treated as a memory about you.</p></div>
           </> : null}
 
-          {tab === "voice" ? <>
-            <div className="section-heading"><div><span className="luma-kicker">One recognizable voice</span><h2>Mira</h2><p>A single warm, conversational Hinglish voice across chat, voice calls, and video calls.</p></div></div>
-            <div className="voice-list"><button type="button" className="voice-option voice-option--selected" onClick={previewVoice}><span><Play aria-hidden="true" /></span><strong>Natural Hinglish</strong><small>One consistent voice, no mood switching</small><Volume2 aria-hidden="true" /></button></div>
-          </> : null}
+          {tab === "voice" ? <VoicePicker selected={companion.voiceId} enabled={processingEnabled} onSelect={voiceId => onChange({ ...companion, voiceId })} /> : null}
         </div>
       </div>
     </section>

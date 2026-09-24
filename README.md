@@ -12,7 +12,7 @@ The hardening, incremental text streaming and protected-recovery v2 code is depl
 
 The [continuation](docs/READINESS-CONTINUATION.md) records further loading improvements and source-loss denial evidence, without claiming the outstanding physical-device, independent-review or production gates are complete.
 
-- **Conversation:** context-aware chat, with Cloudflare Llama 3.3 70B inference.
+- **Conversation:** context-aware chat, with Cloudflare Gemma 4 inference.
 - **Voice and avatar calls:** shared call controls, automatic listening, Inworld speech recognition and the Priya voice. Cloudflare Whisper provides a transcription fallback. The video companion is an animated, open-licensed avatar; it is not a live human video feed.
 - **Memory:** inspect, edit and delete saved memories; export or delete your data.
 - **Accounts and storage:** authenticated account routes and SQLite-backed Cloudflare Durable Objects. Demo state is versioned and can be reset.
@@ -21,6 +21,10 @@ The [continuation](docs/READINESS-CONTINUATION.md) records further loading impro
 Voice and chat depend on external inference services and their available quotas. The website being online does not guarantee speech availability. Camera preview is local; camera-frame understanding is not available.
 
 Billing and transactional recovery-email integrations exist in code but still require configuration and verification. Independent security/legal review, real-device call acceptance, commercial setup and other launch gates are tracked in the [launch operations guide](docs/LAUNCH-OPERATIONS.md). This repository does not claim those gates are complete.
+
+## New companion tools
+
+The current source adds opt-in browser reminders, a voice library with previews, conversation search and weekly reflections from journal entries the user selects. See the [feature guide and verification boundaries](docs/COMPANION-TOOLS.md). These changes are not a claim that this source has been deployed.
 
 ## Run locally
 

@@ -1,3 +1,4 @@
+import type { JournalReflection } from "./journal-reflection";
 import type {
   ActivityDefinition,
   ChatMessage,
@@ -103,6 +104,7 @@ export interface DemoState {
   ownedItems: OwnedItemRecord[];
   subscription: SubscriptionState;
   journalEntries: JournalEntryRecord[];
+  journalReflections: JournalReflection[];
   futureEvents: FutureEventRecord[];
   nudges: ScheduledNudgeRecord[];
   responsePreferences: {
@@ -163,7 +165,7 @@ export const initialState: DemoState = {
     name: "Mira",
     pronouns: "she/her",
     presentation: "playful and warm",
-    voiceId: "mira-natural-01",
+    voiceId: "Priya",
     relationshipMode: "romantic",
     mood: "cheerful",
     createdAt: "2026-07-14T00:00:00.000Z",
@@ -249,6 +251,7 @@ export const initialState: DemoState = {
   ],
   subscription: { planId: "ultra", status: "active", testMode: true },
   journalEntries: [],
+  journalReflections: [],
   futureEvents: [
     { id: "event-stripe", userId: demoUserId, companionId: demoCompanionId, description: "Stripe interview", eventDate: "2026-09-01T11:00:00.000+05:30", status: "confirmed", createdAt: "2026-08-31T18:00:00.000Z" },
   ],

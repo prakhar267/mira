@@ -27,6 +27,7 @@ const callActivities = ["Would you rather", "Relationship cards", "Plan a date",
 export function VideoCallModal({
   companionName,
   userName,
+  voiceId = "Priya",
   onUserTurn,
   onAnalyzeFrame,
   frameUnderstanding = false,
@@ -34,13 +35,14 @@ export function VideoCallModal({
 }: {
   companionName: string;
   userName: string;
+  voiceId?: string;
   initialEnvironment: string;
   onUserTurn: (content: string, context: TurnContext) => Promise<string>;
   frameUnderstanding?: boolean;
   onAnalyzeFrame: (dataBase64: string, contentType: string) => Promise<string>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const { phase, companionLine, userLine, error: speechError, muted, speaker, talkOver, seconds, mouthPose, call } = useCompanionCall(userName, onUserTurn);
+  const { phase, companionLine, userLine, error: speechError, muted, speaker, talkOver, seconds, mouthPose, call } = useCompanionCall(userName, onUserTurn, voiceId);
   const speaking = phase === "speaking";
   const thinking = phase === "thinking" || phase === "transcribing";
   const preparingSpeech = phase === "preparing";
@@ -186,7 +188,7 @@ export function VideoCallModal({
 
       <div className="video-call__tools">
         <span className="video-call__avatar-label"><VideoCamera aria-hidden="true" /> Open-licensed anime avatar · stable live expressions</span>
-        <span className="video-call__avatar-label">English · Hindi · Hinglish · Priya</span>
+        <span className="video-call__avatar-label">English · Hindi · Hinglish · {voiceId}</span>
         <button type="button" aria-pressed={talkOver} onClick={() => call.current?.setTalkOver(!talkOver)}>Talk-over · headphones beta · {talkOver ? "On" : "Off"}</button>
         <button type="button" onClick={() => setActivityOpen((value) => !value)} aria-expanded={activityOpen}><Sparkle aria-hidden="true" /> Activity</button>
         <button type="button" disabled={!frameUnderstanding || !cameraOn || visionBusy} onClick={() => void shareCurrentFrame()}><Camera aria-hidden="true" /> {!frameUnderstanding ? "Frame understanding unavailable" : visionBusy ? "Looking…" : "Show frame"}</button>

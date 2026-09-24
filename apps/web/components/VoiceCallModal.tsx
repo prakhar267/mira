@@ -19,15 +19,17 @@ import { useCallDialog } from "./useCallDialog";
 export function VoiceCallModal({
   companionName,
   userName,
+  voiceId = "Priya",
   onUserTurn,
   onClose,
 }: {
   companionName: string;
   userName: string;
+  voiceId?: string;
   onUserTurn: (content: string, context: TurnContext) => Promise<string>;
   onClose: (durationSeconds: number) => void;
 }) {
-  const { phase, userLine: heard, companionLine, error: speechError, muted, speaker, talkOver, seconds, call } = useCompanionCall(userName, onUserTurn);
+  const { phase, userLine: heard, companionLine, error: speechError, muted, speaker, talkOver, seconds, call } = useCompanionCall(userName, onUserTurn, voiceId);
   const [captions, setCaptions] = useState(true);
   const [heartSent, setHeartSent] = useState(false);
   const dialogRef = useCallDialog(() => { call.current?.close(); onClose(seconds); });
@@ -63,7 +65,7 @@ export function VoiceCallModal({
       {speechError ? <p className="call-speech-error" role="status">{speechError}</p> : null}
 
       <div className="call-pickers">
-        <div className="call-language-picker"><span>English · Hindi · Hinglish · Priya</span></div>
+        <div className="call-language-picker"><span>English · Hindi · Hinglish · {voiceId}</span></div>
         <button type="button" className="call-language-picker" aria-pressed={talkOver} onClick={() => call.current?.setTalkOver(!talkOver)}>Talk-over · headphones beta · {talkOver ? "On" : "Off"}</button>
       </div>
 

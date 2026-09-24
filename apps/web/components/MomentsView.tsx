@@ -32,6 +32,7 @@ export function MomentsView({
   onStartDate,
   onGenerateSelfie,
   onVideoCall,
+  onOpenActivities,
   liveMode = false,
   defaultTab = "moments",
 }: {
@@ -40,6 +41,7 @@ export function MomentsView({
   onStartDate: (environment: EnvironmentId, title: string) => void;
   onGenerateSelfie: () => void;
   onVideoCall: () => void;
+  onOpenActivities: () => void;
   liveMode?: boolean;
   defaultTab?: MomentsTab;
 }) {
@@ -60,6 +62,8 @@ export function MomentsView({
           <i><b style={{ width: `${state.relationship.progress}%` }} /></i>
         </div>
       </header>
+
+      <div className="feature-actions"><button type="button" className="button button--ghost" onClick={onOpenActivities}>Journal, plans & reminders</button></div>
 
       <div className="luma-tabs" role="tablist" aria-label="Moments sections">
         {([

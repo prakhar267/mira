@@ -1,3 +1,4 @@
+import { assertVoiceAvailable, normalizeVoiceId } from "@/lib/voice-catalog";
 import { createInworldSpeechRequest, decodeInworldAudio, fitInworldSpeechPrompt, INWORLD_TTS_ENDPOINT } from "@/lib/inworld-speech";
 import { assertEdgeSameOrigin, EdgeRequestError, edgeError, edgeJson, edgeRateLimited, readEdgeJson, recordServiceMetric } from "@/lib/edge-security";
 import { withProviderDeadline } from "@/lib/provider-resilience";
@@ -17,9 +18,9 @@ const VOICE = {
   language: "hinglish",
 } as const;
 
-async function generateInworldSpeech(prompt: string, apiKey: string, requestSignal: AbortSignal) {
+async function generateInworldSpeech(prompt: string, apiKey: string, requestSignal: AbortSignal, voiceId: string) {
   return withProviderDeadline("inworld-speech", async (signal) => {
-  const response = await providerFetch(INWORLD_TTS_ENDPOINT, {...createInworldSpeechRequest(prompt, apiKey),signal});
+  const response = await providerFetch(INWORLD_TTS_ENDPOINT, {...createInworldSpeechRequest(prompt, apiKey, voiceId),signal});
   if (!response.ok) throw new Error(`Inworld generation returned ${response.status}.`);
   const body = await response.json() as { audioContent?: unknown };
   if (typeof body.audioContent !== "string") throw new Error("Inworld returned no audio.");
@@ -27,7 +28,7 @@ async function generateInworldSpeech(prompt: string, apiKey: string, requestSign
   },10000,requestSignal);
 }
 
-function audioResponse(audio: Uint8Array | ReadableStream<Uint8Array>, requestId: string, startedAt: number) {
+function audioResponse(audio: Uint8Array | ReadableStream<Uint8Array>, requestId: string, startedAt: number, voiceId: string) {
   console.log(JSON.stringify({
     event: "edge_request",
     requestId,
@@ -36,14 +37,14 @@ function audioResponse(audio: Uint8Array | ReadableStream<Uint8Array>, requestId
     latencyMs: Date.now() - startedAt,
     provider: VOICE.provider,
     model: VOICE.model,
-    voice: VOICE.name,
+    voice: voiceId,
     language: VOICE.language,
   }));
   return new Response(audio as unknown as BodyInit, {
     headers: {
       "cache-control": "no-store, no-transform",
       "content-type": "audio/mpeg",
-      "x-companion-voice": VOICE.name,
+      "x-companion-voice": voiceId,
       "x-companion-voice-model": VOICE.model,
       "x-companion-voice-provider": VOICE.provider,
       "x-companion-language": VOICE.language,
@@ -62,13 +63,18 @@ export async function POST(request: Request) {
     assertEdgeSameOrigin(request);
     const principal = await authorizeInference(request, "speech");
     if (await edgeRateLimited(request, "companion-speech", 36)) return respond({ error: "Voice thoda cool down kar raha hai. Ek moment mein try karo." }, 429, { limited: true });
-    const prompt = fitInworldSpeechPrompt(parseSpeechPayload(await readEdgeJson(request, 5_000)));
+    const payload = await readEdgeJson(request, 5_000);
+    const prompt = fitInworldSpeechPrompt(parseSpeechPayload(payload));
+    const requestedVoice = (payload as { voiceId?: unknown }).voiceId;
+    if (requestedVoice !== undefined && typeof requestedVoice !== "string") throw new EdgeRequestError("Voice is invalid.");
+    const voiceId = normalizeVoiceId(requestedVoice ?? principal.state?.companion.voiceId);
     if (!prompt) return respond({ error: "Speech text is required." }, 400);
     if (unsafeCompanionOutput(prompt)) throw new EdgeRequestError("This speech request could not be delivered safely.", 422, "UNSAFE_SPEECH");
 
     const { env } = await import(/* webpackIgnore: true */ "cloudflare:workers");
     const apiKey = (env as typeof env & { INWORLD_API_KEY?: string }).INWORLD_API_KEY?.trim();
-    if (!apiKey) return respond({ error: "Mira's selected Priya voice is not configured yet." }, 503, { provider: VOICE.provider, model: VOICE.model, configuration: "missing" });
+    if (!apiKey) return respond({ error: "Mira's voice service is not configured yet." }, 503, { provider: VOICE.provider, model: VOICE.model, configuration: "missing" });
+    await assertVoiceAvailable(voiceId, apiKey, request.signal);
     if (request.headers.get("x-mira-audio-stream") === "1") {
       // Refuse quota/concurrency failures as HTTP 429 before committing headers.
       const release = await reserveCapacity("speech", principal, prompt.length);
@@ -79,7 +85,7 @@ export async function POST(request: Request) {
           let unresolved = false;
           try { await withProviderDeadline("inworld-speech", async signal => {
             await authorizeInference(request, "speech"); signal.throwIfAborted();
-            const response = await providerFetch(`${INWORLD_TTS_ENDPOINT}:stream`, { ...createInworldSpeechRequest(prompt, apiKey), signal });
+            const response = await providerFetch(`${INWORLD_TTS_ENDPOINT}:stream`, { ...createInworldSpeechRequest(prompt, apiKey, voiceId), signal });
             if (!response.ok || !response.body) { await response.body?.cancel(); throw Error("Speech provider unavailable"); }
             await readInworldAudioStream(response.body, signal, emit);
           }, 10_000, parent); }
@@ -88,16 +94,16 @@ export async function POST(request: Request) {
         },
         finish: failed => recordServiceMetric("companion-speech", failed, Date.now() - startedAt),
       });
-      return audioResponse(body, requestId, startedAt);
+      return audioResponse(body, requestId, startedAt, voiceId);
     }
     const audio = await withInferenceCapacity("speech", principal, prompt.length, async () => {
       await authorizeInference(request, "speech");
-      return generateInworldSpeech(prompt, apiKey, request.signal);
+      return generateInworldSpeech(prompt, apiKey, request.signal, voiceId);
     });
     await authorizeInference(request, "speech");
     request.signal.throwIfAborted();
     recordServiceMetric("companion-speech",false,Date.now()-startedAt);
-    return audioResponse(audio, requestId, startedAt);
+    return audioResponse(audio, requestId, startedAt, voiceId);
   } catch (cause) {
     console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-speech" }));
     if (cause instanceof EdgeRequestError) return edgeError(requestId, "companion-speech", startedAt, cause);

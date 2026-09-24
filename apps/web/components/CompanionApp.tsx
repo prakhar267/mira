@@ -18,6 +18,8 @@ import type {
 } from "@companion/shared";
 import { featureEntitlements, type PlanId } from "@companion/config";
 import { AppShell } from "./AppShell";
+import { ReminderSettings } from "./ReminderSettings";
+import { WeeklyReflection } from "./WeeklyReflection";
 import { ActivitiesView } from "./ActivitiesView";
 import { CameraConversationModal } from "./CameraConversationModal";
 import { ChatView } from "./ChatView";
@@ -177,6 +179,15 @@ export function CompanionApp({
     window.addEventListener("focus", refresh);
     return () => { checks.stop(); window.removeEventListener("mira-capabilities-changed", refresh); window.removeEventListener("focus", refresh); };
   }, [liveMode, state.aiProcessingConsent]);
+
+  useEffect(() => {
+    if (!hydrated || !accountMode) return;
+    const open = () => { window.history.replaceState(null,"","/app?view=activities&tab=reminders"); setState(current => ({...current,currentView:"activities"})); window.dispatchEvent(new Event("mira-open-reminders")); };
+    if (new URLSearchParams(window.location.search).get("tab") === "reminders") open();
+    const message = (event: MessageEvent) => { if (event.data?.type === "mira-open-reminders") open(); };
+    navigator.serviceWorker?.addEventListener("message",message);
+    return () => navigator.serviceWorker?.removeEventListener("message",message);
+  }, [hydrated, accountMode]);
 
   useEffect(() => {
     if (!state.aiProcessingConsent) { turns.current.cancel(); stopCompanionSpeech(); setStreaming(false); setVoiceCallOpen(false); setVideoCallOpen(false); setCameraOpen(false); }
@@ -1013,7 +1024,7 @@ export function CompanionApp({
 
   const speakWithProvider = async (content: string) => {
     if (!processingAllowed()) return;
-    playCompanionSpeech(content, { onError: setActionError });
+    playCompanionSpeech(content, { voiceId: state.companion.voiceId, onError: setActionError });
   };
 
   const uploadImage = async (file: File) => {
@@ -1391,6 +1402,7 @@ export function CompanionApp({
     if (liveMode) await companionApi.deleteJournal(entryId);
     setState((current) => ({
       ...current,
+      journalReflections: current.journalReflections.filter(reflection => !reflection.entryIds.includes(entryId)),
       journalEntries: current.journalEntries.filter(
         (entry) => entry.id !== entryId,
       ),
@@ -1888,6 +1900,7 @@ export function CompanionApp({
       case "chat":
         return (
           <ChatView
+            accountMode={accountMode}
             state={olderMessages.length ? { ...state, messages: appendUniqueMessages(olderMessages, state.messages) } : state}
             {...(accountMode && !olderComplete ? { onLoadOlder: loadOlderMessages } : {})}
             loadingOlder={olderBusy}
@@ -1945,6 +1958,7 @@ export function CompanionApp({
           <MomentsView
             key={momentsTab}
             defaultTab={momentsTab}
+            onOpenActivities={() => setState(current => ({ ...current, currentView: "activities" }))}
             state={state}
             liveMode={cloudBacked}
             onCompleteActivity={(activity) =>
@@ -1961,6 +1975,7 @@ export function CompanionApp({
       case "companion":
         return (
           <CompanionView
+            processingEnabled={state.aiProcessingConsent}
             companion={state.companion}
             backstory={state.companionBackstory}
             storeItems={state.storeItems}
@@ -2014,6 +2029,9 @@ export function CompanionApp({
       case "activities":
         return (
           <ActivitiesView
+            accountMode={accountMode}
+            reminderPanel={<ReminderSettings accountMode={accountMode} events={state.futureEvents} beforeSave={async () => { const sync = accountSync.current; if (!sync) throw new Error("Your account is still loading."); sync.enqueue(stateRef.current); await sync.flush(); }} />}
+            reflectionPanel={<WeeklyReflection entries={state.journalEntries} saved={state.journalReflections} enabled={state.aiProcessingConsent && Boolean(capabilities?.capabilities.journalReflection)} accountMode={accountMode} beforeGenerate={async () => { if (accountMode) { const sync = accountSync.current; if (!sync) throw new Error("Your account is still loading."); sync.enqueue(stateRef.current); await sync.flush(); } }} onSave={reflection => setState(current => ({ ...current, journalReflections: [reflection, ...current.journalReflections].slice(0,30) }))} onDelete={id => setState(current => ({ ...current, journalReflections: current.journalReflections.filter(reflection => reflection.id !== id) }))} />}
             reflectionEnabled={Boolean(capabilities?.capabilities.journalReflection)}
             activities={state.activities}
             completedIds={state.completedActivityIds}
@@ -2172,6 +2190,7 @@ export function CompanionApp({
         <VoiceCallModal
           companionName={state.companion.name}
           userName={state.user.name}
+          voiceId={state.companion.voiceId}
           onUserTurn={(content, context) => replyDuringCall(content, "voice", context)}
           onClose={(seconds) => finishCall("voice", seconds)}
         />
@@ -2180,6 +2199,7 @@ export function CompanionApp({
         <VideoCallModal
           companionName={state.companion.name}
           userName={state.user.name}
+          voiceId={state.companion.voiceId}
           initialEnvironment={state.activeEnvironment}
           onUserTurn={(content, context) => replyDuringCall(content, "video", context)}
           frameUnderstanding={Boolean(capabilities?.capabilities.imageUnderstanding)}

@@ -84,6 +84,7 @@ export function stopCompanionSpeech() {
 }
 
 type SpeechOptions = {
+  voiceId?: string;
   onStart?: () => void;
   onBoundary?: (boundary: { charIndex: number; charLength: number; elapsedTime: number; name: string }) => void;
   onAudioLevel?: (level:number) => void;
@@ -106,7 +107,7 @@ export function speechChunks(text: string, limit = 500): string[] {
   return chunks;
 }
 
-/** Preserve the same Priya voice while respecting each provider request bound. */
+/** Preserve the selected voice across bounded speech chunks. */
 export function playCompanionSpeech(text: string, options: SpeechOptions = {}): CompanionSpeechPlayback {
   const chunks = speechChunks(text);
   if (chunks.length <= 1) return playSpeechChunk(chunks[0] ?? "", options);
@@ -180,7 +181,7 @@ function playSpeechChunk(text: string, options: SpeechOptions = {}): CompanionSp
       response = await fetch("/api/companion-speech", {
         method: "POST",
         headers: { "content-type": "application/json", "x-mira-audio-stream": "1" },
-        body: JSON.stringify({ text: text.replace(/\s+/g, " ").trim() }),
+        body: JSON.stringify({ text: text.replace(/\s+/g, " ").trim(), ...(options.voiceId ? { voiceId: options.voiceId === "mira-natural-01" ? "Priya" : options.voiceId } : {}) }),
         signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(12_000)]),
       });
       if (canceled || finished) return;

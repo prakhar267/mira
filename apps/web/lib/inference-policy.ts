@@ -81,7 +81,7 @@ export function inferenceCapabilities(principal?: InferencePrincipal, available 
     runtime: "cloudflare" as const, mode: principal?.mode ?? "anonymous", policyVersion: INFERENCE_POLICY_VERSION,
     ...(principal?.expiresAt ? { expiresAt: principal.expiresAt } : {}),
     ageAssurance: enabled ? "self-declared" : "none",
-    capabilities: { chat: enabled && available.chat, transcription: enabled && available.transcription, speech: enabled && available.speech, voiceCall: enabled && available.chat && available.transcription && available.speech, videoCall: enabled && available.chat && available.transcription && available.speech, memoryRetrieval: (principal?.memoryConsent ?? false) && available.chat, imageUpload: false, imageGeneration: false, imageUnderstanding: false, journalReflection: false, scheduledNotifications: false, billing: false },
-    voice: { name: "Priya", customization: false },
+    capabilities: { chat: enabled && available.chat, transcription: enabled && available.transcription, speech: enabled && available.speech, voiceCall: enabled && available.chat && available.transcription && available.speech, videoCall: enabled && available.chat && available.transcription && available.speech, memoryRetrieval: (principal?.memoryConsent ?? false) && available.chat, imageUpload: false, imageGeneration: false, imageUnderstanding: false, journalReflection: enabled && available.chat, scheduledNotifications: principal?.mode === "account", billing: false },
+    voice: { name: principal?.state?.companion.voiceId === "mira-natural-01" ? "Priya" : principal?.state?.companion.voiceId ?? "Priya", customization: enabled && available.speech },
   };
 }
