@@ -300,6 +300,8 @@ describe("durable opt-in and delivery", () => {
   it("fences unsubscribe while payload encryption is pending and expires old events", async () => {
     const { db, engine, sql } = fixture();
     try {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-09-24T19:00:00Z"));
       engine.subscribe("u", "one", await device("one"));
       engine.save("u", base);
       sql.exec("UPDATE reminder_rules SET next_at=?", Date.now() - 31 * 60000);

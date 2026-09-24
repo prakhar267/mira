@@ -259,8 +259,8 @@ describe("new companion features in real workerd", () => {
         enabled: true,
         timezone: "UTC",
         time: "19:00",
-        quietStart: "22:00",
-        quietEnd: "08:00",
+        quietStart: "00:00",
+        quietEnd: "00:00",
         minutesBefore: 30,
       },
     });
