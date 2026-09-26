@@ -40,8 +40,17 @@ jobs:
       - name: Generate the Prisma client
         run: pnpm db:generate
 
-      - name: Verify the workspace
-        run: pnpm check
+      - name: Lint the workspace
+        run: pnpm exec turbo lint --concurrency=2
+
+      - name: Typecheck the workspace
+        run: pnpm exec turbo typecheck --concurrency=2
+
+      - name: Run workspace unit and component tests
+        run: pnpm exec turbo test --concurrency=2
+
+      - name: Build the workspace
+        run: pnpm exec turbo build --concurrency=2
 
       - name: Verify committed marketing image delivery budgets
         run: pnpm --filter @companion/web assets:check

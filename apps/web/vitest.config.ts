@@ -13,6 +13,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Keep the expanded DOM/SQLite suite within hosted-runner memory budgets.
+    maxWorkers: 2,
     include: [
       "lib/**/*.test.ts",
       "components/**/*.test.ts",
