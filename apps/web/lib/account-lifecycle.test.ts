@@ -1332,6 +1332,11 @@ describe("store dispatch budget and account error contracts", () => {
 });
 
 describe("route abuse limits preserve account and mail boundaries", () => {
+  beforeEach(() => {
+    // Filling a fixed-window bucket must not straddle the wall-clock boundary.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-26T12:00:30Z"));
+  });
   it.each([
     ["account/forgot-password", "recovery", 4, forgot.POST],
     [
