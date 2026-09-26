@@ -204,4 +204,23 @@ describe("verified avatar delivery profiles", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(await asset(avatarDelivery.path))));
     await expect(fetchAvatarDelivery(controller.signal)).rejects.toMatchObject({ name: "AbortError" });
   });
+  it("rejects an unavailable response or absent body before decoding", async () => {
+    for (const response of [new Response("unavailable", { status: 503 }), new Response(null)]) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+      await expect(fetchAvatarDelivery(new AbortController().signal)).rejects.toThrow("download unavailable");
+    }
+  });
+  it("rejects a valid-size corrupt raw avatar and bounds bytes across chunks", async () => {
+    vi.stubGlobal("DecompressionStream", undefined);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Uint8Array(avatarDelivery.decodedBytes))));
+    await expect(fetchAvatarDelivery(new AbortController().signal)).rejects.toThrow("integrity check failed");
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(avatarDelivery.decodedBytes)); controller.enqueue(new Uint8Array(1)); },
+      cancel,
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body)));
+    await expect(fetchAvatarDelivery(new AbortController().signal)).rejects.toThrow("delivery budget");
+    expect(cancel).toHaveBeenCalledOnce();
+  });
 });

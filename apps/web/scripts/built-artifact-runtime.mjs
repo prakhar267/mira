@@ -57,13 +57,13 @@ export async function compiledModules(root,main){
 
 // dispatchFetch returns decoded bodies. Preserve response streaming/cookies but
 // do not send the compressed content length alongside a decoded stream.
-export function createArtifactHttpServer(dispatchFetch,{onError=console.error}={}){
-  const server=createServer(async(request,response)=>{
+export function createArtifactHttpServer(dispatchFetch,{onError=console.error,serverFactory=createServer}={}){
+  const server=serverFactory(async(request,response)=>{
     const abort=new AbortController();
     const disconnected=()=>{if(!response.writableEnded)abort.abort(Error("Local client disconnected"));};
     request.once("aborted",disconnected);response.once("close",disconnected);
     try{
-      const base=`http://127.0.0.1:${server.address().port}`;
+      const base=`${request.socket.encrypted?"https":"http"}://127.0.0.1:${server.address().port}`;
       const url=new URL(request.url,base);
       if(url.origin!==base)throw Error("Non-local request target rejected");
       const connectionTokens=new Set((request.headers.connection??"").toLowerCase().split(",").map(value=>value.trim()));

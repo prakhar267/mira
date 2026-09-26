@@ -13,6 +13,7 @@ import { CHAT_STREAM_TYPE } from "@/lib/chat-stream-protocol";
 import { discardUnusedRequestBody } from "@/lib/unused-request-body";
 import { groundReplyPerspective } from "@/lib/reply-perspective";
 import { isClosingThanks, isFactCorrection, replyGroundingIssue } from "@/lib/conversation-focus";
+import { cloudflareAiError } from "@/lib/cloudflare-ai-error";
 
 const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 
@@ -166,6 +167,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const timedOut=error instanceof DOMException && error.name==="TimeoutError";
     console.error(JSON.stringify({ event: "provider_failure", requestId, route: "companion-chat", reason:timedOut?"deadline":"request-failed" }));
+    const providerError = cloudflareAiError(error);
+    if (providerError) return edgeError(requestId, "companion-chat", startedAt, providerError);
     if(timedOut)return edgeError(requestId,"companion-chat",startedAt,new EdgeRequestError("The AI provider took too long to respond. Please retry this turn.",503,"PROVIDER_TIMEOUT"));
     if (error instanceof EdgeRequestError) return edgeError(requestId, "companion-chat", startedAt, error);
     return respond({ error: "Mira could not form a fresh reply just now." }, 503, { model: MODEL });

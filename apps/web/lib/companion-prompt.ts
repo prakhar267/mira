@@ -45,7 +45,7 @@ function explicitlyRequestedLanguage(value: string): CompanionLanguage | null {
   if (shortChoice) return shortChoice === "hindi" ? "hi" : shortChoice === "hinglish" ? "hinglish" : "en";
   const spokenChoice = value.trim().match(/^(?:प्लीज़?\s+)?(हिंदी|हिन्दी|अंग्रेज़ी|अंग्रेजी|इंग्लिश|हिंग्लिश)(?:\s+प्लीज़?)?[.!?।\s]*$/u)?.[1];
   if (spokenChoice) return /^(?:हिंदी|हिन्दी)$/u.test(spokenChoice) ? "hi" : spokenChoice === "हिंग्लिश" ? "hinglish" : "en";
-  if (!/\b(?:speak|talk|reply|answer|chat|language|keep|say|switch|baat|bolo|mein)\b|(?:बात|बोल|जवाब|भाषा|में)/iu.test(value)) return null;
+  if (!/\b(?:speak|talk|reply|answer|chat|language|keep|say|switch|baat|bolo|mein|me)\b|(?:बात|बोल|जवाब|भाषा|में)/iu.test(value)) return null;
 
   const mentions = [
     ...[...value.matchAll(/(?:hinglish|हिंग्लिश)/giu)].map((match) => ({ language: "hinglish" as const, index: match.index, value: match[0] })),
@@ -57,7 +57,7 @@ function explicitlyRequestedLanguage(value: string): CompanionLanguage | null {
     const before = value.slice(Math.max(0, mention.index - 24), mention.index);
     const after = value.slice(mention.index + mention.value.length, mention.index + mention.value.length + 24);
     const negatedBefore = /(?:not|nahi|नहीं|मत)\s*$/iu.test(before)
-      || /(?:don['’]?t|do not|mat)\s+(?:speak|talk|reply|answer|बोल\p{L}*)\s*$/iu.test(before);
+      || /(?:don['’]?t|do not|mat)\s+(?:speak|talk|reply|answer|बोल\p{L}*)\s*(?:in\s*)?$/iu.test(before);
     const negatedAfter = /^\s*(?:(?:mein|me|में)\s*)?(?:not|nahi|नहीं)\b/iu.test(after);
     return !negatedBefore && !negatedAfter;
   });
@@ -68,8 +68,6 @@ function explicitlyRequestedLanguage(value: string): CompanionLanguage | null {
 export function detectCompanionLanguage(value: string): CompanionLanguage {
   const requestedLanguage = explicitlyRequestedLanguage(value);
   if (requestedLanguage) return requestedLanguage;
-  if (/\b(?:reply|answer|speak|talk) in hindi\b|\bhindi (?:mein|me)\b/i.test(value) || /हिंदी में/u.test(value)) return "hi";
-  if (/\b(?:reply|answer|speak|talk) in english\b/i.test(value) || /अंग्रेज़ी में/u.test(value)) return "en";
   if (/\p{Script=Devanagari}|\p{Script=Arabic}/u.test(value)) return "hi";
   // These Roman-Hindi acknowledgements are not English by default. Keep this
   // anchored: an English sentence discussing a title/name isn't a switch.

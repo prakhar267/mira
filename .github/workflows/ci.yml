@@ -49,8 +49,17 @@ jobs:
       - name: Worker-runtime route and SQLite integration tests
         run: pnpm --filter @companion/web test:worker
 
+      - name: Enforce 95 percent coverage in every new feature module
+        run: pnpm --filter @companion/web test:coverage:features
+
+      - name: Enforce 95 percent coverage across the active website
+        run: pnpm --filter @companion/web test:coverage
+
       - name: Install supported test browsers
         run: pnpm --filter @companion/web exec playwright install --with-deps chromium firefox webkit
+
+      - name: Exercise compiled app routes and SQLite through all supported browsers
+        run: pnpm --filter @companion/web test:e2e
 
       - name: Build Cloudflare target and run isolated browser acceptance
         run: pnpm --filter @companion/web test:browser

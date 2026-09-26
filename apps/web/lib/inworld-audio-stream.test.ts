@@ -58,3 +58,9 @@ describe("speech delivery consent, backpressure and completion",()=>{
     await vi.waitFor(()=>expect(finish).toHaveBeenCalledWith(true));expect(check).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("audio transport byte budgets",()=>{
+ it("accepts a frame-sync MP3 without ID3 metadata",async()=>{expect(await readInworldAudioStream(source(frame(String.fromCharCode(255,251,1))),signal(),async()=>{})).toBe(3);});
+ it("rejects an oversized terminated frame and cumulative transport bytes",async()=>{await expect(readInworldAudioStream(source(" ".repeat(1_500_001)+"\n"),signal(),async()=>{})).rejects.toThrow("frame exceeds");let index=0;const stream=new ReadableStream<Uint8Array>({pull(c){if(index++<12)c.enqueue(encoded(" ".repeat(999999)+"\n"));else c.close();}});await expect(readInworldAudioStream(stream,signal(),async()=>{})).rejects.toThrow("stream exceeds");});
+ it("caps decoded audio even when each individual frame fits",async()=>{let index=0;const block=Buffer.alloc(730000,1);block.set([73,68,51]);const line=JSON.stringify({result:{audioContent:block.toString("base64")}})+"\n";const stream=new ReadableStream<Uint8Array>({pull(c){if(index++<11)c.enqueue(encoded(line));else c.close();}});await expect(readInworldAudioStream(stream,signal(),async()=>{})).rejects.toThrow("audio exceeds");});
+});

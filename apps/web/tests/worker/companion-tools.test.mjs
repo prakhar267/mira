@@ -92,6 +92,16 @@ async function signup(index = 1) {
 const stub = () =>
   env.MIRA_STORE.get(env.MIRA_STORE.idFromName("mira-production-v1"));
 describe("new companion features in real workerd", () => {
+  it("reports the real provider quota envelope clearly for reflections and chat", async () => {
+    const user = await signup();
+    user.state.journalEntries[0].content = "[synthetic-provider-quota]";
+    expect((await request("/api/account/state", user.cookie, { state: user.state, revision: user.revision }, "PUT")).status).toBe(200);
+    const reflection = await request("/api/journal-reflection", user.cookie, { entryIds: ["entry-one"] });
+    expect(reflection.status).toBe(429); expect(await reflection.json()).toMatchObject({ code: "PROVIDER_DAILY_QUOTA", error: expect.stringContaining("00:00 UTC") });
+    expect(Number(reflection.headers.get("retry-after"))).toBeGreaterThan(0);
+    const chat = await request("/api/companion-chat", user.cookie, { user: { name: "Synthetic" }, companion: { name: "Mira" }, messages: [{ role: "user", content: "[synthetic-provider-quota] I drew a tree." }], delivery: "text" });
+    expect(chat.status).toBe(429); expect(await chat.json()).toMatchObject({ code: "PROVIDER_DAILY_QUOTA" });
+  });
   it("searches older messages across the stored history and enforces account ownership", async () => {
     const first = await signup(1),
       second = await signup(2);

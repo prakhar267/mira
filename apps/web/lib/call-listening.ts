@@ -131,6 +131,7 @@ export async function startCallListening(options: CallListeningOptions): Promise
   });
   if (options.signal?.aborted) { stream.getTracks().forEach(track => track.stop()); throw new DOMException("Call cancelled", "AbortError"); }
   let acquiredContext: AudioContext | undefined;
+  let acquisitionCleanup: (() => void) | undefined;
   try {
   const AudioContextConstructor = window.AudioContext
     ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -229,6 +230,12 @@ export async function startCallListening(options: CallListeningOptions): Promise
     analyser.disconnect();
     stream.getTracks().forEach((track) => track.stop());
     void context.close();
+  };
+  acquisitionCleanup = () => {
+    canceled = true;
+    transcriptionController.abort();
+    try { browserRecognition?.abort(); } catch { /* Already ended. */ }
+    cleanup();
   };
 
   const stop = () => {
@@ -347,8 +354,11 @@ export async function startCallListening(options: CallListeningOptions): Promise
     },
   };
   } catch (error) {
-    stream.getTracks().forEach(track => track.stop());
-    void acquiredContext?.close().catch(() => undefined);
+    if (acquisitionCleanup) acquisitionCleanup();
+    else {
+      stream.getTracks().forEach(track => track.stop());
+      void acquiredContext?.close().catch(() => undefined);
+    }
     throw error;
   }
 }

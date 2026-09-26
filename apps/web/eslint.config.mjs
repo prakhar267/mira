@@ -15,6 +15,7 @@ export default defineConfig([
     ".next/**",
     ".wrangler/**",
     "coverage/**",
+    "test-results/**",
     "dist/**",
     "next-env.d.ts",
   ]),

@@ -34,3 +34,9 @@ describe("bounded streaming request reader", () => {
     expect(await response.json()).toMatchObject({ code: "DAILY_CAPACITY_EXHAUSTED", requestId: "synthetic-request", retryAfterSeconds: 10000 });
   });
 });
+
+describe("edge metadata and quoted JSON boundaries",()=>{
+ it.each([[400,"INVALID_REQUEST"],[401,"SESSION_REQUIRED"],[403,"POLICY_DENIED"],[413,"INPUT_TOO_LARGE"],[429,"RATE_LIMITED"],[503,"SERVICE_UNAVAILABLE"]])("maps status %s to a stable public code",(status,code)=>{expect(new EdgeRequestError("failure",status as number).code).toBe(code)});
+ it.each(["same-origin","none","cross-site"])("validates fetch-site %s without an Origin header",site=>{const work=()=>assertEdgeSameOrigin(new Request("https://mira.test",{headers:{"sec-fetch-site":site}}));if(site==="cross-site")expect(work).toThrow();else expect(work).not.toThrow();});
+ it("rejects absent/declared-oversize bodies and handles escaped quotes without counting fake nesting",async()=>{await expect(readEdgeJson(new Request("https://mira.test"),100)).rejects.toThrow("body is required");await expect(readEdgeJson(new Request("https://mira.test",{method:"POST",body:"{}",headers:{"content-length":"200"}}),100)).rejects.toMatchObject({status:413});const value={text:'escaped "quote" \\ [{{{{{{{{{{{{{{{{{{{{'};expect(await readEdgeJson(new Request("https://mira.test",{method:"POST",body:JSON.stringify(value)}),500)).toEqual(value);});
+});

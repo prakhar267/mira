@@ -16,6 +16,7 @@ import { withProviderDeadline } from "@/lib/provider-resilience";
 import { readChatStream } from "@/lib/chat-stream";
 import { unsafeCompanionOutput } from "@/lib/companion-safety";
 import { discardUnusedRequestBody } from "@/lib/unused-request-body";
+import { cloudflareAiError } from "@/lib/cloudflare-ai-error";
 
 export async function POST(request: Request) {
   const started = Date.now(),
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
       entryIds: selected.entries.map((entry) => entry.id),
     });
   } catch (cause) {
-    return edgeError(id, "journal-reflection", started, cause);
+    return edgeError(id, "journal-reflection", started, cloudflareAiError(cause) ?? cause);
   } finally {
     await discardUnusedRequestBody(request);
   }

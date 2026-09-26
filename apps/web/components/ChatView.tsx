@@ -95,7 +95,7 @@ export function ChatView({ state, streaming, streamingText = "", processingEnabl
 
   useEffect(() => {
     const cleanup = () => { recordingAttempt.current++; voicePending.current = false; clearTimeout(recordingTimer.current); voiceRecognition.current?.abort(); if (mediaRecorder.current?.state === "recording") mediaRecorder.current.stop(); voiceStream.current?.getTracks().forEach(track => track.stop()); };
-    if (!processingEnabled) cleanup();
+    if (!processingEnabled) { cleanup(); setVoiceActive(false); }
     const visibility = () => { if (document.hidden) { cleanup(); setVoiceActive(false); } };
     document.addEventListener("visibilitychange", visibility);
     return () => { document.removeEventListener("visibilitychange", visibility); cleanup(); };

@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { microphoneRms } from "./voice-activity";
-
-describe("microphone activity", () => {
-  it("measures silence and speech energy without depending on sample polarity", () => {
-    expect(microphoneRms(new Float32Array([0, 0, 0]))).toBe(0);
-    expect(microphoneRms(new Float32Array([.2, -.2, .2, -.2]))).toBeCloseTo(.2, 5);
-  });
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { microphoneRms, startVoiceActivityMonitor } from "./voice-activity";
+let level = .001, frame: FrameRequestCallback, detect = false;
+const stop = vi.fn(), connect = vi.fn(), disconnectSource = vi.fn(), disconnectAnalyser = vi.fn(), close = vi.fn().mockResolvedValue(undefined), speech = vi.fn();
+class Context { createMediaStreamSource() { return { connect, disconnect: disconnectSource }; } createAnalyser() { return { fftSize: 0, smoothingTimeConstant: 0, getFloatTimeDomainData: (array: Float32Array) => array.fill(level), disconnect: disconnectAnalyser }; } close = close; }
+beforeEach(() => { vi.clearAllMocks(); level = .001; detect = false; Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop }] }) } }); vi.stubGlobal("AudioContext", Context); vi.stubGlobal("webkitAudioContext", undefined); vi.spyOn(window, "requestAnimationFrame").mockImplementation(callback => { frame = callback; return 1; }); vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+describe("microphone activity monitoring", () => {
+  it("requires sustained speech, rearms between turns and cleans up idempotently", async () => { expect(microphoneRms(new Float32Array())).toBe(0); expect(microphoneRms(new Float32Array([1, -1]))).toBe(1); const monitor = await startVoiceActivityMonitor({ shouldDetect: () => detect, onSpeech: speech }); frame(0); detect = true; frame(1); level = .2; for (let n = 0; n < 4; n++) frame(n); expect(speech).not.toHaveBeenCalled(); frame(5); expect(speech).toHaveBeenCalledOnce(); frame(6); expect(speech).toHaveBeenCalledOnce(); detect = false; frame(7); detect = true; for (let n = 0; n < 5; n++) frame(n); expect(speech).toHaveBeenCalledTimes(2); monitor.stop(); monitor.stop(); frame(0); expect(stop).toHaveBeenCalledOnce(); expect(disconnectSource).toHaveBeenCalledOnce(); expect(disconnectAnalyser).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalledOnce(); });
+  it("supports the prefixed audio context", async () => { vi.stubGlobal("AudioContext", undefined); vi.stubGlobal("webkitAudioContext", Context); const monitor = await startVoiceActivityMonitor({ shouldDetect: () => false, onSpeech: speech }); monitor.stop(); expect(connect).toHaveBeenCalled(); });
+  it("rejects missing microphone access and stops a stream when audio analysis is unavailable", async () => { Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: undefined }); await expect(startVoiceActivityMonitor({ shouldDetect: () => true, onSpeech: speech })).rejects.toThrow("Microphone monitoring"); Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop }] }) } }); vi.stubGlobal("AudioContext", undefined); await expect(startVoiceActivityMonitor({ shouldDetect: () => true, onSpeech: speech })).rejects.toThrow("Audio monitoring"); expect(stop).toHaveBeenCalledOnce(); });
 });

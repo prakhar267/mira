@@ -252,19 +252,30 @@ export const companionApi = {
     const audio = new Audio();
     audio.autoplay = true;
     peer.ontrack = (event) => { audio.srcObject = event.streams[0] ?? null; };
-    const media = await navigator.mediaDevices.getUserMedia({ audio: true });
-    for (const track of media.getTracks()) peer.addTrack(track, media);
-    const events = peer.createDataChannel("oai-events");
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-    const sdp = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/sdp" }, body: offer.sdp ?? "" });
-    if (!sdp.ok) {
-      for (const track of media.getTracks()) track.stop();
+    let media: MediaStream | undefined, events: RTCDataChannel | undefined, closed = false;
+    const disconnect = () => {
+      if (closed) return;
+      closed = true;
+      media?.getTracks().forEach(track => track.stop());
+      events?.close();
       peer.close();
-      throw new Error("The realtime media connection could not be established.");
+      audio.srcObject = null;
+      void request(`/calls/${session.callId}/end`, { method: "POST" }).catch(() => undefined);
+    };
+    try {
+      media = await navigator.mediaDevices.getUserMedia({ audio: true });
+      for (const track of media.getTracks()) peer.addTrack(track, media);
+      events = peer.createDataChannel("oai-events");
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      const sdp = await fetch("https://api.openai.com/v1/realtime/calls", { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/sdp" }, body: offer.sdp ?? "" });
+      if (!sdp.ok) throw new Error("The realtime media connection could not be established.");
+      await peer.setRemoteDescription({ type: "answer", sdp: await sdp.text() });
+      return { peer, events, audio, disconnect };
+    } catch (cause) {
+      disconnect();
+      throw cause;
     }
-    await peer.setRemoteDescription({ type: "answer", sdp: await sdp.text() });
-    return { peer, events, audio, disconnect() { for (const track of media.getTracks()) track.stop(); events.close(); peer.close(); audio.srcObject = null; void request(`/calls/${session.callId}/end`, { method: "POST" }).catch(() => undefined); } };
   },
 };
 

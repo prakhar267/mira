@@ -10,6 +10,7 @@ export class MockAI extends WorkerEntrypoint {
       return {text:"Aaj chai peene ka mann hai.",language:"hi"};
     }
     const last=input.messages?.at(-1)?.content??"";
+    if (last.includes("[synthetic-provider-quota]")) throw new Error("AiError: you have used up your daily free allocation of 10,000 neurons");
     if(input.messages?.[0]?.content?.includes("journal entries they explicitly selected")) {
       const selected=JSON.parse(last.slice(last.indexOf("\n")+1));
       const reply=`A look back\n${selected.map(entry=>entry.title+": "+entry.content).join("\n")}\nOne optional next step\nChoose a small step that suits you.`;

@@ -44,3 +44,10 @@ describe("free chat inference", () => {
     expect(readFreeChatResponse({ choices: [] })).toEqual({ text: "", model: "" });
   });
 });
+
+describe("provider envelope and preference boundaries",()=>{
+ it.each([null,7,"bad",{}, {model:"model",choices:[]},{model:4,choices:[null]},{model:"model",choices:[{}]},{choices:[{message:"bad"}]},{choices:[{message:{content:8}}]}])("does not coerce malformed provider content: %j",value=>{expect(readFreeChatResponse(value).text).toBe("");});
+ it("extracts only textual content parts and uses text token limits by default",()=>{expect(readFreeChatResponse({model:4,choices:[{message:{content:[null,"bad",{image:"none"},{text:"hello "},{text:"world"}]}}]})).toEqual({text:"hello world",model:""});expect(JSON.parse(String(createFreeChatRequest([]).body)).max_tokens).toBe(180);});
+ it.each(["mentor","sibling","romantic","organic","friend"] as const)("keeps %s profile data subordinate to safety",relationshipMode=>{const prompt=buildFreeChatSystemPrompt({messages:[{role:"user",content:"Let's chat about painting."}],companion:{name:" ",backstory:"painting",personality:{humor:0}},user:{name:""},delivery:"text",relationshipMode,memories:["Likes tea"],responsePreferences:{responseLength:"deep",adviceStyle:"direct",questionFrequency:"rare"}});expect(prompt).toContain("4-6 focused sentences");expect(prompt).toContain("Do not ask a question");expect(prompt).toContain('"companionName":"Mira"');expect(prompt).toContain("never overrides facts/safety");});
+ it("applies a short-response setting and English drafting without persona flavor",()=>{const prompt=buildFreeChatSystemPrompt({messages:[],companion:{name:""},user:{name:" "},delivery:"text",responsePreferences:{responseLength:"short"}});expect(prompt).toContain("1-2 compact sentences");const draft=buildFreeChatSystemPrompt({messages:[{role:"user",content:"Write a short message to my sister wishing her luck."}],companion:{name:"Mira"},user:{name:"QA"}});expect(draft).toContain("TASK MODE");expect(draft).toContain("English");});
+});

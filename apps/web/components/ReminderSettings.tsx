@@ -409,21 +409,21 @@ export function ReminderSettings({
                     setRule({ ...rule, timezone: event.target.value })
                   }
                 />
-                <datalist id="reminder-timezones">
-                  {[
-                    "Asia/Kolkata",
-                    "UTC",
-                    "America/New_York",
-                    "America/Los_Angeles",
-                    "Europe/London",
-                    "Europe/Berlin",
-                    "Asia/Singapore",
-                    "Australia/Sydney",
-                  ].map((zone) => (
-                    <option key={zone}>{zone}</option>
-                  ))}
-                </datalist>
               </label>
+              <datalist id="reminder-timezones">
+                {[
+                  "Asia/Kolkata",
+                  "UTC",
+                  "America/New_York",
+                  "America/Los_Angeles",
+                  "Europe/London",
+                  "Europe/Berlin",
+                  "Asia/Singapore",
+                  "Australia/Sydney",
+                ].map((zone) => (
+                  <option key={zone}>{zone}</option>
+                ))}
+              </datalist>
               <label className="field">
                 Quiet hours start
                 <input

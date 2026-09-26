@@ -1,0 +1,19 @@
+[
+  "components/ConversationSearch.tsx",
+  "components/WeeklyReflection.tsx",
+  "components/VoicePicker.tsx",
+  "components/ReminderSettings.tsx",
+  "lib/conversation-search.ts",
+  "lib/journal-reflection.ts",
+  "lib/cloudflare-ai-error.ts",
+  "lib/voice-catalog.ts",
+  "lib/reminders.ts",
+  "lib/reminder-engine.ts",
+  "lib/reminder-delivery.ts",
+  "app/api/account/search/route.ts",
+  "app/api/journal-reflection/route.ts",
+  "app/api/voices/route.ts",
+  "app/api/voices/preview/route.ts",
+  "app/api/account/reminders/route.ts",
+  "public/sw.js"
+]

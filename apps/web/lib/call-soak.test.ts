@@ -355,14 +355,14 @@ function setupMicrophone() {
     requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++frameId, callback); return frameId; },
     cancelAnimationFrame: (id: number) => frames.delete(id),
   });
-  async function frame(value: number) {
+  async function frame(value: number, elapsed = 20) {
     level = value;
-    await vi.advanceTimersByTimeAsync(20);
+    await vi.advanceTimersByTimeAsync(elapsed);
     const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback(performance.now()));
     await flush();
   }
   return {
-    tracks, contexts, connections, frames, recorders, getUserMedia,
+    tracks, contexts, connections, frames, recorders, getUserMedia, frame,
     delayPermission() { delayedPermission = true; }, releasePermission() { resolvePermission?.(); },
     async utterance() {
       // Deterministic analyser values, not recorded human or generated speech.
@@ -422,4 +422,66 @@ describe("real microphone adapter with synthetic browser resources", () => {
     call.listen(); call.close(); x.releasePermission(); await flush();
     expect(call.state.phase).toBe("closed"); expect(x.recorders).toHaveLength(0); x.expectReleased();
   });
+});
+
+describe("speech playback transport and chunk boundaries", () => {
+  it.each([502, 504])("retries HTTP %s once, preserves voice and emits one successful lifecycle", async status => {
+    const x = setupAudio(), http = vi.fn().mockResolvedValueOnce(Response.json({ error: "Unavailable" }, { status })).mockImplementation(async () => x.response()); vi.stubGlobal("fetch", http); const onStart = vi.fn(), onBoundary = vi.fn(), onEnd = vi.fn(); playCompanionSpeech("A short response", { voiceId: "mira-natural-01", onStart, onBoundary, onEnd }); await flush(); await vi.advanceTimersByTimeAsync(181); const audio = x.audios[0]!; expect(JSON.parse(http.mock.calls[1]![1].body).voiceId).toBe("Priya"); await vi.advanceTimersByTimeAsync(80); expect(onBoundary).toHaveBeenCalledWith(expect.objectContaining({ charIndex: 0 })); audio.currentTime = .5; await vi.advanceTimersByTimeAsync(80); audio.onwaiting?.(); expect(vi.getTimerCount()).toBe(0); audio.onplaying?.(); expect(onStart).toHaveBeenCalledOnce(); audio.onended?.(); expect(onEnd).toHaveBeenCalledOnce(); expect(x.urls.size).toBe(0);
+  });
+  it.each(["HTTP JSON", "HTTP text", "wrong type", "network", "unknown", "playback"])("reports %s failures without a successful completion", async kind => {
+    const x = setupAudio(), onError = vi.fn(), onEnd = vi.fn(); let fetcher; if (kind === "HTTP JSON") fetcher = vi.fn().mockResolvedValue(Response.json({ error: "Explicit voice error" }, { status: 503 })); else if (kind === "HTTP text") fetcher = vi.fn().mockResolvedValue(new Response("Unavailable", { status: 400 })); else if (kind === "wrong type") fetcher = vi.fn().mockResolvedValue(new Response("bad")); else if (kind === "network" || kind === "unknown") fetcher = vi.fn().mockRejectedValue(kind === "network" ? Error("Offline") : "offline"); else fetcher = vi.fn(async () => x.response()); vi.stubGlobal("fetch", fetcher); playCompanionSpeech("A reply", { onError, onEnd }); await flush(); if (kind === "playback") x.audios[0]!.onerror?.(); expect(onError).toHaveBeenCalledOnce(); expect(onEnd).not.toHaveBeenCalled(); expect(x.urls.size).toBe(0);
+  });
+  it("keeps boundary offsets across multiple chunks and aborts the remaining chunks on error", async () => {
+    const x = setupAudio(), http = vi.fn<(url: string, options: RequestInit) => Promise<Response>>(async () => x.response()); vi.stubGlobal("fetch", http); const onStart = vi.fn(), onBoundary = vi.fn(), onEnd = vi.fn(), onError = vi.fn(); const text = "A full sentence. ".repeat(80); const playback = playCompanionSpeech(text, { voiceId: "Ashley", onStart, onBoundary, onEnd, onError }); await flush(); let previousIndex = -1;
+    while (!onEnd.mock.calls.length) { const audio = x.audios.at(-1)!; audio.currentTime = .5; await vi.advanceTimersByTimeAsync(80); const index = onBoundary.mock.calls.at(-1)![0].charIndex as number; expect(index).toBeGreaterThan(previousIndex); previousIndex = index; audio.onended?.(); await flush(); }
+    expect(onStart).toHaveBeenCalledOnce(); expect(http.mock.calls.length).toBeGreaterThan(1); expect(http.mock.calls.every(([, options]) => JSON.parse(options.body as string).voiceId === "Ashley")).toBe(true); playback.cancel(); expect(x.urls.size).toBe(0);
+    const failed = playCompanionSpeech(text, { onError }); await flush(); x.audios.at(-1)!.onerror?.(); const count = http.mock.calls.length; failed.cancel(); await flush(); expect(http).toHaveBeenCalledTimes(count); expect(onError).toHaveBeenCalledOnce();
+  });
+  it("decodes animation samples without routing playback through AudioContext and tolerates decoder rejection", async () => {
+    const x = setupAudio(); vi.stubGlobal("fetch", vi.fn(async () => x.response())); const decodeAudioData = vi.fn().mockResolvedValue({ sampleRate: 10, getChannelData: () => new Float32Array(40).fill(.2) }); vi.stubGlobal("OfflineAudioContext", class { decodeAudioData = decodeAudioData; }); const level = vi.fn(), boundary = vi.fn(); playCompanionSpeech("hello", { onAudioLevel: level, onBoundary: boundary }); await flush(); const audio = x.audios[0]!; audio.duration = NaN; audio.currentTime = .25; await vi.advanceTimersByTimeAsync(160); expect(level).toHaveBeenCalledWith(1); expect(boundary).toHaveBeenCalledOnce(); audio.paused = true; await vi.advanceTimersByTimeAsync(80); expect(level).toHaveBeenLastCalledWith(0); audio.onended?.();
+    decodeAudioData.mockRejectedValueOnce(Error("Unsupported codec")); playCompanionSpeech("hello", { onAudioLevel: level }); await flush(); expect(x.audios).toHaveLength(2); x.audios[1]!.onended?.(); expect(x.urls.size).toBe(0);
+  });
+});
+
+class TestRecognition {
+  static latest: TestRecognition; static startFailure = false; static stopFailure = false; static abortFailure = false;
+  continuous = false; interimResults = false; lang = "";
+  onresult: ((e: { results: Array<{ isFinal?: boolean; 0?: { transcript?: string; confidence?: number } }> }) => void) | null = null; onerror: (() => void) | null = null; onend: (() => void) | null = null;
+  constructor() { TestRecognition.latest = this; }
+  start() { if (TestRecognition.startFailure) throw Error("Recognition unavailable"); }
+  stop() { if (TestRecognition.stopFailure) throw Error("Recognition stopped"); setTimeout(() => this.onend?.(), 60); }
+  abort() { if (TestRecognition.abortFailure) throw Error("Already ended"); this.onend?.(); }
+}
+describe("microphone fallback and failed acquisition", () => {
+  beforeEach(() => { TestRecognition.startFailure = TestRecognition.stopFailure = TestRecognition.abortFailure = false; });
+  it("uses only final high-confidence browser text after provider failure and waits for recognition to end", async () => {
+    const x = setupMicrophone(); Object.assign(window, { SpeechRecognition: TestRecognition }); vi.stubGlobal("fetch", vi.fn().mockRejectedValue(Error("offline"))); const onTranscript = vi.fn(), onError = vi.fn(); const session = await startCallListening({ onTranscript, onError, onSilence: vi.fn(), vocabulary: ["Pune"] }); TestRecognition.latest.onresult?.({ results: [{ isFinal: false, 0: { transcript: "Not final", confidence: 1 } }, { isFinal: true, 0: { transcript: "I finished my drawing today", confidence: .99 } }] }); await x.utterance(); expect(onTranscript).not.toHaveBeenCalled(); await vi.advanceTimersByTimeAsync(61); expect(onTranscript).toHaveBeenCalledWith("I finished my drawing today"); expect(onError).not.toHaveBeenCalled(); session.cancel(); x.expectReleased();
+  });
+  it.each(["start", "stop", "error", "missing fields", "timeout"])("handles browser recognition %s without inventing words", async failure => {
+    const x = setupMicrophone(); Object.assign(window, { webkitSpeechRecognition: TestRecognition }); TestRecognition.startFailure = failure === "start"; TestRecognition.stopFailure = failure === "stop"; vi.stubGlobal("fetch", vi.fn(async () => new Response("invalid json", { status: 503 }))); const onError = vi.fn(), onTranscript = vi.fn(); const session = await startCallListening({ onTranscript, onError, onSilence: vi.fn() });
+    if (failure === "error") TestRecognition.latest.onerror?.(); if (failure === "missing fields") TestRecognition.latest.onresult?.({ results: [{ isFinal: true }, { isFinal: true, 0: { transcript: "Uncertain guess" } }] }); if (failure === "timeout") TestRecognition.latest.stop = () => undefined;
+    await x.utterance(); await vi.advanceTimersByTimeAsync(300); expect(onTranscript).not.toHaveBeenCalled(); expect(onError).toHaveBeenCalledOnce(); TestRecognition.abortFailure = true; session.cancel(); x.expectReleased();
+  });
+  it("does not start browser recognition during talk-over and reports silence after the no-speech deadline", async () => {
+    const x = setupMicrophone(); Object.assign(window, { SpeechRecognition: TestRecognition }); const onSilence = vi.fn(), onSpeechStart = vi.fn(); const session = await startCallListening({ onTranscript: vi.fn(), onError: vi.fn(), onSilence, onSpeechStart, interruption: true }); await x.frame(.001, 10001); expect(onSilence).toHaveBeenCalledOnce(); expect(onSpeechStart).not.toHaveBeenCalled(); session.cancel(); x.expectReleased();
+    const next = await startCallListening({ onTranscript: vi.fn(), onError: vi.fn(), onSilence, interruption: true }); await x.frame(0, 300); for (let n = 0; n < 12; n++) await x.frame(.08); next.cancel(); x.expectReleased();
+  });
+  it("rejects missing recording and analysis APIs without retaining acquired resources", async () => {
+    const x = setupMicrophone(); const recording = window.MediaRecorder; delete (window as { MediaRecorder?: unknown }).MediaRecorder; await expect(startCallListening({ onTranscript: vi.fn(), onError: vi.fn(), onSilence: vi.fn() })).rejects.toThrow("recording support"); Object.assign(window, { MediaRecorder: recording, AudioContext: undefined }); await expect(startCallListening({ onTranscript: vi.fn(), onError: vi.fn(), onSilence: vi.fn() })).rejects.toThrow("voice detection"); x.expectReleased();
+  });
+  it.each(["resume rejection", "resume cancellation", "start rejection"])("cleans a partially acquired audio context after %s", async failure => {
+    const x = setupMicrophone(), stop = new AbortController(); if (failure === "resume rejection") vi.spyOn(window.AudioContext.prototype, "resume").mockRejectedValueOnce(Error("Resume failed")); if (failure === "resume cancellation") vi.spyOn(window.AudioContext.prototype, "resume").mockImplementationOnce(async () => { stop.abort(); }); if (failure === "start rejection") vi.spyOn(MediaRecorder.prototype, "start").mockImplementationOnce(() => { throw Error("Recording unavailable"); }); await expect(startCallListening({ signal: stop.signal, onTranscript: vi.fn(), onError: vi.fn(), onSilence: vi.fn() })).rejects.toThrow(); x.expectReleased();
+  });
+  it("bounds oversized recordings, tolerates repeated hardware error events and falls back to an unspecified MIME type", async () => {
+    const x = setupMicrophone(); vi.spyOn(MediaRecorder, "isTypeSupported").mockReturnValue(false); const onError = vi.fn(); const session = await startCallListening({ onTranscript: vi.fn(), onSilence: vi.fn(), onError }); x.recorders[0]!.ondataavailable?.({ data: new Blob([new Uint8Array(2_500_001)]) }); expect(onError).toHaveBeenCalledOnce(); x.recorders[0]!.onerror?.(); session.cancel(); x.expectReleased();
+    const second = await startCallListening({ onTranscript: vi.fn(), onSilence: vi.fn(), onError }); x.recorders[1]!.onerror?.(); expect(onError).toHaveBeenCalledTimes(2); second.cancel(); x.expectReleased();
+  });
+});
+
+describe("audio event reentrancy and stream read failures",()=>{
+ it("resets exactly one boundary timer on repeated playing and ignores detached pause/wait/error events",async()=>{const x=setupAudio();vi.stubGlobal("fetch",vi.fn(async()=>x.response()));const level=vi.fn(),onError=vi.fn();const playback=playCompanionSpeech("A reply.",{onAudioLevel:level,onError});await flush();const audio=x.audios[0]!,pause=audio.onpause,wait=audio.onwaiting,error=audio.onerror;audio.onplaying?.();expect(vi.getTimerCount()).toBe(1);pause?.();expect(level).toHaveBeenLastCalledWith(0);wait?.();wait?.();expect(vi.getTimerCount()).toBe(0);playback.cancel();playback.cancel();pause?.();wait?.();error?.();expect(onError).not.toHaveBeenCalled();expect(x.urls.size).toBe(0);});
+ it("allows a consumer to synchronously hang up during onStart",async()=>{const x=setupAudio();vi.stubGlobal("fetch",vi.fn(async()=>x.response()));const onStart=vi.fn(()=>stopCompanionSpeech()),onBoundary=vi.fn();playCompanionSpeech("A reply",{onStart,onBoundary});await flush();await vi.advanceTimersByTimeAsync(100);expect(onStart).toHaveBeenCalledOnce();expect(onBoundary).not.toHaveBeenCalled();expect(x.urls.size).toBe(0);expect(vi.getTimerCount()).toBe(0);});
+ it("cancels safely from a decoded audio-level callback before a text boundary",async()=>{const x=setupAudio();vi.stubGlobal("fetch",vi.fn(async()=>x.response()));vi.stubGlobal("OfflineAudioContext",class{decodeAudioData=async()=>({sampleRate:10,getChannelData:()=>new Float32Array(30).fill(.2)});});const boundary=vi.fn();playCompanionSpeech("A reply",{onAudioLevel:level=>{if(level>0)stopCompanionSpeech();},onBoundary:boundary});await flush();await vi.advanceTimersByTimeAsync(80);expect(boundary).not.toHaveBeenCalled();expect(x.urls.size).toBe(0);});
+ it.each([Error("Audio stream interrupted"),"untyped stream failure"])("cleans a failed response body: %s",async cause=>{const x=setupAudio();vi.stubGlobal("fetch",vi.fn(async()=>new Response(new ReadableStream({pull(){throw cause}}),{headers:{"content-type":"audio/mpeg"}})));const onError=vi.fn(),onEnd=vi.fn();playCompanionSpeech("A reply",{onError,onEnd});await flush();expect(onError).toHaveBeenCalledOnce();expect(onEnd).not.toHaveBeenCalled();expect(x.urls.size).toBe(0);});
+ it("does not coerce a response without content type into playable audio",async()=>{const x=setupAudio();vi.stubGlobal("fetch",vi.fn(async()=>new Response(new Uint8Array([1,2]))));const onError=vi.fn();playCompanionSpeech("",{onError});await flush();expect(onError).toHaveBeenCalledWith(expect.stringContaining("invalid audio"));expect(x.audios).toHaveLength(0);});
 });

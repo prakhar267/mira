@@ -16,6 +16,12 @@ import type { InferencePrincipal } from "./inference-policy";
 const input = { user: { name: "Synthetic" }, companion: { name: "Mira" }, messages: [{ role: "user", content: "I have an interview tomorrow." }], delivery: "text" };
 const request = (payload: unknown) => new Request("https://mira.test/api/test", { method: "POST", body: JSON.stringify(payload), headers: { "content-type": "application/json" } });
 describe("active inference route boundaries (mock providers)", () => {
+  it("explains an exhausted provider free quota without retrying or leaking provider details", async () => {
+    mocks.provider.mockRejectedValue(new Error("AiError: you have used up your daily free allocation of 10,000 neurons"));
+    const response = await chat(request(input));
+    expect(response.status).toBe(429); expect(await response.json()).toMatchObject({ code: "PROVIDER_DAILY_QUOTA" });
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0); expect(mocks.provider).toHaveBeenCalledOnce();
+  });
   beforeEach(() => {
     vi.resetAllMocks(); mocks.store.mockResolvedValue({ limited: false });
     mocks.authorize.mockResolvedValue({ mode: "demo", id: "synthetic", memoryConsent: true });
@@ -151,4 +157,18 @@ describe("active inference route boundaries (mock providers)", () => {
       }
     }
   }
+});
+
+describe("chat response compatibility and incremental delivery",()=>{
+ beforeEach(()=>{vi.resetAllMocks();mocks.store.mockResolvedValue({limited:false});mocks.authorize.mockResolvedValue({mode:"demo",id:"synthetic",memoryConsent:true});mocks.capacity.mockImplementation((_service,_principal,_units,work)=>work());});
+ const good="We can practice an interview question together.";
+ it.each(["string","output_text","message","parts","text","output"])("accepts the documented %s provider envelope",async kind=>{
+  const result=kind==="string"?good:kind==="output_text"?{output_text:good}:kind==="message"?{choices:[{message:{content:good}}]}:kind==="parts"?{choices:[{message:{content:[null,4,{}, {text:good}]}}]}:kind==="text"?{choices:[{text:good}]}:{output:[null,4,{}, {content:[null,{},4,{text:good}]}]};mocks.provider.mockResolvedValue(result);const response=await chat(request(input));expect(response.status).toBe(200);expect(await response.json()).toMatchObject({reply:good});
+ });
+ it.each([null,4,{}, {choices:[{message:{content:1}}]}])("refuses empty or malformed model output after one bounded repair: %j",async value=>{mocks.provider.mockResolvedValue(value);const response=await chat(request(input));expect(response.status).toBe(503);expect(await response.json()).toMatchObject({code:"INVALID_REPLY"});expect(mocks.provider).toHaveBeenCalledTimes(2);});
+ it("does not leak unexpected provider errors or overrun a rate limit",async()=>{mocks.provider.mockRejectedValue("private upstream details");const failed=await chat(request(input));expect(failed.status).toBe(503);expect(await failed.text()).not.toContain("private");mocks.provider.mockClear();mocks.store.mockResolvedValue({limited:true});expect((await chat(request(input))).status).toBe(429);expect(mocks.provider).not.toHaveBeenCalled();});
+ it.each(["Who are you?","How was your day?","What do you remember about me?","I want to hurt myself"])("streams a direct reply without a provider for %s",async text=>{const response=await chat(new Request("https://mira.test/api/companion-chat",{method:"POST",headers:{accept:"application/x-ndjson"},body:JSON.stringify({...input,memories:["I like painting."],messages:[{role:"user",content:text}]})}));const frames=(await response.text()).trim().split("\n").map(x=>JSON.parse(x));expect(frames.at(-1)).toMatchObject({type:"done",reply:expect.any(String)});expect(mocks.provider).not.toHaveBeenCalled();});
+ it.each([false,true])("validates incremental provider sentences and rejects unsafe continuation=%s",async unsafe=>{const encoder=new TextEncoder();mocks.provider.mockImplementation(()=>new ReadableStream({start(c){for(const text of ["We can practice together. ","Start with your experience. ",unsafe?"I am a real human and I live near you.":"Keep it brief."]){c.enqueue(encoder.encode(`data: ${JSON.stringify({response:text})}\n\n`));}c.enqueue(encoder.encode("data: [DONE]\n\n"));c.close();}}));const response=await chat(new Request("https://mira.test/api/companion-chat",{method:"POST",headers:{accept:"application/x-ndjson"},body:JSON.stringify(input)}));const frames=(await response.text()).trim().split("\n").map(x=>JSON.parse(x));expect(frames.some(x=>x.type==="delta")).toBe(true);expect(frames.at(-1).type).toBe(unsafe?"error":"done");if(unsafe)expect(frames.at(-1).code).toBe("UNSAFE_STREAM");});
+ it("validates deep text responses and replaces unsafe repair output",async()=>{mocks.provider.mockResolvedValueOnce({response:""}).mockResolvedValueOnce({response:"I am a real human and I live near you."});const response=await chat(request({...input,responsePreferences:{responseLength:"deep"}}));expect(await response.json()).toMatchObject({model:"safety"});expect(mocks.provider.mock.calls[0]![1]).toMatchObject({max_completion_tokens:500});});
+ it("returns empty safe memory matches, valid rankings and sanitized provider errors",async()=>{for(const payload of [{query:"tea",memories:[]},{query:"I want to hurt myself",memories:[{id:"m",content:"Likes tea"}]},{query:"tea",memories:[{id:"m",content:"I want to hurt myself"}]}])expect(await(await memory(request(payload))).json()).toMatchObject({matches:[]});expect(mocks.provider).not.toHaveBeenCalled();mocks.provider.mockResolvedValue({response:[{id:0,score:1}]});expect(await(await memory(request({query:"tea",memories:[{id:"m",content:"Likes tea"}]}))).json()).toMatchObject({matches:[{id:"m",reason:"semantic"}]});mocks.provider.mockRejectedValue(Error("sensitive detail"));const failed=await memory(request({query:"tea",memories:[{id:"m",content:"Likes tea"}]}));expect(failed.status).toBe(503);expect(await failed.text()).not.toContain("sensitive");mocks.store.mockResolvedValue({limited:true});expect((await memory(request({query:"tea"}))).status).toBe(429);});
 });

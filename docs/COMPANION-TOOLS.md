@@ -2,6 +2,8 @@
 
 Implemented in `apps/web` on 24 September 2026. This describes the source changes; deployment and physical-device notification/audio acceptance are separate from automated tests.
 
+The [26 September coverage and end-to-end report](COMPANION-TOOLS-QA.md) describes the enforced 95% whole-website and per-feature-file minimums, browser-to-database checks, and the live free-AI-quota finding.
+
 ## Where to find them
 
 | Feature | Location | Behavior |

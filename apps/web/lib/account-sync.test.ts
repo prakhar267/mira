@@ -27,3 +27,7 @@ describe("account synchronization", () => {
     expect(save).toHaveBeenCalledTimes(1); expect(status).not.toHaveBeenCalledWith("saved");
   });
 });
+
+describe("explicit blocked synchronization",()=>{
+ it("refuses stopped and blocked flushes, then permits a user-requested retry",async()=>{const save=vi.fn().mockRejectedValueOnce(Error("offline")).mockResolvedValue({state:"draft",revision:2}),sync=new AccountSync(1,save,vi.fn());sync.enqueue("draft");await expect(sync.flush()).rejects.toThrow("offline");await expect(sync.flush()).rejects.toThrow("Resolve the account sync issue");await sync.retry();expect(sync.revision).toBe(2);sync.stop();await expect(sync.flush()).rejects.toThrow("Resolve the account sync issue");});
+});
